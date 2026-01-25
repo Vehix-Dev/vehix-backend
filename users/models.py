@@ -53,16 +53,12 @@ class User(AbstractUser):
     )
 
     is_active = models.BooleanField(default=True)
-    # Deprecated: Use realtime/consumers.py for live status
     is_online = models.BooleanField(default=False, editable=False)
     is_deleted = models.BooleanField(default=False)
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
     lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
 
-    # These fields are now only for legacy/historical use. Live status is managed in-memory via WebSocket consumers.
-
     def save(self, *args, **kwargs):
-        # Generate external_id if not set
         if not self.external_id:
             if self.role == 'RIDER':
                 prefix = 'R'
@@ -74,7 +70,6 @@ class User(AbstractUser):
             if prefix:
                 try:
                     with transaction.atomic():
-                        # Get all existing external IDs with this prefix
                         existing = User.objects.filter(
                             external_id__startswith=prefix,
                             external_id__regex=r'^' + re.escape(prefix) + r'\d+$'
@@ -84,7 +79,6 @@ class User(AbstractUser):
                         for val in existing:
                             if not val:
                                 continue
-                            # Extract the numeric part
                             try:
                                 n = int(val[len(prefix):])
                                 if n > max_n:
@@ -95,15 +89,12 @@ class User(AbstractUser):
                         seq = max_n + 1
                         self.external_id = f"{prefix}{seq:03d}"
                 except Exception:
-                    # Fallback in case of any error
                     self.external_id = f"{prefix}001"
 
-        # Generate referral_code if not set
         if not self.referral_code:
             prefix = 'VX'
             try:
                 with transaction.atomic():
-                    # Get all existing referral codes with VX prefix
                     existing = User.objects.filter(
                         referral_code__startswith=prefix,
                         referral_code__regex=r'^' + re.escape(prefix) + r'\d+$'
@@ -113,7 +104,6 @@ class User(AbstractUser):
                     for val in existing:
                         if not val:
                             continue
-                        # Extract the numeric part
                         try:
                             n = int(val[len(prefix):])
                             if n > max_n:
@@ -124,10 +114,8 @@ class User(AbstractUser):
                     seq = max_n + 1
                     self.referral_code = f"{prefix}{seq:03d}"
             except Exception:
-                # Fallback in case of any error
                 self.referral_code = f"VX001"
 
-        # Auto-approve admins
         if self.role == 'ADMIN':
             self.is_approved = True
 

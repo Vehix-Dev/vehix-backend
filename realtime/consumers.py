@@ -1,12 +1,28 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-
 from requests.models import ServiceRequest
 from requests.models_chat import ChatMessage
 from users.models import RiderAvailabilityLog
 from django.utils import timezone
+from django.core.cache import cache
 User = get_user_model()
+
+
+@database_sync_to_async
+def cache_set_rodie_location(user_id, lat, lng):
+    try:
+        cache.set(f"rodie_loc:{user_id}", {'lat': float(lat), 'lng': float(lng)}, timeout=300)
+    except Exception:
+        pass
+
+
+@database_sync_to_async
+def cache_get_rodie_location(user_id):
+    try:
+        return cache.get(f"rodie_loc:{user_id}")
+    except Exception:
+        return None
 
 class AdminConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
@@ -103,7 +119,6 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 lat = content.get("lat")
                 lng = content.get("lng")
                 if rider_id is not None and lat is not None and lng is not None:
-                    # Only send if data is valid
                     await self.channel_layer.group_send(
                         f"rider_{rider_id}",
                         {
@@ -121,6 +136,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                             "lng": lng
                         }
                     )
+                    # persist rodie's broadcast location to cache (avoid frequent DB writes)
+                    try:
+                        await cache_set_rodie_location(self.scope['user'].id, lat, lng)
+                    except Exception:
+                        pass
             elif msg_type == 'CHAT':
                 request_id = content.get('request_id')
                 text = content.get('text')
@@ -147,9 +167,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _log_online(self, user):
-        # End any previous open session
         RiderAvailabilityLog.objects.filter(user=user, went_offline_at__isnull=True).update(went_offline_at=timezone.now())
-        # Start new session
         return RiderAvailabilityLog.objects.create(user=user, went_online_at=timezone.now())
 
     @database_sync_to_async
@@ -220,7 +238,6 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 lat = content.get("lat")
                 lng = content.get("lng")
                 if lat is not None and lng is not None:
-                    # No DB write for live location, just broadcast
                     await self.channel_layer.group_send(
                         "admin_monitoring",
                         {
@@ -308,8 +325,14 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
                 pass
 
             for u in qs.all():
-                rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
-                rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
+                # Prefer RodieLocation as the canonical source of truth for rodie position
+                try:
+                    rl = RodieLocation.objects.get(rodie=u)
+                    rodie_lat = rl.lat
+                    rodie_lng = rl.lng
+                except RodieLocation.DoesNotExist:
+                    rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
+                    rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
 
                 results.append({
                     'rodie_id': u.id,
@@ -323,38 +346,12 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
             return []
         return results
 
-    @database_sync_to_async
-    def save_user_location(self, user_id, lat, lng):
+    async def save_user_location(self, user_id, lat, lng):
+        """Save location to cache instead of writing DB on every update.
+        Periodic persistence can be implemented separately to flush cache -> DB.
+        """
         try:
-            user = User.objects.get(id=user_id)
+            # Write ephemeral location into cache to serve realtime components.
+            await cache_set_rodie_location(user_id, lat, lng)
         except Exception:
-            return
-
-        updated_fields = []
-        if hasattr(user, 'lat') and hasattr(user, 'lng'):
-            try:
-                user.lat = lat
-                user.lng = lng
-                updated_fields += ['lat', 'lng']
-            except Exception:
-                pass
-        elif hasattr(user, 'last_lat') and hasattr(user, 'last_lng'):
-            try:
-                user.last_lat = lat
-                user.last_lng = lng
-                updated_fields += ['last_lat', 'last_lng']
-            except Exception:
-                pass
-        elif hasattr(user, 'current_lat') and hasattr(user, 'current_lng'):
-            try:
-                user.current_lat = lat
-                user.current_lng = lng
-                updated_fields += ['current_lat', 'current_lng']
-            except Exception:
-                pass
-
-        if updated_fields:
-            try:
-                user.save(update_fields=updated_fields)
-            except Exception:
-                pass
+            pass

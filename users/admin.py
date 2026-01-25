@@ -37,7 +37,6 @@ class UserAdmin(admin.ModelAdmin):
     inlines = [RodieServiceInline]
 
     def save_model(self, request, obj, form, change):
-        # If the user is saved as staff or superuser, ensure they are treated as ADMIN
         if getattr(obj, 'is_superuser', False) or getattr(obj, 'is_staff', False):
             obj.role = 'ADMIN'
             obj.is_staff = True
@@ -45,28 +44,22 @@ class UserAdmin(admin.ModelAdmin):
             obj.is_approved = True
             obj.is_active = True
 
-        # Also ensure that users with role 'ADMIN' get admin flags
         if getattr(obj, 'role', None) == 'ADMIN':
             obj.is_staff = True
             obj.is_superuser = True
             obj.is_approved = True
             obj.is_active = True
 
-        # Normalize username whitespace
         if getattr(obj, 'username', None):
             obj.username = obj.username.strip()
 
-        # If the admin changed the password field in the form and the value
-        # appears to be a raw password (no Django-style '$' hashed marker),
-        # hash it before saving. This avoids storing plaintext passwords when
-        # admins enter new passwords directly in the password field.
+        
         try:
             changed = getattr(form, 'changed_data', [])
         except Exception:
             changed = []
 
         if 'password' in changed:
-            # cleaned_data is available because admin validated the form
             pw = form.cleaned_data.get('password') if hasattr(form, 'cleaned_data') else getattr(obj, 'password', None)
             if pw and ('$' not in pw):
                 obj.set_password(pw)
@@ -123,7 +116,7 @@ class UserAdmin(admin.ModelAdmin):
 
                 try:
                     client = PesapalClient()
-                    callback_url = request.build_absolute_uri('/api/payments/pesapal/ipn/') # Use IPN or a specific callback
+                    callback_url = request.build_absolute_uri('/api/payments/pesapal/ipn/') 
                     order_res = client.submit_order(payment, callback_url)
                     tracking_id = order_res.get('order_tracking_id')
                     payment.processor_id = tracking_id

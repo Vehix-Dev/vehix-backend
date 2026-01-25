@@ -123,7 +123,6 @@ class DepositView(APIView):
         serializer.is_valid(raise_exception=True)
         amount = serializer.validated_data['amount']
 
-        # Create Payment Record
         import uuid
         from .pesapal import PesapalClient
         
@@ -139,11 +138,8 @@ class DepositView(APIView):
 
         try:
             client = PesapalClient()
-            # Define your frontend callback URL here
             callback_url = request.build_absolute_uri('/api/users/wallet/callback/') 
             response = client.submit_order(payment, callback_url)
-            
-            # Save the tracking ID provided by Pesapal
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
@@ -154,7 +150,6 @@ class DepositView(APIView):
                 try:
                     stk_response = client.submit_mobile_payment(tracking_id, phone_number)
                 except Exception as stk_e:
-                    # Log STK error but don't fail the whole process as user can still use the redirect URL
                     pass
 
             return Response({
@@ -181,19 +176,17 @@ class WithdrawView(APIView):
         if wallet.balance < amount:
             return Response({'error': 'Insufficient funds'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Deduct balance immediately
         wallet.balance -= amount
         wallet.save()
 
         import uuid
         reference = f"WTH-{uuid.uuid4().hex[:12].upper()}"
         
-        # Create Payment Record
         Payment.objects.create(
             user=request.user,
             amount=amount,
             transaction_type='WITHDRAWAL',
-            status='PENDING', # Pending admin approval or auto-process
+            status='PENDING', 
             reference=reference,
             description=f"Withdrawal request to {serializer.validated_data.get('phone_number', request.user.phone)}"
         )
@@ -211,7 +204,6 @@ class PesapalIPNView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        # Pesapal sends OrderTrackingId and OrderNotificationType as query params
         tracking_id = request.query_params.get('OrderTrackingId')
         merchant_reference = request.query_params.get('OrderMerchantReference')
         
@@ -230,7 +222,7 @@ class PesapalIPNView(APIView):
         status_data = client.get_transaction_status(tracking_id)
         
         if status_data:
-            pesapal_status = status_data.get('payment_status_description') # COMPLETED, FAILED, INVALID
+            pesapal_status = status_data.get('payment_status_description') 
             
             if pesapal_status == 'COMPLETED' and payment.status != 'COMPLETED':
                 payment.status = 'COMPLETED'
@@ -249,7 +241,6 @@ class PesapalIPNView(APIView):
                 payment.status = 'FAILED'
                 payment.save()
 
-        # Return response required by Pesapal to confirm receipt
         return Response({
             'orderNotificationType': request.query_params.get('OrderNotificationType'),
             'orderTrackingId': tracking_id,

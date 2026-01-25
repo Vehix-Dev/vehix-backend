@@ -3,6 +3,9 @@ from rest_framework.views import APIView
 from .models import ServiceRequest
 from .serializers import ServiceRequestCreateSerializer
 from .services import find_nearby_rodies
+from services.models import RodieService
+from locations.utils import calculate_distance_km
+from django.core.cache import cache
 from users.models import Wallet, PlatformConfig
 from rest_framework.exceptions import PermissionDenied
 from decimal import Decimal
@@ -46,22 +49,22 @@ class NearbyRodieListView(APIView):
         except Exception:
             return Response({'detail': 'invalid service_id'}, status=status.HTTP_400_BAD_REQUEST)
 
-        rodie_services = RodieService.objects.filter(service_id=service_type_id, rodie__is_active=True).select_related('rodie')
+        rodie_services = RodieService.objects.filter(service=service_type_id, rodie__is_active=True).select_related('rodie')
         results = []
         from .osrm import get_route_info
         for rs in rodie_services:
-            try:
-                loc = RodieLocation.objects.get(rodie=rs.rodie)
-            except RodieLocation.DoesNotExist:
+            # prefer ephemeral cached rodie location
+            loc = cache.get(f"rodie_loc:{rs.rodie.id}")
+            if not loc:
                 continue
-            dist_km = calculate_distance_km(float(lat), float(lng), float(loc.lat), float(loc.lng))
+            dist_km = calculate_distance_km(float(lat), float(lng), float(loc.get('lat')), float(loc.get('lng')))
             if dist_km <= 5:
-                distance_m, duration_s = get_route_info(loc.lat, loc.lng, float(lat), float(lng))
+                distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), float(lat), float(lng))
                 results.append({
                     'rodie_id': rs.rodie.id,
                     'username': rs.rodie.username,
-                    'lat': float(loc.lat),
-                    'lng': float(loc.lng),
+                    'lat': float(loc.get('lat')),
+                    'lng': float(loc.get('lng')),
                     'distance_km': dist_km,
                     'eta_seconds': duration_s,
                     'distance_meters': distance_m,
@@ -115,6 +118,11 @@ class CreateServiceRequestView(generics.CreateAPIView):
 
         from requests.services import notify_rodies
         notify_rodies(filtered, request_obj)
+        # mark ephemeral request status in cache so notify worker can poll without DB locks
+        try:
+            cache.set(f"request_status:{request_obj.id}", 'REQUESTED', timeout=120)
+        except Exception:
+            pass
         print("Matched Rodies:", matched_usernames)
 
 
@@ -176,6 +184,10 @@ class AcceptRequestView(APIView):
         req.status = 'ACCEPTED'
         req.accepted_at = timezone.now()
         req.save()
+        try:
+            cache.set(f"request_status:{req.id}", 'ACCEPTED', timeout=3600)
+        except Exception:
+            pass
 
         try:
             if get_channel_layer and async_to_sync:
@@ -202,6 +214,10 @@ class DeclineRequestView(APIView):
                 async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.declined', 'data': {'request_id': req.id, 'rodie_id': user.id}})
         except Exception:
             pass
+        try:
+            cache.set(f"request_status:{req.id}", 'DECLINED', timeout=300)
+        except Exception:
+            pass
 
         return Response({'detail': 'Declined'}, status=status.HTTP_200_OK)
 
@@ -216,6 +232,10 @@ class CancelRequestView(APIView):
         if user.role == 'RIDER' and req.rider_id == user.id:
             req.status = 'CANCELLED'
             req.save()
+            try:
+                cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
+            except Exception:
+                pass
             return Response({'detail': 'Cancelled'})
 
         # rodie cancel rules: not allowed when within 10 meters of rider
@@ -249,6 +269,10 @@ class EnrouteRequestView(APIView):
         req.en_route_at = timezone.now()
         req.save()
         try:
+            cache.set(f"request_status:{req.id}", 'EN_ROUTE', timeout=3600)
+        except Exception:
+            pass
+        try:
             if get_channel_layer and async_to_sync:
                 async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.enroute', 'data': {'request_id': req.id}})
         except Exception:
@@ -270,6 +294,10 @@ class StartRequestView(APIView):
         req.started_at = timezone.now()
         req.save()
         try:
+            cache.set(f"request_status:{req.id}", 'STARTED', timeout=3600)
+        except Exception:
+            pass
+        try:
             if get_channel_layer and async_to_sync:
                 async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.started', 'data': {'request_id': req.id}})
         except Exception:
@@ -290,6 +318,10 @@ class CompleteRequestView(APIView):
         req.status = 'COMPLETED'
         req.completed_at = timezone.now()
         req.save()
+        try:
+            cache.set(f"request_status:{req.id}", 'COMPLETED', timeout=3600)
+        except Exception:
+            pass
         try:
             from .models import charge_fee_for_request
             charge_fee_for_request(req)

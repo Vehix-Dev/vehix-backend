@@ -1,8 +1,12 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from a .env file at project root (if present)
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = 'django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7'
 
@@ -27,6 +31,7 @@ INSTALLED_APPS = [
     'requests',
     'locations',
     'images',
+    'config',
 ]
 
 MEDIA_URL = '/media/'
@@ -37,20 +42,24 @@ MAX_IMAGE_SIZE = 5242880
 # ASGI configuration for Django Channels
 ASGI_APPLICATION = 'config.asgi.application'
 
+# Redis configuration (used for Channels and caching)
+REDIS_URL = os.environ.get('REDIS_URL')
+if not REDIS_URL:
+    REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
+    REDIS_PORT = os.environ.get('REDIS_PORT', '6379')
+    REDIS_DB = os.environ.get('REDIS_DB', '1')
+    REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
+    if REDIS_PASSWORD:
+        REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    else:
+        REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+
 # Django Channels Redis Configuration
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],  # Redis server address and port
-            # Optional Redis configuration:
-            # "password": "yourpassword",  # If Redis has password
-            # "db": 0,  # Redis database number (default 0)
-            # "prefix": "vehix",  # Optional: prefix for Redis keys
-            # "socket_timeout": 5,  # Connection timeout in seconds
-            # "socket_connect_timeout": 5,  # Socket connection timeout
-            # "socket_keepalive": True,  # Enable TCP keepalive
-            # "retry_on_timeout": True,  # Retry on timeout
+            "hosts": [REDIS_URL],
         },
     },
 }
@@ -142,6 +151,8 @@ DATABASES = {
         'PASSWORD': 'TUTU2005',
         'HOST': 'localhost',
         'PORT': '5432',
+        # Keep DB connections open for reuse to reduce connection overhead
+        'CONN_MAX_AGE': 60,
     }
 }
 
@@ -204,3 +215,36 @@ PESAPAL_URL = 'https://pay.pesapal.com/v3'
 PESAPAL_IPN_URL = 'https://0ae745a8c873.ngrok-free.app/api/payments/pesapal/ipn/'
 PESAPAL_IPN_ID = ''
 CSRF_TRUSTED_ORIGINS = ['https://0ae745a8c873.ngrok-free.app']
+
+# Cache configuration - use Redis as the default cache backend.
+# Ensure `django-redis` and `redis` packages are installed in your environment.
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
+# Use cached sessions to reduce DB load (optional).
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
+# Celery configuration
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_TIMEZONE = TIME_ZONE
+# Celery beat schedule: flush cached locations frequently and clear cache daily
+from celery.schedules import crontab, schedule
+CELERY_BEAT_SCHEDULE = {
+    'flush-locations-every-30s': {
+        'task': 'config.tasks.flush_locations_task',
+        'schedule': 30.0,
+    },
+    'clear-cache-daily-midnight': {
+        'task': 'config.tasks.clear_cache_task',
+        'schedule': crontab(minute=0, hour=0),
+    },
+}

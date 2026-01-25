@@ -1,6 +1,6 @@
-from locations.models import RodieLocation
 from services.models import RodieService
 from locations.utils import calculate_distance_km
+from django.core.cache import cache
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from threading import Thread
@@ -24,15 +24,17 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     ).select_related('rodie')
 
     for rs in rodie_services:
-        try:
-            location = RodieLocation.objects.get(rodie=rs.rodie)
-        except RodieLocation.DoesNotExist:
+        # read ephemeral rodie location from cache; skip if not available
+        loc = cache.get(f"rodie_loc:{rs.rodie.id}")
+        if not loc:
             continue
-
-        distance = calculate_distance_km(
-            rider_lat, rider_lng,
-            float(location.lat), float(location.lng)
-        )
+        try:
+            distance = calculate_distance_km(
+                rider_lat, rider_lng,
+                float(loc.get('lat')), float(loc.get('lng'))
+            )
+        except Exception:
+            continue
 
         if distance <= MAX_DISTANCE_KM:
             eligible_rodies.append({
@@ -50,9 +52,9 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
     from .models import ServiceRequest
 
     for r in rodies:
-        # check expiry
         if time.time() - start >= expiry_seconds:
             try:
+                # Final DB check before expiring
                 req = ServiceRequest.objects.get(id=request_id)
                 if req.status == 'REQUESTED':
                     req.status = 'EXPIRED'
@@ -62,10 +64,14 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             break
 
         rodie = r.get('rodie')
-        try:
-            loc = RodieLocation.objects.get(rodie=rodie)
-            distance_m, duration_s = get_route_info(loc.lat, loc.lng, rider_lat, rider_lng)
-        except Exception:
+        # try to read cached location
+        loc = cache.get(f"rodie_loc:{rodie.id}")
+        if loc:
+            try:
+                distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), rider_lat, rider_lng)
+            except Exception:
+                distance_m, duration_s = None, None
+        else:
             distance_m, duration_s = None, None
 
         payload = {
@@ -85,6 +91,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             )
         except Exception:
             pass
+        # Poll the ephemeral cache for request status to avoid heavy DB locks
         waited = 0.0
         interval = 0.5
         accepted = False
@@ -92,11 +99,11 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             time.sleep(interval)
             waited += interval
             try:
-                req = ServiceRequest.objects.select_for_update().get(id=request_id)
-                if req.status == 'ACCEPTED':
+                status = cache.get(f"request_status:{request_id}")
+                if status == 'ACCEPTED':
                     accepted = True
                     break
-                if req.status in ('CANCELLED', 'EXPIRED'):
+                if status in ('CANCELLED', 'EXPIRED', 'DECLINED'):
                     accepted = False
                     break
             except Exception:
@@ -105,15 +112,18 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         if accepted:
             break
 
-    # If the loop finished and still REQUESTED, mark as EXPIRED
     try:
         from django.db import transaction
         with transaction.atomic():
-            req = ServiceRequest.objects.select_for_update().get(id=request_id)
+            req = ServiceRequest.objects.get(id=request_id)
             if req.status == 'REQUESTED':
                 req.status = 'EXPIRED'
                 req.save()
-                # Notify rider
+                # update cache and notify
+                try:
+                    cache.set(f"request_status:{req.id}", 'EXPIRED', timeout=300)
+                except Exception:
+                    pass
                 async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'data': {'request_id': req.id}})
     except Exception:
         pass
