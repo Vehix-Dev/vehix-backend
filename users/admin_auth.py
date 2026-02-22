@@ -1,11 +1,12 @@
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .tokens import CustomTokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+import uuid
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 
 
-class AdminTokenObtainPairSerializer(TokenObtainPairSerializer):
+class AdminTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
     def validate(self, attrs):
         username_field = self.username_field
         username = attrs.get(username_field)
@@ -17,6 +18,19 @@ class AdminTokenObtainPairSerializer(TokenObtainPairSerializer):
                 attrs[username_field] = getattr(u, username_field)
             except User.DoesNotExist:
                 pass
+
+        # Since we inherit from CustomTokenObtainPairSerializer, 
+        # but we handle credentials differently here (super.validate calls authenticate),
+        # we should ensure the user is authenticated and then update their login_id.
+        
+        from django.contrib.auth import authenticate
+        # We need to manually authenticate here because we might have changed the username to email
+        user = authenticate(username=attrs.get(username_field), password=attrs.get('password'))
+        if user and user.is_active:
+            new_login_id = uuid.uuid4()
+            user.current_login_id = new_login_id
+            user.save(update_fields=['current_login_id'])
+            self.user = user
 
         data = super().validate(attrs)
         user = getattr(self, 'user', None)

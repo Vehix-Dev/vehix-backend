@@ -432,14 +432,14 @@ class AdminNotificationRUDView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class AdminUserPasswordView(APIView):
-    """Admin endpoint to change/reset passwords for Riders and Roadies."""
+    """Admin endpoint to change/reset passwords for Riders, Roadies and Admins."""
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def post(self, request, pk):
         try:
             user = User.objects.get(id=pk)
-            if user.role not in ('RIDER', 'RODIE'):
-                return Response({'error': 'Password change only allowed for Riders and Roadies'}, status=403)
+            if user.role not in ('RIDER', 'RODIE', 'ADMIN'):
+                return Response({'error': 'Password change only allowed for Riders, Roadies and Admins'}, status=403)
             
             new_password = request.data.get('password')
             if not new_password:

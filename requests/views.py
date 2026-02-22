@@ -21,6 +21,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 
+
 class RiderRequestsListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     from .serializers import ServiceRequestSerializer
@@ -32,6 +33,19 @@ class RiderRequestsListView(generics.ListAPIView):
         status_filter = self.request.query_params.get('status')
         if status_filter == 'active':
             qs = qs.filter(status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'STARTED'])
+        return qs
+
+
+class RoadieRequestsListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    from .serializers import ServiceRequestSerializer
+    serializer_class = ServiceRequestSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role != 'RODIE':
+            return ServiceRequest.objects.none()
+        qs = ServiceRequest.objects.filter(rodie=user).select_related('rider', 'service_type').order_by('-created_at')
         return qs
 
 

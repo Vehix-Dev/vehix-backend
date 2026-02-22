@@ -4,12 +4,14 @@ from django.db import transaction
 from django.core.validators import RegexValidator
 from django.utils import timezone
 import re
+import uuid
 
 
 class User(AbstractUser):
     ROLE_CHOICES = (
         ('RIDER', 'Rider'),
         ('RODIE', 'Rodie'),
+        ('MECHANIC', 'Mechanic'),
         ('ADMIN', 'Admin'),
     )
 
@@ -58,12 +60,16 @@ class User(AbstractUser):
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
     lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
 
+    current_login_id = models.UUIDField(null=True, blank=True, help_text="Used to enforce single device login")
+
     def save(self, *args, **kwargs):
         if not self.external_id:
             if self.role == 'RIDER':
                 prefix = 'R'
             elif self.role == 'RODIE':
                 prefix = 'BS'
+            elif self.role == 'MECHANIC':
+                prefix = 'IT'
             else:
                 prefix = None
 
@@ -117,7 +123,7 @@ class User(AbstractUser):
                 self.referral_code = f"VX001"
 
         if self.role == 'ADMIN':
-            self.is_approved = True
+            self.is_approved = False
 
         super().save(*args, **kwargs)
 
@@ -166,6 +172,7 @@ class Notification(models.Model):
     TARGET_ROLE_CHOICES = (
         ('RIDER', 'Rider'),
         ('RODIE', 'Rodie'),
+        ('MECHANIC','Mechanic')
     )
     target_role = models.CharField(max_length=10, choices=TARGET_ROLE_CHOICES, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -201,6 +208,7 @@ class PlatformConfig(models.Model):
     max_negative_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     service_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     trial_days = models.IntegerField(default=0, help_text="Free trial period in days from user registration")
+    mechanic_transition_documents = models.JSONField(default=list, help_text="List of required documents for mechanic transition, e.g. ['ID', 'License', 'Certificate']")
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

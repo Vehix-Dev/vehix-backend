@@ -101,10 +101,8 @@ def charge_fee_for_request(instance):
         trial_days = cfg.trial_days if cfg else 0
 
         if instance.rodie:
-            # Check for free trial
             user_age_days = (timezone.now() - instance.rodie.created_at).days
             if user_age_days < trial_days:
-                # Still in trial period, don't charge fee
                 instance.fee_charged = True
                 instance.save(update_fields=['fee_charged'])
                 return True

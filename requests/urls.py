@@ -9,12 +9,14 @@ from .views import (
     StartRequestView,
     CompleteRequestView,
     RiderRequestsListView,
+    RoadieRequestsListView,
     NearbyRodieListView,
 )
 
 urlpatterns = [
     path('create/', CreateServiceRequestView.as_view()),
     path('my/', RiderRequestsListView.as_view(), name='rider_my_requests'),
+    path('roadie/', RoadieRequestsListView.as_view(), name='roadie_requests'),
     path('<int:pk>/chat/', ChatMessageCreateAPIView.as_view(), name='request_chat_create'),
     path('<int:pk>/accept/', AcceptRequestView.as_view(), name='request_accept'),
     path('<int:pk>/decline/', DeclineRequestView.as_view(), name='request_decline'),

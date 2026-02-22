@@ -161,7 +161,7 @@ class AdminAssignRodieView(APIView):
         User = get_user_model()
         rodie = get_object_or_404(User, id=rodie_id, role='RODIE')
 
-        # Check if rodie offers this service
+        
         from services.models import RodieService
         if not RodieService.objects.filter(rodie=rodie, service=req.service_type).exists():
             return Response({'detail': 'Selected roadie does not offer this service'}, status=400)
@@ -172,7 +172,7 @@ class AdminAssignRodieView(APIView):
         req.accepted_at = timezone.now()
         req.save()
 
-        # Notify via channels
+        
         try:
             from asgiref.sync import async_to_sync
             from channels.layers import get_channel_layer

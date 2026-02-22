@@ -11,6 +11,7 @@ from .models import Payment
 from .pesapal import PesapalClient
 import uuid
 from services.models import RodieService
+from django.db.models import Q
 
 
 
@@ -35,6 +36,13 @@ class UserAdmin(admin.ModelAdmin):
     )
 
     inlines = [RodieServiceInline]
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['mechanics_url'] = '/admin/users/user/mechanics/'
+        if request.GET.get('role') == 'MECHANIC':
+            extra_context['mechanics_link'] = format_html('<a href="/admin/users/user/mechanics/">View All Mechanics</a>')
+        return super().changelist_view(request, extra_context)
 
     def save_model(self, request, obj, form, change):
         if getattr(obj, 'is_superuser', False) or getattr(obj, 'is_staff', False):
@@ -74,7 +82,7 @@ class UserAdmin(admin.ModelAdmin):
     wallet_balance.short_description = 'Wallet Balance'
     
     def services_list(self, obj):
-        if getattr(obj, 'role', None) != 'RODIE':
+        if getattr(obj, 'role', None) not in ('RODIE', 'MECHANIC'):
             return ''
         qs = RodieService.objects.filter(rodie=obj).select_related('service')
         items = ', '.join([s.service.name for s in qs])
@@ -142,6 +150,16 @@ class UserAdmin(admin.ModelAdmin):
             'opts': self.model._meta,
         }
         return render(request, 'admin/users/stk_deposit.html', context)
+
+    def mechanics_view(self, request):
+        mechanics = User.objects.filter(role='MECHANIC').select_related('wallet')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Mechanics (Former Roadies)',
+            'mechanics': mechanics,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/mechanics.html', context)
 
 
 @admin.register(Wallet)

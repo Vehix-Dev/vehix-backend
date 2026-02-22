@@ -7,8 +7,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('users.urls')),
     path('api/requests/', include('requests.urls')),
+    path('api/services/', include('services.urls')),
     path('api/images/', include('images.urls')),
+    path('api/garages/', include('garages.urls')),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Force reload trigger 2

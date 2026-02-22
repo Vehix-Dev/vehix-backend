@@ -77,7 +77,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
 
     async def disconnect(self, close_code):
         try:
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            if hasattr(self, 'group_name'):
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
         except Exception as e:
             import logging; logging.exception("RodieConsumer disconnect error")
 
@@ -213,7 +214,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                         "is_online": False
                     }
                 )
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            if hasattr(self, 'group_name'):
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
         except Exception as e:
             import logging; logging.exception("RiderConsumer disconnect error")
 

@@ -52,4 +52,6 @@ instance/
 docs/_build/
 target/
 .ipynb_checkpoints
+vehix_rider_app/
+vehix_roadie_app/
 

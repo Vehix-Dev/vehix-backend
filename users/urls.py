@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView
+from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
     RiderRetrieveUpdateDestroyView,
@@ -47,7 +48,9 @@ from .admin_auth import AdminTokenObtainPairView
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    path('login/', TokenObtainPairView.as_view(), name='login'),
+    path('login/', CustomTokenObtainPairView.as_view(), name='login'),
+    path('login/rider/', RiderLoginView.as_view(), name='rider_login'),
+    path('login/roadie/', RoadieLoginView.as_view(), name='roadie_login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', MeView.as_view(), name='me'),
     path('wallet/', MyWalletView.as_view(), name='my_wallet'),
@@ -59,7 +62,7 @@ urlpatterns = [
     path('auth/platform/config/', PlatformConfigView.as_view(), name='platform_config'),
     path('notifications/', NotificationListCreateView.as_view(), name='my_notifications'),
     path('notifications/<int:pk>/', NotificationRUDView.as_view(), name='my_notifications_rud'),
-    path('login/', TokenObtainPairView.as_view(), name='login'),
+    path('login/', CustomTokenObtainPairView.as_view(), name='login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', MeView.as_view(), name='me'),
     path('auth/admin/login/', AdminTokenObtainPairView.as_view(), name='admin_login'),

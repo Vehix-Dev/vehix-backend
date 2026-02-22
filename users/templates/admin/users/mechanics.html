@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>External ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Wallet Balance</th>
+                    <th>Approved</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mechanic in mechanics %}
+                <tr>
+                    <td>{{ mechanic.external_id }}</td>
+                    <td>{{ mechanic.username }}</td>
+                    <td>{{ mechanic.email }}</td>
+                    <td>{{ mechanic.phone }}</td>
+                    <td>{{ mechanic.wallet.balance|default:0 }}</td>
+                    <td>{{ mechanic.is_approved|yesno:"Yes,No" }}</td>
+                    <td>{{ mechanic.created_at }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">No mechanics found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

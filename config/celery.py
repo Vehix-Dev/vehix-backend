@@ -13,7 +13,7 @@ app.conf.task_serializer = 'json'
 app.conf.result_serializer = 'json'
 
 try:
-    from . import tasks  # ensure tasks in this package are imported
+    from . import tasks 
 except Exception:
     pass
 

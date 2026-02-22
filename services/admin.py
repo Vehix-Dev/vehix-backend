@@ -4,7 +4,7 @@ from .models import ServiceType, RodieService
 
 @admin.register(ServiceType)
 class ServiceTypeAdmin(admin.ModelAdmin):
-	list_display = ('name', 'code', 'is_active', 'rodie_count')
+	list_display = ('name', 'code', 'category', 'is_active', 'rodie_count')
 	search_fields = ('name', 'code')
 
 	def rodie_count(self, obj):

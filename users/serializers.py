@@ -62,9 +62,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         role = data.get('role')
         nin = data.get('nin')
 
-        if role in ('RIDER', 'RODIE'):
+        if role in ('RIDER', 'RODIE', 'MECHANIC'):
             if not nin:
-                raise serializers.ValidationError({'nin': 'NIN is required for riders and roadies'})
+                raise serializers.ValidationError({'nin': 'NIN is required for riders, roadies, and mechanics'})
             if len(nin) != 14:
                 raise serializers.ValidationError({'nin': 'NIN must be exactly 14 characters'})
             if User.objects.filter(nin=nin).exists():
@@ -93,7 +93,7 @@ class WalletSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
     broadcast = serializers.BooleanField(required=False)
-    target_role = serializers.ChoiceField(choices=(('RIDER', 'Rider'), ('RODIE', 'Rodie')), required=False, allow_blank=True, allow_null=True)
+    target_role = serializers.ChoiceField(choices=(('RIDER', 'Rider'), ('RODIE', 'Rodie'), ('MECHANIC', 'Mechanic')), required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Notification
@@ -113,6 +113,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     wallet = WalletSerializer(read_only=True)
     services = serializers.SerializerMethodField()
+    profile_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -132,21 +133,32 @@ class UserSerializer(serializers.ModelSerializer):
             'updated_at',
             'wallet',
             'services',
+            'profile_photo',
         )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
 
     def get_services(self, obj):
-        if getattr(obj, 'role', None) != 'RODIE':
+        if getattr(obj, 'role', None) not in ('RODIE', 'MECHANIC'):
             return []
         qs = RodieService.objects.filter(rodie=obj).select_related('service')
         return [
             {
-                'service_id': r.service.id, 
+                'service_id': r.service.id,
                 'service_name': r.service.name,
                 'fixed_price': r.service.fixed_price,
                 'image': self.context['request'].build_absolute_uri(r.service.image.url) if r.service.image and 'request' in self.context else (r.service.image.url if r.service.image else None)
             } for r in qs
         ]
+
+    def get_profile_photo(self, obj):
+        from images.models import UserImage
+        # Get latest profile photo
+        image = UserImage.objects.filter(user=obj, image_type='PROFILE').order_by('-created_at').first()
+        if image and image.original_image:
+            if 'request' in self.context:
+                return self.context['request'].build_absolute_uri(image.original_image.url)
+            return image.original_image.url
+        return None
 
 
 
@@ -162,7 +174,7 @@ class ReferralSerializer(serializers.ModelSerializer):
 class PlatformConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformConfig
-        fields = ('id', 'max_negative_balance', 'service_fee', 'trial_days', 'updated_at')
+        fields = ('id', 'max_negative_balance', 'service_fee', 'trial_days', 'mechanic_transition_documents', 'updated_at')
 
 
 class PaymentSerializer(serializers.ModelSerializer):
