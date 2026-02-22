@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['188.166.154.163', 'yourdomain.com']
+ALLOWED_HOSTS = ['188.166.154.163', 'backend.vehix.ug']
 
 
 # Application definition
@@ -237,3 +237,11 @@ LOGGING = {
 
 # Additional security settings for development
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
+import os
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
