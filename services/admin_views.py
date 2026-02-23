@@ -6,7 +6,7 @@ from .admin_serializers import ServiceTypeSerializer, RodieServiceSerializer
 class ServiceTypeListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     serializer_class = ServiceTypeSerializer
-    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
     filter_backends = [filters.SearchFilter]
     search_fields = ['code', 'name']
 
@@ -17,7 +17,7 @@ class ServiceTypeListCreateView(generics.ListCreateAPIView):
 class ServiceTypeRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ServiceTypeSerializer
-    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
 
     def get_queryset(self):
         return ServiceType.objects.all()
