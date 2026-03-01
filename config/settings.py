@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False  # Changed to False for production
+DEBUG = True  # Changed to False for production
 
 ALLOWED_HOSTS = ['188.166.154.163', 'backend.vehix.ug', 'www.backend.vehix.ug']
 
