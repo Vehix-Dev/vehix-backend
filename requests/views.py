@@ -57,42 +57,55 @@ class NearbyRodieListView(APIView):
         lng = request.query_params.get('lng')
         service_id = request.query_params.get('service_id')
         if not lat or not lng or not service_id:
-            return Response({'detail': 'lat, lng and service_id required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'detail': 'lat, lng and service_id required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             service_type_id = int(service_id)
         except Exception:
             return Response({'detail': 'invalid service_id'}, status=status.HTTP_400_BAD_REQUEST)
 
-        rodie_services = RodieService.objects.filter(service=service_type_id, rodie__is_active=True).select_related('rodie')
+        rodie_services = RodieService.objects.filter(
+            service=service_type_id,
+            rodie__is_active=True
+        ).select_related('rodie')
+
         results = []
         from .osrm import get_route_info
+        from locations.models import RodieLocation
+
         for rs in rodie_services:
-            # prefer ephemeral cached rodie location
-            loc = cache.get(f"rodie_loc:{rs.rodie.id}")
+            rodie_id = rs.rodie.id
+
+            # Try cache first
+            loc = cache.get(f"rodie_loc:{rodie_id}")
+
+            # Fallback to DB if cache empty
             if not loc:
-                continue
-            dist_km = calculate_distance_km(float(lat), float(lng), float(loc.get('lat')), float(loc.get('lng')))
+                try:
+                    db_loc = RodieLocation.objects.get(rodie_id=rodie_id)
+                    loc = {"lat": float(db_loc.lat), "lng": float(db_loc.lng)}
+                    cache.set(f"rodie_loc:{rodie_id}", loc, timeout=300)  # cache 5 min
+                except RodieLocation.DoesNotExist:
+                    continue  # no location info, skip this rodie
+
+            dist_km = calculate_distance_km(float(lat), float(lng), float(loc['lat']), float(loc['lng']))
             if dist_km <= 5:
-                distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), float(lat), float(lng))
+                distance_m, duration_s = get_route_info(loc['lat'], loc['lng'], float(lat), float(lng))
                 results.append({
-                    'rodie_id': rs.rodie.id,
+                    'rodie_id': rodie_id,
                     'username': rs.rodie.username,
-                    'lat': float(loc.get('lat')),
-                    'lng': float(loc.get('lng')),
+                    'lat': float(loc['lat']),
+                    'lng': float(loc['lng']),
                     'distance_km': dist_km,
                     'eta_seconds': duration_s,
                     'distance_meters': distance_m,
                 })
 
-        results = sorted(results, key=lambda x: x['distance_km'])
-        return Response(results)
-
-try:
-    from asgiref.sync import async_to_sync
-    from channels.layers import get_channel_layer
-except Exception:
-    async_to_sync = None
-    get_channel_layer = None
+        results.sort(key=lambda x: x['distance_km'])
+        return Response(results)None
 
 
 class CreateServiceRequestView(generics.CreateAPIView):
