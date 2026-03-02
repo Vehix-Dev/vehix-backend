@@ -12,7 +12,19 @@ User = get_user_model()
 @database_sync_to_async
 def cache_set_rodie_location(user_id, lat, lng):
     try:
-        cache.set(f"rodie_loc:{user_id}", {'lat': float(lat), 'lng': float(lng)}, timeout=300)
+        lat_f, lng_f = float(lat), float(lng)
+        cache.set(f"rodie_loc:{user_id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
+        # Persistent storage for matching fallback and history
+        User.objects.filter(id=user_id).update(lat=lat_f, lng=lng_f)
+    except Exception:
+        pass
+
+@database_sync_to_async
+def cache_set_rider_location(user_id, lat, lng):
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+        cache.set(f"rider_loc:{user_id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
+        User.objects.filter(id=user_id).update(lat=lat_f, lng=lng_f)
     except Exception:
         pass
 
@@ -58,6 +70,10 @@ class AdminConsumer(AsyncJsonWebsocketConsumer):
         })
 
 class RodieConsumer(AsyncJsonWebsocketConsumer):
+    @database_sync_to_async
+    def _set_online(self, user, online):
+        from users.models import User
+        User.objects.filter(id=user.id).update(is_online=online)
 
     async def connect(self):
         user = self.scope["user"]
@@ -70,7 +86,19 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
             await self.channel_layer.group_add('notifications', self.channel_name)
+            await self._set_online(user, True)
             await self.accept()
+
+            # Check for active offer if reconnected during dispatch
+            try:
+                offer = cache.get(f"active_offer:{user.id}")
+                if offer:
+                    await self.send_json({
+                        "type": "OFFER_REQUEST",
+                        "request": offer
+                    })
+            except Exception:
+                pass
         except Exception as e:
             import logging; logging.exception("RodieConsumer connect error")
             await self.close()
@@ -79,6 +107,10 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         try:
             if hasattr(self, 'group_name'):
                 await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            
+            user = self.scope.get("user")
+            if user and user.is_authenticated:
+                await self._set_online(user, False)
         except Exception as e:
             import logging; logging.exception("RodieConsumer disconnect error")
 
@@ -91,7 +123,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def offer_request(self, event):
         await self.send_json({
             "type": "OFFER_REQUEST",
-            "data": event.get("data")
+            "request": event.get("request")
         })
 
     async def user_status(self, event):
@@ -109,7 +141,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def request_update(self, event):
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "data": event["data"]
+            "request": event.get("request") or event.get("data")
         })
 
     async def receive_json(self, content):
@@ -156,12 +188,45 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         {
                             'type': 'chat.message',
                             'sender_id': self.scope['user'].id,
+                            'sender_role': 'RODIE',
                             'text': text,
-                            'created_at': None,
+                            'created_at': timezone.now().isoformat(),
                         }
                     )
+            elif msg_type == 'JOIN_REQUEST':
+                req_id = content.get('request_id')
+                if req_id:
+                    await self.channel_layer.group_add(f"request_{req_id}", self.channel_name)
+                    await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
         except Exception as e:
             import logging; logging.exception("RodieConsumer receive_json error")
+
+    async def chat_message(self, event):
+        await self.send_json({
+            'type': 'CHAT_MESSAGE',
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
+        })
+
+    async def request_accepted(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ACCEPTED", "request": event.get("request")})
+
+    async def request_enroute(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EN_ROUTE", "request": event.get("request")})
+
+    async def request_started(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
+
+    async def request_completed(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
+
+    async def request_declined(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "DECLINED", "request": event.get("request")})
+
+    async def request_expired(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
 
 
 class RiderConsumer(AsyncJsonWebsocketConsumer):
@@ -229,7 +294,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def request_update(self, event):
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "data": event["data"]
+            "request": event.get("request") or event.get("data")
         })
 
     async def receive_json(self, content):
@@ -240,6 +305,10 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 lat = content.get("lat")
                 lng = content.get("lng")
                 if lat is not None and lng is not None:
+                    try:
+                        await cache_set_rider_location(user.id, lat, lng)
+                    except Exception:
+                        pass
                     await self.channel_layer.group_send(
                         "admin_monitoring",
                         {
@@ -247,6 +316,30 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                             "rider_id": user.id,
                             "lat": lat,
                             "lng": lng
+                        }
+                    )
+            elif msg_type == 'JOIN_REQUEST':
+                req_id = content.get('request_id')
+                if req_id:
+                    await self.channel_layer.group_add(f"request_{req_id}", self.channel_name)
+                    await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
+            elif msg_type == 'CHAT':
+                request_id = content.get('request_id')
+                text = content.get('text')
+                if request_id and text:
+                    await database_sync_to_async(ChatMessage.objects.create)(
+                        service_request_id=request_id,
+                        sender=self.scope['user'],
+                        text=text
+                    )
+                    await self.channel_layer.group_send(
+                        f"request_{request_id}",
+                        {
+                            'type': 'chat.message',
+                            'sender_id': self.scope['user'].id,
+                            'sender_role': 'RIDER',
+                            'text': text,
+                            'created_at': timezone.now().isoformat(),
                         }
                     )
         except Exception as e:
@@ -268,8 +361,34 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
             'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
             'text': event.get('text'),
             'created_at': event.get('created_at'),
+        })
+
+    async def request_accepted(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ACCEPTED", "request": event.get("request")})
+
+    async def request_enroute(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EN_ROUTE", "request": event.get("request")})
+
+    async def request_started(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
+
+    async def request_completed(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
+
+    async def request_expired(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
+
+    async def request_declined(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "DECLINED", "request": event.get("request")})
+
+    async def request_proximity(self, event):
+        await self.send_json({
+            "type": "REQUEST_PROXIMITY",
+            "distance_km": event.get("distance_km"),
+            "eta_seconds": event.get("eta_seconds")
         })
 
 

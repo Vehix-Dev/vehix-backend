@@ -6,6 +6,8 @@ from .services import find_nearby_rodies
 from services.models import RodieService
 from locations.utils import calculate_distance_km
 from django.core.cache import cache
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from users.models import Wallet, PlatformConfig
 from rest_framework.exceptions import PermissionDenied
 from decimal import Decimal
@@ -46,6 +48,10 @@ class RoadieRequestsListView(generics.ListAPIView):
         if user.role != 'RODIE':
             return ServiceRequest.objects.none()
         qs = ServiceRequest.objects.filter(rodie=user).select_related('rider', 'service_type').order_by('-created_at')
+        
+        status_filter = self.request.query_params.get('status')
+        if status_filter == 'active':
+            qs = qs.filter(status__in=['ACCEPTED', 'EN_ROUTE', 'STARTED'])
         return qs
 
 
@@ -143,6 +149,9 @@ class CreateServiceRequestView(generics.CreateAPIView):
                 if rodie:
                     matched_usernames.append(getattr(rodie, 'username', 'unknown'))
 
+        filtered = [r for r in filtered if r['rodie'].id != self.request.user.id]
+        matched_usernames = [r['rodie'].username for r in filtered]
+        
         from requests.services import notify_rodies
         notify_rodies(filtered, request_obj)
         # mark ephemeral request status in cache so notify worker can poll without DB locks
@@ -150,7 +159,7 @@ class CreateServiceRequestView(generics.CreateAPIView):
             cache.set(f"request_status:{request_obj.id}", 'REQUESTED', timeout=120)
         except Exception:
             pass
-        print("Matched Rodies:", matched_usernames)
+        print("Matched Rodies (Final):", matched_usernames)
 
 
 class ChatMessageCreateAPIView(generics.CreateAPIView):
@@ -218,9 +227,26 @@ class AcceptRequestView(APIView):
 
         try:
             if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.accepted', 'data': {'request_id': req.id, 'rodie_id': user.id}})
-        except Exception:
-            pass
+                from .serializers import ServiceRequestSerializer
+                serializer = ServiceRequestSerializer(req)
+                resp_data = serializer.data
+                
+                # Include roadie's current location for the map
+                loc = cache.get(f"rodie_loc:{user.id}")
+                if loc:
+                    resp_data['roadie_lat'] = loc.get('lat')
+                    resp_data['roadie_lng'] = loc.get('lng')
+
+                print(f"DEBUG: Acceptance notifying group request_{req.id}")
+                async_to_sync(get_channel_layer().group_send)(
+                    f'request_{req.id}', 
+                    {
+                        'type': 'request.accepted', 
+                        'request': resp_data
+                    }
+                )
+        except Exception as e:
+            print(f"DEBUG: Acceptance notification error: {e}")
 
         return Response({'detail': 'Request accepted', 'request_id': req.id})
 
@@ -238,7 +264,7 @@ class DeclineRequestView(APIView):
 
         try:
             if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.declined', 'data': {'request_id': req.id, 'rodie_id': user.id}})
+                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.declined', 'request': {'id': req.id, 'rodie_id': user.id}})
         except Exception:
             pass
         try:

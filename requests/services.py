@@ -1,4 +1,4 @@
-from services.models import RodieService
+from services.models import RodieService, ServiceType
 from locations.utils import calculate_distance_km
 from django.core.cache import cache
 from channels.layers import get_channel_layer
@@ -8,7 +8,7 @@ import time
 from .osrm import get_route_info
 from django.db import transaction
 
-MAX_DISTANCE_KM = 4 # MVP radius
+MAX_DISTANCE_KM = 50 # Increased for development/testing
 
 
 def find_nearby_rodies(service_type, rider_lat, rider_lng):
@@ -26,8 +26,21 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     for rs in rodie_services:
         # read ephemeral rodie location from cache; skip if not available
         loc = cache.get(f"rodie_loc:{rs.rodie.id}")
+        
+        # Fallback to database
+        if not loc:
+            from locations.models import RodieLocation
+            try:
+                rl = RodieLocation.objects.get(rodie=rs.rodie)
+                loc = {'lat': float(rl.lat), 'lng': float(rl.lng)}
+            except RodieLocation.DoesNotExist:
+                # Last resort: User model fields
+                if rs.rodie.lat and rs.rodie.lng:
+                    loc = {'lat': float(rs.rodie.lat), 'lng': float(rs.rodie.lng)}
+        
         if not loc:
             continue
+
         try:
             distance = calculate_distance_km(
                 rider_lat, rider_lng,
@@ -74,40 +87,66 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         else:
             distance_m, duration_s = None, None
 
+        req_obj = ServiceRequest.objects.get(id=request_id)
         payload = {
-            "request_id": request_id,
+            "id": request_id, 
             "service_id": service_type_id,
-            "service_name": str(service_type_id),
+            "service_type_name": ServiceType.objects.get(id=service_type_id).name,
             "rider_lat": float(rider_lat),
             "rider_lng": float(rider_lng),
             "eta_seconds": duration_s,
             "distance_meters": distance_m,
+            "distance_km": round((distance_m or 0) / 1000.0, 1),
+            "fee": 15000,  # Placeholder for now
+            "rider": {
+                "id": req_obj.rider.id,
+                "first_name": req_obj.rider.first_name,
+                "last_name": req_obj.rider.last_name,
+                "phone": req_obj.rider.phone,
+            }
         }
 
         try:
+            # Persistent offer for reconnection
+            cache.set(f"active_offer:{rodie.id}", payload, timeout=offer_seconds + 2)
+            
             async_to_sync(channel_layer.group_send)(
                 f"rodie_{rodie.id}",
-                {"type": "offer.request", "data": payload}
+                {"type": "offer.request", "request": payload}
+            )
+
+            # Notify Rider about the proximity of this specific roadie being offered
+            async_to_sync(channel_layer.group_send)(
+                f"request_{request_id}",
+                {
+                    "type": "request.proximity",
+                    "distance_km": payload["distance_km"],
+                    "eta_seconds": payload["eta_seconds"]
+                }
             )
         except Exception:
             pass
-        # Poll the ephemeral cache for request status to avoid heavy DB locks
-        waited = 0.0
-        interval = 0.5
-        accepted = False
-        while waited < offer_seconds:
-            time.sleep(interval)
-            waited += interval
+        # Poll for acceptance or decline
+        accepted = False # Initialize accepted flag
+        start_time = time.time()
+        while time.time() - start_time < offer_seconds:
             try:
                 status = cache.get(f"request_status:{request_id}")
                 if status == 'ACCEPTED':
                     accepted = True
                     break
-                if status in ('CANCELLED', 'EXPIRED', 'DECLINED'):
-                    accepted = False
+                if status == 'DECLINED':
+                    # Move to next roadie immediately if declined
                     break
             except Exception:
                 pass
+            time.sleep(1)
+        
+        # Clear active offer after turn ends
+        try:
+            cache.delete(f"active_offer:{rodie.id}")
+        except Exception:
+            pass
 
         if accepted:
             break
@@ -124,7 +163,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                     cache.set(f"request_status:{req.id}", 'EXPIRED', timeout=300)
                 except Exception:
                     pass
-                async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'data': {'request_id': req.id}})
+                async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'request': {'id': req.id}})
     except Exception:
         pass
 
