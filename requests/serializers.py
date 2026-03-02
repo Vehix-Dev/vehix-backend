@@ -45,8 +45,27 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     rider_id = serializers.IntegerField(source='rider.id', read_only=True)
     rodie_id = serializers.IntegerField(source='rodie.id', read_only=True)
     service_type_name = serializers.CharField(source='service_type.name', read_only=True)
+    rider_phone = serializers.CharField(source='rider.phone', read_only=True)
+    rodie_phone = serializers.CharField(source='rodie.phone', read_only=True)
+    rider_name = serializers.SerializerMethodField()
+    rodie_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
-        fields = ('id', 'service_type', 'service_type_name', 'rider_id', 'rodie_id', 'status', 'rider_lat', 'rider_lng', 'accepted_at', 'en_route_at', 'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at')
+        fields = (
+            'id', 'service_type', 'service_type_name', 'rider_id', 'rodie_id', 
+            'rider_name', 'rodie_name', 'rider_phone', 'rodie_phone',
+            'status', 'rider_lat', 'rider_lng', 'accepted_at', 'en_route_at', 
+            'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at'
+        )
         read_only_fields = ('accepted_at', 'en_route_at', 'started_at', 'completed_at', 'created_at', 'updated_at')
+
+    def get_rider_name(self, obj):
+        if obj.rider:
+            return f"{obj.rider.first_name} {obj.rider.last_name}".strip() or obj.rider.username
+        return None
+
+    def get_rodie_name(self, obj):
+        if obj.rodie:
+            return f"{obj.rodie.first_name} {obj.rodie.last_name}".strip() or obj.rodie.username
+        return None

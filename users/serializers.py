@@ -56,6 +56,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
 
+        if validated_data.get('role') == 'RODIE':
+            from services.models import ServiceType, RodieService
+            basic_services = ServiceType.objects.filter(category='BASIC', is_active=True)
+            for svc in basic_services:
+                RodieService.objects.get_or_create(rodie=user, service=svc)
+
         return user
 
     def validate(self, data):
