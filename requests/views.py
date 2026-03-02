@@ -105,7 +105,7 @@ class NearbyRodieListView(APIView):
                 })
 
         results.sort(key=lambda x: x['distance_km'])
-        return Response(results)None
+        return Response(results)
 
 
 class CreateServiceRequestView(generics.CreateAPIView):
