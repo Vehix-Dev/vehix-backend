@@ -54,7 +54,5 @@ target/
 .ipynb_checkpoints
 vehix_rider_app/
 vehix_roadie_app/
-rider-app/
-roadie_app/
-config/settings.py
+
 
