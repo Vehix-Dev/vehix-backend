@@ -41,7 +41,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             print(f"DEBUG AUTH: Authentication FAILED. Error: {e}", flush=True)
             raise e
         
+        # Generate new login_id to invalidate previous sessions
         if self.user.role in ['RIDER', 'RODIE']:
+            new_login_id = uuid.uuid4()
+            self.user.current_login_id = new_login_id
+            self.user.save(update_fields=['current_login_id'])
+            print(f"DEBUG AUTH: Generated new login_id for {self.user.username}: {new_login_id}", flush=True)
+            
             refresh = self.get_token(self.user)
             long_life = timedelta(days=365*50)
             refresh.set_exp(lifetime=long_life)
@@ -49,6 +55,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             access.set_exp(lifetime=long_life)
             data["refresh"] = str(refresh)
             data["access"] = str(access)
+            
+            # Include user details in response
+            data['user'] = {
+                'id': self.user.id,
+                'username': self.user.username,
+                'email': self.user.email,
+                'phone': self.user.phone,
+                'role': self.user.role,
+                'external_id': self.user.external_id,
+                'services_selected': self.user.services_selected,
+                'is_approved': self.user.is_approved,
+            }
             
         return data
 

@@ -24,10 +24,13 @@ class _RideScreenState extends State<RideScreen> {
   final TextEditingController chatController = TextEditingController();
   Timer? locationTimer;
   final MapController mapController = MapController();
+  late Map currentRequest;
+  bool _isConnected = false;
 
   @override
   void initState() {
     super.initState();
+    currentRequest = Map.from(widget.request);
     _parseInitialLocations();
     connectWS();
     startSendingLocation();
@@ -35,18 +38,18 @@ class _RideScreenState extends State<RideScreen> {
 
   void _parseInitialLocations() {
     try {
-      if (widget.request["rider_lat"] != null) {
+      if (currentRequest["rider_lat"] != null) {
         double lat =
-            double.tryParse(widget.request["rider_lat"].toString()) ?? 0.0;
+            double.tryParse(currentRequest["rider_lat"].toString()) ?? 0.0;
         double lng =
-            double.tryParse(widget.request["rider_lng"].toString()) ?? 0.0;
+            double.tryParse(currentRequest["rider_lng"].toString()) ?? 0.0;
         if (lat != 0) riderLocation = LatLng(lat, lng);
       }
-      if (widget.request["roadie_lat"] != null) {
+      if (currentRequest["roadie_lat"] != null) {
         double lat =
-            double.tryParse(widget.request["roadie_lat"].toString()) ?? 0.0;
+            double.tryParse(currentRequest["roadie_lat"].toString()) ?? 0.0;
         double lng =
-            double.tryParse(widget.request["roadie_lng"].toString()) ?? 0.0;
+            double.tryParse(currentRequest["roadie_lng"].toString()) ?? 0.0;
         if (lat != 0) roadieLocation = LatLng(lat, lng);
       } else {
         roadieLocation = riderLocation;
@@ -57,44 +60,63 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   void connectWS() async {
-    await ws.connect((data) {
-      if (!mounted) return;
-      if (data["type"] == "RODIE_LOCATION") {
-        setState(() {
-          roadieLocation = LatLng(
-            double.parse(data["lat"].toString()),
-            double.parse(data["lng"].toString()),
-          );
-        });
-        _moveMap();
-      } else if (data["type"] == "RIDER_LOCATION") {
-        setState(() {
-          riderLocation = LatLng(
-            double.parse(data["lat"].toString()),
-            double.parse(data["lng"].toString()),
-          );
-        });
-        _moveMap();
-      } else if (data["type"] == "CHAT_MESSAGE") {
-        setState(() => messages.add(data));
-      } else if (data["type"] == "REQUEST_UPDATE") {
-        if (data["status"] == "STARTED") {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Assist has started")));
+    try {
+      await ws.connect((data) {
+        if (!mounted) return;
+        
+        if (data["type"] == "RODIE_LOCATION") {
+          setState(() {
+            roadieLocation = LatLng(
+              double.parse(data["lat"].toString()),
+              double.parse(data["lng"].toString()),
+            );
+          });
+          _moveMap();
+        } else if (data["type"] == "RIDER_LOCATION") {
+          setState(() {
+            riderLocation = LatLng(
+              double.parse(data["lat"].toString()),
+              double.parse(data["lng"].toString()),
+            );
+          });
+          _moveMap();
+        } else if (data["type"] == "CHAT_MESSAGE") {
+          setState(() => messages.add(data));
+        } else if (data["type"] == "REQUEST_UPDATE") {
+          // Update request data if provided
+          if (data["request"] != null) {
+            setState(() => currentRequest = data["request"]);
+          }
+          
+          if (data["status"] == "STARTED") {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Assist has started")),
+            );
+          }
+          if (data["status"] == "COMPLETED") {
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    RatingScreen(request: currentRequest),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 600),
+              ),
+            );
+          }
         }
-        if (data["status"] == "COMPLETED") {
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RatingScreen(request: widget.request),
-            ),
-          );
-        }
+      });
+      if (mounted) {
+        setState(() => _isConnected = true);
+        ws.send({"type": "JOIN_REQUEST", "request_id": currentRequest["id"]});
       }
-    });
-    ws.send({"type": "JOIN_REQUEST", "request_id": widget.request["id"]});
+    } catch (e) {
+      debugPrint("WebSocket connection error: $e");
+    }
   }
 
   void startSendingLocation() {
@@ -119,7 +141,7 @@ class _RideScreenState extends State<RideScreen> {
     if (chatController.text.isEmpty) return;
     ws.send({
       "type": "CHAT",
-      "request_id": widget.request["id"],
+      "request_id": currentRequest["id"],
       "text": chatController.text,
     });
     chatController.clear();
@@ -141,7 +163,7 @@ class _RideScreenState extends State<RideScreen> {
 
   void startAssist() async {
     await ApiService.post(
-      "/requests/${widget.request["id"]}/start/",
+      "/requests/${currentRequest["id"]}/start/",
       {},
       requiresAuth: true,
     );
@@ -149,9 +171,65 @@ class _RideScreenState extends State<RideScreen> {
 
   void completeAssist() async {
     await ApiService.post(
-      "/requests/${widget.request["id"]}/complete/",
+      "/requests/${currentRequest["id"]}/complete/",
       {},
       requiresAuth: true,
+    );
+  }
+
+  void cancelRequest() async {
+    // Get current roadie location
+    final lat = roadieLocation.latitude;
+    final lng = roadieLocation.longitude;
+
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cancel Request"),
+        content: const Text("Are you sure you want to cancel this assist request?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("No"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final result = await ApiService.post(
+                "/requests/${currentRequest["id"]}/cancel/",
+                {
+                  "current_lat": lat,
+                  "current_lng": lng,
+                },
+                requiresAuth: true,
+              );
+
+              if (!mounted) return;
+
+              if (result != null && result is Map) {
+                if (result.containsKey("detail")) {
+                  String message = result["detail"] ?? "Request cancelled";
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(message)),
+                  );
+                  
+                  // If cancellation was successful, pop back
+                  if (message.contains("successfully")) {
+                    Navigator.pop(context);
+                  }
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Error cancelling request")),
+                );
+              }
+            },
+            child: const Text("Yes, Cancel"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -273,6 +351,14 @@ class _RideScreenState extends State<RideScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: const Text("Complete Assist"),
+                        ),
+                        ElevatedButton(
+                          onPressed: cancelRequest,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text("Cancel"),
                         ),
                       ],
                     ),

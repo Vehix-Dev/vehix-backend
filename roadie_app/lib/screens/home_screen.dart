@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../services/websocket_service.dart';
 import '../services/api_service.dart';
 import 'ride_screen.dart';
+import 'login_screen.dart';
 import '../widgets/app_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -45,9 +46,36 @@ class _HomeScreenState extends State<HomeScreen> {
         _sendInitialLocation();
         _startLocationBroadcast();
       }
+    } on SessionInvalidatedException catch (e) {
+      if (mounted) {
+        _showSessionInvalidatedDialog(e.message);
+      }
     } catch (e) {
       if (mounted) setState(() => _loadingStatus = "Error: $e");
     }
+  }
+
+  void _showSessionInvalidatedDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Session Ended'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
   }
 
   Future<void> _initLocation() async {

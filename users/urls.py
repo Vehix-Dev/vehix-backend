@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, UserProfileUpdateView, UserProfilePhotoUploadView
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -31,7 +31,7 @@ from services.admin_views import (
     RodieServiceListCreateView,
     RodieServiceRetrieveUpdateDestroyView,
 )
-from services.views import RodieMyServicesView
+from services.views import RodieMyServicesView, RodieInitialServiceSelectionView
 from requests.admin_views import (
     ServiceRequestListCreateView,
     ServiceRequestRetrieveUpdateDestroyView,
@@ -53,9 +53,12 @@ urlpatterns = [
     path('login/roadie/', RoadieLoginView.as_view(), name='roadie_login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', MeView.as_view(), name='me'),
+    path('profile/', UserProfileUpdateView.as_view(), name='user_profile_update'),
+    path('profile/photo/', UserProfilePhotoUploadView.as_view(), name='user_profile_photo_upload'),
     path('wallet/', MyWalletView.as_view(), name='my_wallet'),
     path('wallet/deposit/', DepositView.as_view(), name='wallet_deposit'),
     path('wallet/withdraw/', WithdrawView.as_view(), name='wallet_withdraw'),
+    path('roadie/payments/', RoadiePaymentsView.as_view(), name='roadie_payments'),
     path('payments/pesapal/ipn/', PesapalIPNView.as_view(), name='pesapal_ipn'),
     path('referrals/', MyReferralsView.as_view(), name='my_referrals'),
     path('roadie/status/', RoadieStatusUpdateView.as_view(), name='roadie_status_update'),
@@ -78,6 +81,7 @@ urlpatterns = [
     path('auth/admin/rodie-services/', RodieServiceListCreateView.as_view(), name='admin_rodie_services_list_create'),
     path('auth/admin/rodie-services/<int:pk>/', RodieServiceRetrieveUpdateDestroyView.as_view(), name='admin_rodie_services_rud'),
     path('auth/rodie/services/', RodieMyServicesView.as_view(), name='rodie_my_services'),
+    path('auth/rodie/services/initial/', RodieInitialServiceSelectionView.as_view(), name='rodie_initial_service_selection'),
     path('auth/admin/requests/', ServiceRequestListCreateView.as_view(), name='admin_requests_list_create'),
     path('auth/admin/requests/<int:pk>/', ServiceRequestRetrieveUpdateDestroyView.as_view(), name='admin_requests_rud'),
     path('auth/admin/requests/realtime/', RealtimeRiderLocationsView.as_view(), name='admin_requests_realtime'),

@@ -14,7 +14,10 @@ class RodieMyServicesView(APIView):
         if request.user.role not in ('RODIE', 'MECHANIC'):
             return Response({'error': 'Only roadies and mechanics may manage services'}, status=status.HTTP_403_FORBIDDEN)
         services = RodieService.objects.filter(rodie=request.user).select_related('service')
-        return Response([{'id': s.id, 'service_id': s.service.id, 'service_name': s.service.name} for s in services])
+        return Response({
+            'services': [{'id': s.id, 'service_id': s.service.id, 'service_name': s.service.name} for s in services],
+            'services_selected': request.user.services_selected
+        })
 
     def post(self, request):
         if request.user.role != 'RODIE':
@@ -38,8 +41,89 @@ class RodieMyServicesView(APIView):
                 RodieService.objects.create(rodie=request.user, service=svc)
             except ServiceType.DoesNotExist:
                 continue
+        
+        # Mark services as selected
+        if not request.user.services_selected:
+            request.user.services_selected = True
+            request.user.save(update_fields=['services_selected'])
+        
         services = RodieService.objects.filter(rodie=request.user).select_related('service')
-        return Response([{'service_id': s.service.id, 'service_name': s.service.name} for s in services])
+        return Response({
+            'success': True,
+            'message': 'Services updated successfully',
+            'services': [{'service_id': s.service.id, 'service_name': s.service.name} for s in services],
+            'services_selected': request.user.services_selected
+        })
+
+
+class RodieInitialServiceSelectionView(APIView):
+    """
+    First-time service selection for roadies after registration/login
+    POST: Select services for first time
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'RODIE':
+            return Response(
+                {'error': 'Only roadies can select services'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if request.user.services_selected:
+            return Response({
+                'message': 'Services already selected. Use Manage My Services to update.',
+            }, status=status.HTTP_200_OK)
+        
+        service_ids = request.data.get('service_ids', [])
+        if not isinstance(service_ids, list):
+            return Response(
+                {'error': 'service_ids must be a list of integers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not service_ids:
+            return Response(
+                {'error': 'Please select at least one service'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create service selections
+        created_count = 0
+        for service_id in service_ids:
+            try:
+                svc = ServiceType.objects.get(id=int(service_id), is_active=True)
+                RodieService.objects.get_or_create(rodie=request.user, service=svc)
+                created_count += 1
+            except (ServiceType.DoesNotExist, ValueError):
+                continue
+        
+        if created_count == 0:
+            return Response(
+                {'error': 'No valid services found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Mark services as selected
+        request.user.services_selected = True
+        request.user.save(update_fields=['services_selected'])
+        
+        # Return selected services
+        services = RodieService.objects.filter(rodie=request.user).select_related('service')
+        return Response({
+            'success': True,
+            'message': 'Services selected successfully',
+            'services': [
+                {
+                    'service_id': s.service.id,
+                    'service_name': s.service.name,
+                    'fixed_price': str(s.service.fixed_price),
+                    'code': s.service.code,
+                    'category': s.service.category
+                } for s in services
+            ],
+            'services_selected': True
+        }, status=status.HTTP_201_CREATED)
 
 
 from rest_framework import generics

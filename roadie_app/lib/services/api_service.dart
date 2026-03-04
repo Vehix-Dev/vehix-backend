@@ -1,10 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+class SessionInvalidatedException implements Exception {
+  final String message;
+  SessionInvalidatedException(this.message);
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   static const String baseUrl = "https://backend.vehix.ug/api";
+  static const Duration requestTimeout = Duration(seconds: 15);
+  static const int maxRetries = 3;
+  static const Duration retryDelay = Duration(seconds: 2);
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -66,6 +77,76 @@ class ApiService {
     return prefs.getString("access");
   }
 
+  /// Helper method to retry failed network requests
+  static Future<http.Response?> _retryablePost(
+    Uri url,
+    Map<String, String> headers,
+    String body,
+  ) async {
+    int retries = 0;
+    while (retries < maxRetries) {
+      try {
+        print("📤 POST attempt ${retries + 1}/$maxRetries to: $url");
+        final response = await http.post(
+          url,
+          headers: headers,
+          body: body,
+        ).timeout(requestTimeout, onTimeout: () {
+          throw TimeoutException("Request timeout after $requestTimeout");
+        });
+        print("📥 Response received: ${response.statusCode}");
+        return response;
+      } on SocketException catch (e) {
+        print("⚠️ Network error (attempt ${retries + 1}): $e");
+        retries++;
+        if (retries < maxRetries) {
+          await Future.delayed(retryDelay);
+        }
+      } on TimeoutException catch (e) {
+        print("⏱️ Timeout (attempt ${retries + 1}): $e");
+        retries++;
+        if (retries < maxRetries) {
+          await Future.delayed(retryDelay);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Helper method to retry failed GET requests
+  static Future<http.Response?> _retryableGet(
+    Uri url,
+    Map<String, String> headers,
+  ) async {
+    int retries = 0;
+    while (retries < maxRetries) {
+      try {
+        print("📤 GET attempt ${retries + 1}/$maxRetries to: $url");
+        final response = await http.get(
+          url,
+          headers: headers,
+        ).timeout(requestTimeout, onTimeout: () {
+          throw TimeoutException("Request timeout after $requestTimeout");
+        });
+        print("📥 Response received: ${response.statusCode}");
+        return response;
+      } on SocketException catch (e) {
+        print("⚠️ Network error (attempt ${retries + 1}): $e");
+        retries++;
+        if (retries < maxRetries) {
+          await Future.delayed(retryDelay);
+        }
+      } on TimeoutException catch (e) {
+        print("⏱️ Timeout (attempt ${retries + 1}): $e");
+        retries++;
+        if (retries < maxRetries) {
+          await Future.delayed(retryDelay);
+        }
+      }
+    }
+    return null;
+  }
+
   static Future<bool> signup({
     required String username,
     required String email,
@@ -98,21 +179,40 @@ class ApiService {
 
   static Future<bool> login(String username, String password) async {
     final url = Uri.parse("$baseUrl/login/roadie/");
+    print("🔐 Roadie login attempt: user=$username, url=$url");
     try {
-      final response = await http.post(
+      final response = await _retryablePost(
         url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"username": username, "password": password}),
+        {"Content-Type": "application/json"},
+        jsonEncode({"username": username, "password": password}),
       );
+
+      if (response == null) {
+        print("❌ Login failed: No response after retries");
+        return false;
+      }
+
+      print("📨 Login response: status=${response.statusCode}");
+      print("📦 Response body: ${response.body}");
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await saveToken(data["access"]);
         await saveRole("RODIE");
+        print("✅ Roadie login successful!");
         return true;
       } else {
+        print("❌ Login failed with status ${response.statusCode}");
+        if (response.body.isNotEmpty) {
+          try {
+            final errorData = jsonDecode(response.body);
+            print("❌ Error details: $errorData");
+          } catch (_) {}
+        }
         return false;
       }
     } catch (e) {
+      print("❌ Login exception: $e");
       return false;
     }
   }
@@ -129,13 +229,38 @@ class ApiService {
         final token = await getToken();
         if (token != null) headers["Authorization"] = "Bearer $token";
       }
-      final response = await http.post(
+      
+      final response = await _retryablePost(
         url,
-        headers: headers,
-        body: jsonEncode(body),
+        headers,
+        jsonEncode(body),
       );
 
+      if (response == null) {
+        print("⚠️ POST $endpoint failed after retries");
+        return null;
+      }
+
       if (response.statusCode == 401) {
+        print("🔓 Unauthorized (401)");
+        // Check if it's a session invalidation (logged in elsewhere)
+        if (response.body.isNotEmpty) {
+          try {
+            final errorData = jsonDecode(response.body);
+            final detail = errorData['detail'] ?? '';
+            if (detail.contains('session is no longer valid') || 
+                detail.contains('Another device') ||
+                errorData['code'] == 'multiple_device_login') {
+              print("🔓 Session invalidated - another device logged in");
+              await logout();
+              throw SessionInvalidatedException(
+                'You have been logged out because you logged in on another device.'
+              );
+            }
+          } catch (e) {
+            if (e is SessionInvalidatedException) rethrow;
+          }
+        }
         await logout();
         return null;
       }
@@ -143,20 +268,50 @@ class ApiService {
       if (response.body.isEmpty) return null;
       return jsonDecode(response.body);
     } catch (e) {
+      if (e is SessionInvalidatedException) rethrow;
+      print("❌ POST error: $e");
       return null;
     }
   }
 
   static Future<dynamic> get(String endpoint) async {
     final token = await getToken();
-    if (token == null) return null;
+    if (token == null) {
+      print("⚠️ No token available for GET $endpoint");
+      return null;
+    }
     try {
-      final response = await http.get(
-        Uri.parse("$baseUrl$endpoint"),
-        headers: {"Authorization": "Bearer $token"},
+      final url = Uri.parse("$baseUrl$endpoint");
+      final response = await _retryableGet(
+        url,
+        {"Authorization": "Bearer $token"},
       );
 
+      if (response == null) {
+        print("⚠️ GET $endpoint failed after retries");
+        return null;
+      }
+
       if (response.statusCode == 401) {
+        print("🔓 Unauthorized (401)");
+        // Check if it's a session invalidation (logged in elsewhere)
+        if (response.body.isNotEmpty) {
+          try {
+            final errorData = jsonDecode(response.body);
+            final detail = errorData['detail'] ?? '';
+            if (detail.contains('session is no longer valid') || 
+                detail.contains('Another device') ||
+                errorData['code'] == 'multiple_device_login') {
+              print("🔓 Session invalidated - another device logged in");
+              await logout();
+              throw SessionInvalidatedException(
+                'You have been logged out because you logged in on another device.'
+              );
+            }
+          } catch (e) {
+            if (e is SessionInvalidatedException) rethrow;
+          }
+        }
         await logout();
         return null;
       }
@@ -164,7 +319,9 @@ class ApiService {
       if (response.body.isEmpty) return null;
       return jsonDecode(response.body);
     } catch (e) {
+      print("❌ GET error: $e");
       return null;
+    }
     }
   }
 

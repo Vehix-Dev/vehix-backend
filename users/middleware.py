@@ -13,6 +13,13 @@ def get_user(token_key):
     try:
         access_token = AccessToken(token_key)
         user = User.objects.get(id=access_token['user_id'])
+        
+        # Check if token's login_id matches user's current login session
+        token_login_id = access_token.get('login_id')
+        if not token_login_id or str(user.current_login_id) != str(token_login_id):
+            print(f"JWT Auth Error: Session invalid - device logged out elsewhere")
+            return AnonymousUser()
+        
         return user
     except Exception as e:
         print(f"JWT Auth Error: {e}")
