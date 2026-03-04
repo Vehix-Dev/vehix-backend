@@ -201,3 +201,102 @@ class WithdrawSerializer(serializers.Serializer):
     def validate_amount(self, value):
         # Balance check will be done in the view
         return value
+
+
+class TransactionHistorySerializer(serializers.Serializer):
+    """Unified transaction history combining Payments and WalletTransactions"""
+    id = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    reason = serializers.CharField(source='get_reason', required=False)
+    status = serializers.SerializerMethodField()
+    reference = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField()
+
+    def get_id(self, obj):
+        if isinstance(obj, Payment):
+            return f"payment_{obj.id}"
+        return f"transaction_{obj.id}"
+
+    def get_type(self, obj):
+        if isinstance(obj, Payment):
+            return obj.transaction_type  # DEPOSIT or WITHDRAWAL
+        return "TRANSACTION"
+
+    def get_reason(self, obj):
+        if isinstance(obj, Payment):
+            return obj.description
+        return obj.reason or "Wallet Transaction"
+
+    def get_status(self, obj):
+        if isinstance(obj, Payment):
+            return obj.status
+        return "COMPLETED"
+
+    def get_reference(self, obj):
+        if isinstance(obj, Payment):
+            return obj.reference
+        return f"TXN-{obj.id}"
+
+
+class RoadiePaymentSummarySerializer(serializers.Serializer):
+    """Summary of roadie payments including balance and recent activity"""
+    current_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_earned = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_withdrawn = serializers.DecimalField(max_digits=12, decimal_places=2)
+    pending_deposits = serializers.DecimalField(max_digits=12, decimal_places=2)
+    transaction_count = serializers.IntegerField()
+
+
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for users to update their profile information"""
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'username',
+        )
+        read_only_fields = ('id',)
+
+    def validate_email(self, value):
+        user = self.instance
+        if User.objects.exclude(id=user.id).filter(email=value).exists():
+            raise serializers.ValidationError("This email is already in use.")
+        return value
+
+    def validate_phone(self, value):
+        user = self.instance
+        if User.objects.exclude(id=user.id).filter(phone=value).exists():
+            raise serializers.ValidationError("This phone number is already in use.")
+        return value
+
+    def validate_username(self, value):
+        user = self.instance
+        if User.objects.exclude(id=user.id).filter(username=value).exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
+
+    def update(self, instance, validated_data):
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.phone = validated_data.get('phone', instance.phone)
+        instance.username = validated_data.get('username', instance.username)
+        instance.save()
+        return instance
+
+
+class UserProfilePhotoSerializer(serializers.Serializer):
+    """Serializer for uploading profile photo"""
+    profile_photo = serializers.ImageField()
+
+    def validate_profile_photo(self, value):
+        # Simple validation
+        if value.size > 5 * 1024 * 1024:  # 5MB limit
+            raise serializers.ValidationError("Profile photo size must be less than 5MB.")
+        return value
+

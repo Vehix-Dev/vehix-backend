@@ -153,7 +153,7 @@ class CreateServiceRequestView(generics.CreateAPIView):
         matched_usernames = [r['rodie'].username for r in filtered]
         
         from requests.services import notify_rodies
-        notify_rodies(filtered, request_obj)
+        notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
         # mark ephemeral request status in cache so notify worker can poll without DB locks
         try:
             cache.set(f"request_status:{request_obj.id}", 'REQUESTED', timeout=120)
@@ -281,29 +281,96 @@ class CancelRequestView(APIView):
     def post(self, request, pk):
         user = request.user
         req = get_object_or_404(ServiceRequest, id=pk)
+        
+        # Minimum distance in km (100 meters = 0.1 km)
+        MIN_CANCEL_DISTANCE_KM = 0.1
+
+        # Get current locations from request body
+        current_lat = request.data.get('current_lat')
+        current_lng = request.data.get('current_lng')
 
         if user.role == 'RIDER' and req.rider_id == user.id:
-            req.status = 'CANCELLED'
-            req.save()
-            try:
-                cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
-            except Exception:
-                pass
-            return Response({'detail': 'Cancelled'})
+            # Rider can cancel if request is not yet accepted or in certain statuses
+            if req.status in ['REQUESTED', 'ACCEPTED']:
+                # Check distance if accepted
+                if req.status == 'ACCEPTED' and req.rodie:
+                    if current_lat and current_lng:
+                        try:
+                            # Get rodie's current location
+                            rodie_loc = RodieLocation.objects.get(rodie=req.rodie)
+                            dist_km = calculate_distance_km(
+                                float(current_lat), float(current_lng),
+                                float(rodie_loc.lat), float(rodie_loc.lng)
+                            )
+                            if dist_km < MIN_CANCEL_DISTANCE_KM:
+                                return Response(
+                                    {
+                                        'detail': f'Distance should be more than {int(MIN_CANCEL_DISTANCE_KM * 1000)} meters to cancel',
+                                        'min_distance_meters': int(MIN_CANCEL_DISTANCE_KM * 1000),
+                                        'current_distance_meters': max(1, int(dist_km * 1000))
+                                    },
+                                    status=status.HTTP_403_FORBIDDEN
+                                )
+                        except RodieLocation.DoesNotExist:
+                            # No location for rodie, allow cancel
+                            pass
+                    else:
+                        # No location provided, deny for safety
+                        return Response(
+                            {'detail': 'Current location required to cancel accepted request'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                
+                req.status = 'CANCELLED'
+                req.save()
+                try:
+                    cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
+                except Exception:
+                    pass
+                return Response({'detail': 'Request cancelled successfully'})
+            else:
+                return Response(
+                    {'detail': f'Cannot cancel request with status {req.status}'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        # rodie cancel rules: not allowed when within 10 meters of rider
+        # Rodie can cancel if request is accepted/en_route/started
         if user.role == 'RODIE' and req.rodie_id == user.id:
-            try:
-                loc = RodieLocation.objects.get(rodie=user)
-                dist_km = calculate_distance_km(float(loc.lat), float(loc.lng), float(req.rider_lat), float(req.rider_lng))
-                if dist_km <= 0.01:
-                    return Response({'detail': 'Cannot cancel: within proximity of rider'}, status=status.HTTP_403_FORBIDDEN)
-            except RodieLocation.DoesNotExist:
-                pass
-
-            req.status = 'CANCELLED'
-            req.save()
-            return Response({'detail': 'Cancelled'})
+            if req.status in ['ACCEPTED', 'EN_ROUTE', 'STARTED']:
+                # Check distance
+                if current_lat and current_lng:
+                    dist_km = calculate_distance_km(
+                        float(current_lat), float(current_lng),
+                        float(req.rider_lat), float(req.rider_lng)
+                    )
+                    if dist_km < MIN_CANCEL_DISTANCE_KM:
+                        return Response(
+                            {
+                                'detail': f'Distance should be more than {int(MIN_CANCEL_DISTANCE_KM * 1000)} meters to cancel',
+                                'min_distance_meters': int(MIN_CANCEL_DISTANCE_KM * 1000),
+                                'current_distance_meters': max(1, int(dist_km * 1000))
+                            },
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                else:
+                    # No location provided, deny for safety
+                    return Response(
+                        {'detail': 'Current location required to cancel'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                req.status = 'CANCELLED'
+                req.save()
+                try:
+                    cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
+                except Exception:
+                    pass
+                return Response({'detail': 'Request cancelled successfully'})
+            else:
+                return Response(
+                    {'detail': f'Cannot cancel request with status {req.status}'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         return Response({'detail': 'Not authorized to cancel'}, status=status.HTTP_403_FORBIDDEN)
 

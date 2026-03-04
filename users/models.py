@@ -62,6 +62,11 @@ class User(AbstractUser):
 
     current_login_id = models.UUIDField(null=True, blank=True, help_text="Used to enforce single device login")
 
+    services_selected = models.BooleanField(
+        default=False,
+        help_text="Tracks if roadie has selected services on first login"
+    )
+
     def save(self, *args, **kwargs):
         if not self.external_id:
             if self.role == 'RIDER':
