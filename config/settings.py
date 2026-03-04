@@ -273,6 +273,7 @@ else:
     CSRF_COOKIE_SECURE = False
 
 # Logging configuration
+# Logging configuration (Production Safe)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -281,35 +282,22 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
-            'formatter': 'verbose',
-        },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'corsheaders': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
         },
     },
 }
