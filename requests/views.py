@@ -5,6 +5,7 @@ from .serializers import ServiceRequestCreateSerializer
 from .services import find_nearby_rodies
 from services.models import RodieService
 from locations.utils import calculate_distance_km
+from locations.models import RodieLocation
 from django.core.cache import cache
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -80,7 +81,6 @@ class NearbyRodieListView(APIView):
 
         results = []
         from .osrm import get_route_info
-        from locations.models import RodieLocation
 
         for rs in rodie_services:
             rodie_id = rs.rodie.id
