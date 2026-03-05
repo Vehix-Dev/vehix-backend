@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import 'services_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -30,10 +31,33 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = false);
 
     if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen(role: widget.role)),
-      );
+      // Only for roadies, check if they need to select services
+      if (widget.role == 'RODIE') {
+        final userInfo = await ApiService.fetchUserInfo();
+        final servicesSelected = userInfo?['services_selected'] ?? false;
+
+        if (!servicesSelected) {
+          // First time login, show services selection
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ServicesSelectionScreen(role: widget.role),
+            ),
+          );
+        } else {
+          // Already selected services, go to home
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen(role: widget.role)),
+          );
+        }
+      } else {
+        // Non-roadie users go directly to home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => HomeScreen(role: widget.role)),
+        );
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login failed. Check credentials.")),

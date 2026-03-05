@@ -13,14 +13,15 @@ MAX_DISTANCE_KM = 50 # Increased for development/testing
 
 def find_nearby_rodies(service_type, rider_lat, rider_lng):
     """
-    Find Rodies within MAX_DISTANCE_KM who offer the requested service.
+    Find online Rodies within MAX_DISTANCE_KM who offer the requested service.
     Returns a sorted list by closest distance.
     """
     eligible_rodies = []
 
     rodie_services = RodieService.objects.filter(
         service=service_type,
-        rodie__is_active=True
+        rodie__is_active=True,
+        rodie__is_online=True  # Only online rodies
     ).select_related('rodie')
 
     for rs in rodie_services:

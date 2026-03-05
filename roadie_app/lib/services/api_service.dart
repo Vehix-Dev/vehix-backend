@@ -322,7 +322,6 @@ class ApiService {
       print("❌ GET error: $e");
       return null;
     }
-    }
   }
 
   /// Corrected: Backend uses /api/services/ for general service listing
@@ -420,5 +419,14 @@ class ApiService {
   static Future<List<dynamic>> getReferrals() async {
     final response = await get("/users/referrals/");
     return response is List ? response : [];
+  }
+
+  /// Rodie Status APIs
+  static Future<dynamic> updateRodieStatus(bool isOnline) async {
+    return await post(
+      "/roadie/status/",
+      {"is_online": isOnline},
+      requiresAuth: true,
+    );
   }
 }
