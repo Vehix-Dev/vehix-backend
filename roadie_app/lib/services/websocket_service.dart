@@ -38,12 +38,12 @@ class WebSocketService {
 
       // Map role to Django endpoint: RIDER -> rider, RODIE -> rodie, DRIVER -> rodie
       final roleEndpoint = _role == "RIDER" ? "rider" : "rodie";
-      final url = "wss://backend.vehix.ug/ws/$roleEndpoint/?token=$token";
+      final url = "wss://backend.vehix.ug:443/ws/$roleEndpoint/?token=$token";
       
-      debugPrint("🔌 WebSocket connecting to: wss://backend.vehix.ug/ws/$roleEndpoint/?token=***");
+      debugPrint("🔌 WebSocket connecting to: wss://backend.vehix.ug:443/ws/$roleEndpoint/?token=***");
 
       final uri = Uri.parse(url);
-      debugPrint("🔌 Parsed URI: ${uri.scheme}://${uri.host}:${uri.port}${uri.path}?${uri.query}");
+      debugPrint("🔌 Parsed URI: $url");
 
       _channel = WebSocketChannel.connect(uri);
 
@@ -53,15 +53,16 @@ class WebSocketService {
             final data = jsonDecode(event);
             _callback?.call(data);
           } catch (e) {
-            // Error decoding
+            debugPrint("❌ Error decoding WebSocket message: $e");
           }
         },
         onDone: () {
-          debugPrint("⚠️ WebSocket connection closed");
+          debugPrint("⚠️ WebSocket connection closed by server");
           _reconnect();
         },
         onError: (error) {
           debugPrint("❌ WebSocket error: $error");
+          debugPrint("   Error type: ${error.runtimeType}");
           _reconnect();
         },
       );

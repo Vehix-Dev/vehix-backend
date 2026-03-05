@@ -78,7 +78,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
         try:
+            print(f"🔌 [RodieConsumer] Connection attempt from user {user.id}")
             if not user.is_authenticated or user.role != "RODIE":
+                print(f"❌ [RodieConsumer] Auth failed - Authenticated: {user.is_authenticated}, Role: {user.role}")
                 await self.close()
                 return
 
@@ -88,6 +90,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add('notifications', self.channel_name)
             await self._set_online(user, True)
             await self.accept()
+            print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
 
             # Check for active offer if reconnected during dispatch
             try:
@@ -100,6 +103,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             except Exception:
                 pass
         except Exception as e:
+            print(f"❌ [RodieConsumer] Connection error: {e}")
             import logging; logging.exception("RodieConsumer connect error")
             await self.close()
 
@@ -198,7 +202,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 if req_id:
                     await self.channel_layer.group_add(f"request_{req_id}", self.channel_name)
                     await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
+            elif msg_type == 'PING':
+                # Handle keep-alive ping from client
+                await self.send_json({"type": "PONG"})
         except Exception as e:
+            print(f"❌ [RodieConsumer] receive_json error: {e}")
             import logging; logging.exception("RodieConsumer receive_json error")
 
     async def chat_message(self, event):
@@ -243,7 +251,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
         try:
+            print(f"🔌 [RiderConsumer] Connection attempt from user {user.id}")
             if not user.is_authenticated or user.role != "RIDER":
+                print(f"❌ [RiderConsumer] Auth failed - Authenticated: {user.is_authenticated}, Role: {user.role}")
                 await self.close()
                 return
 
@@ -262,7 +272,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
             await self.channel_layer.group_add('notifications', self.channel_name)
             await self.accept()
+            print(f"✅ [RiderConsumer] Connected successfully for user {user.id}")
         except Exception as e:
+            print(f"❌ [RiderConsumer] Connection error: {e}")
             import logging; logging.exception("RiderConsumer connect error")
             await self.close()
 
@@ -342,7 +354,11 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                             'created_at': timezone.now().isoformat(),
                         }
                     )
+            elif msg_type == 'PING':
+                # Handle keep-alive ping from client
+                await self.send_json({"type": "PONG"})
         except Exception as e:
+            print(f"❌ [RiderConsumer] receive_json error: {e}")
             import logging; logging.exception("RiderConsumer receive_json error")
 
     async def notification(self, event):
