@@ -178,11 +178,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 20,
-        }
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'parkingdb',
+        'USER': 'parkinguser',
+        'PASSWORD': 'strongpassword',  # Consider using environment variable
+        'HOST': 'localhost',
+        'PORT': '5432',
+        'CONN_MAX_AGE': 60,  # Persistent connections for performance
     }
 }
 
@@ -273,6 +275,7 @@ else:
     CSRF_COOKIE_SECURE = False
 
 # Logging configuration
+# Logging configuration (Production Safe)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -281,35 +284,22 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
-            'formatter': 'verbose',
-        },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'corsheaders': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
         },
     },
 }
