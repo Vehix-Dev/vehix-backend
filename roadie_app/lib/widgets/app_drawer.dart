@@ -6,9 +6,12 @@ import '../screens/referrals_screen.dart';
 import '../screens/help_screen.dart';
 import '../screens/wallet_screen.dart';
 import '../screens/history_screen.dart';
+import '../screens/services_selection_screen.dart';
 
 class AppDrawer extends StatefulWidget {
-  const AppDrawer({super.key});
+  final Map<String, dynamic>? userData;
+  
+  const AppDrawer({super.key, this.userData});
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();
@@ -20,7 +23,11 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    userData = widget.userData;
+    // Load user data if not provided
+    if (userData == null) {
+      _loadUserData();
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -40,19 +47,56 @@ class _AppDrawerState extends State<AppDrawer> {
     return Drawer(
       child: Column(
         children: [
-          UserAccountsDrawerHeader(
+          DrawerHeader(
             decoration: const BoxDecoration(color: Color(0xFF10223D)),
-            accountName: Text(displayName),
-            accountEmail: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (email.isNotEmpty) Text(email),
-                if (phone.isNotEmpty) Text(phone),
+                CircleAvatar(
+                  radius: 35,
+                  backgroundColor: Colors.white,
+                  backgroundImage: const AssetImage('assets/logo.jpeg'),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (email.isNotEmpty)
+                        Text(
+                          email,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      if (phone.isNotEmpty)
+                        Text(
+                          phone,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
               ],
-            ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              backgroundImage: const AssetImage('assets/logo.jpeg'),
             ),
           ),
           ListTile(
@@ -60,9 +104,22 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Profile'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.build, color: Color(0xFF10223D)),
+            title: const Text('Manage My Services'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ServicesSelectionScreen(role: 'RODIE'),
+                ),
               );
             },
           ),
@@ -71,7 +128,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Wallet'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const WalletScreen()),
               );
@@ -82,7 +139,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('History'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const HistoryScreen()),
               );
@@ -93,7 +150,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Referrals'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const ReferralsScreen()),
               );
@@ -104,7 +161,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Help'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const HelpScreen()),
               );
@@ -138,3 +195,4 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 }
+

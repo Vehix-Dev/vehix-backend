@@ -27,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Map? activeOffer;
   Timer? _locationTimer;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  Map<String, dynamic>? userData;
+  bool _isOnline = false;
 
   final String _tileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -38,6 +40,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeScreen() async {
     try {
+      // Load user data first
+      final userInfo = await ApiService.fetchUserInfo();
+      if (mounted) {
+        setState(() {
+          userData = userInfo;
+          _isOnline = userInfo?['is_online'] ?? false;
+        });
+      }
+      
       await _initLocation();
       setState(() => _loadingStatus = "Connecting...");
       await _connectWS();
@@ -67,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.of(context).pop();
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => LoginScreen(role: widget.role)),
               );
             },
             child: const Text('OK'),
@@ -75,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
   }
 
   Future<void> _initLocation() async {
@@ -151,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
           desiredAccuracy: LocationAccuracy.high,
         );
         ws.sendLocation(lat: position.latitude, lng: position.longitude);
+        debugPrint("📍 [Roadie] Location sent: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}");
       } catch (e) {
         // Silently fail in background
       }
@@ -213,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
+      drawer: AppDrawer(userData: userData),
       body: Stack(
         children: [
           FlutterMap(
@@ -272,37 +283,48 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
+                      color: (_isOnline ? Colors.green : Colors.red).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.online_prediction,
-                      color: Colors.green,
+                      color: _isOnline ? Colors.green : Colors.red,
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Status: Online",
-                          style: TextStyle(
+                          _isOnline ? "Status: Online" : "Status: Offline",
+                          style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             color: Color(0xFF10223D),
                           ),
                         ),
                         Text(
-                          "Ready for requests",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          _isOnline ? "Ready for requests" : "Currently unavailable",
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   Switch(
-                    value: true,
+                    value: _isOnline,
                     activeThumbColor: const Color(0xFFFF8C00),
-                    onChanged: (v) {},
+                    onChanged: (newValue) async {
+                      setState(() => _isOnline = newValue);
+                      debugPrint("🟢 [Roadie] Online status updated to: ${newValue ? 'ONLINE' : 'OFFLINE'}");
+                      final response = await ApiService.updateRodieStatus(newValue);
+                      if (response == null && mounted) {
+                        setState(() => _isOnline = !newValue);
+                        debugPrint("❌ [Roadie] Failed to update online status");
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Failed to update status")),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),

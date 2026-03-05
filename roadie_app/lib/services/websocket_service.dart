@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'api_service.dart';
 
@@ -27,6 +28,7 @@ class WebSocketService {
 
     try {
       if (token == null || token.isEmpty) {
+        debugPrint("❌ No token available for WebSocket connection");
         return;
       }
 
@@ -37,8 +39,13 @@ class WebSocketService {
       // Map role to Django endpoint: RIDER -> rider, RODIE -> rodie, DRIVER -> rodie
       final roleEndpoint = _role == "RIDER" ? "rider" : "rodie";
       final url = "wss://backend.vehix.ug/ws/$roleEndpoint/?token=$token";
+      
+      debugPrint("🔌 WebSocket connecting to: wss://backend.vehix.ug/ws/$roleEndpoint/?token=***");
 
-      _channel = WebSocketChannel.connect(Uri.parse(url));
+      final uri = Uri.parse(url);
+      debugPrint("🔌 Parsed URI: ${uri.scheme}://${uri.host}:${uri.port}${uri.path}?${uri.query}");
+
+      _channel = WebSocketChannel.connect(uri);
 
       _channel!.stream.listen(
         (event) {
@@ -50,9 +57,11 @@ class WebSocketService {
           }
         },
         onDone: () {
+          debugPrint("⚠️ WebSocket connection closed");
           _reconnect();
         },
         onError: (error) {
+          debugPrint("❌ WebSocket error: $error");
           _reconnect();
         },
       );
@@ -63,7 +72,9 @@ class WebSocketService {
 
       // Reset reconnect attempts after successful connection
       _reconnectAttempts = 0;
+      debugPrint("✅ WebSocket connected successfully");
     } catch (e) {
+      debugPrint("❌ WebSocket connection error: $e");
       _reconnect();
     }
   }

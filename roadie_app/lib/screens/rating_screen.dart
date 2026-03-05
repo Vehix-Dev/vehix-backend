@@ -30,7 +30,7 @@ class _RatingScreenState extends State<RatingScreen> {
       
       // Navigate to HomeScreen
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen(role: 'RODIE')),
         (route) => false,
       );
     } catch (e) {
@@ -45,7 +45,7 @@ class _RatingScreenState extends State<RatingScreen> {
 
   void goHome() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const HomeScreen(role: 'RODIE')),
       (route) => false,
     );
   }

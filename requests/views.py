@@ -129,11 +129,18 @@ class CreateServiceRequestView(generics.CreateAPIView):
             status='REQUESTED'
         )
 
+        print(f"\n📍 RIDER REQUEST: {self.request.user.username} requesting {request_obj.service_type.name} at ({request_obj.rider_lat}, {request_obj.rider_lng})")
+
         nearby_rodies = find_nearby_rodies(
             request_obj.service_type,
             float(request_obj.rider_lat),
             float(request_obj.rider_lng)
         )
+
+        print(f"📡 Found {len(nearby_rodies)} nearby online rodies offering {request_obj.service_type.name}:")
+        for item in nearby_rodies:
+            rodie = item.get('rodie')
+            print(f"  - {rodie.username}: {item['distance']:.2f}km away, is_online={rodie.is_online}")
 
         filtered = []
         matched_usernames = []
@@ -151,6 +158,8 @@ class CreateServiceRequestView(generics.CreateAPIView):
 
         filtered = [r for r in filtered if r['rodie'].id != self.request.user.id]
         matched_usernames = [r['rodie'].username for r in filtered]
+        
+        print(f"✅ MATCHED RODIES (after wallet/filters): {matched_usernames}\n")
         
         from requests.services import notify_rodies
         notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
