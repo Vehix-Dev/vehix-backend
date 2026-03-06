@@ -78,9 +78,13 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
         try:
+            if not user.is_authenticated:
+                print(f"❌ [RodieConsumer] Auth failed - user is AnonymousUser")
+                await self.close()
+                return
             print(f"🔌 [RodieConsumer] Connection attempt from user {user.id}")
-            if not user.is_authenticated or user.role != "RODIE":
-                print(f"❌ [RodieConsumer] Auth failed - Authenticated: {user.is_authenticated}, Role: {user.role}")
+            if user.role != "RODIE":
+                print(f"❌ [RodieConsumer] Auth failed - Role: {user.role} (expected RODIE)")
                 await self.close()
                 return
 
@@ -251,9 +255,13 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
         try:
+            if not user.is_authenticated:
+                print(f"❌ [RiderConsumer] Auth failed - user is AnonymousUser")
+                await self.close()
+                return
             print(f"🔌 [RiderConsumer] Connection attempt from user {user.id}")
-            if not user.is_authenticated or user.role != "RIDER":
-                print(f"❌ [RiderConsumer] Auth failed - Authenticated: {user.is_authenticated}, Role: {user.role}")
+            if user.role != "RIDER":
+                print(f"❌ [RiderConsumer] Auth failed - Role: {user.role} (expected RIDER)")
                 await self.close()
                 return
 

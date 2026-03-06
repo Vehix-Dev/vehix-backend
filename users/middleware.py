@@ -12,17 +12,21 @@ User = get_user_model()
 def get_user(token_key):
     try:
         access_token = AccessToken(token_key)
-        user = User.objects.get(id=access_token['user_id'])
+        user_id = access_token['user_id']
+        user = User.objects.get(id=user_id)
         
         # Check if token's login_id matches user's current login session
         token_login_id = access_token.get('login_id')
-        if not token_login_id or str(user.current_login_id) != str(token_login_id):
-            print(f"JWT Auth Error: Session invalid - device logged out elsewhere")
+        db_login_id = str(user.current_login_id) if user.current_login_id else None
+        
+        if not token_login_id or db_login_id != str(token_login_id):
+            print(f"WS Auth Error: Session invalid for user {user_id} - token_login_id={token_login_id}, db_login_id={db_login_id}")
             return AnonymousUser()
         
+        print(f"WS Auth OK: user {user_id} ({user.role})")
         return user
     except Exception as e:
-        print(f"JWT Auth Error: {e}")
+        print(f"WS Auth Error: {e}")
         return AnonymousUser()
 
 class JwtAuthMiddleware(BaseMiddleware):
