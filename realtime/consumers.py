@@ -160,15 +160,22 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 rider_id = content.get("rider_id")
                 lat = content.get("lat")
                 lng = content.get("lng")
-                if rider_id is not None and lat is not None and lng is not None:
-                    await self.channel_layer.group_send(
-                        f"rider_{rider_id}",
-                        {
-                            "type": "rodie_location",
-                            "lat": lat,
-                            "lng": lng
-                        }
-                    )
+                if lat is not None and lng is not None:
+                    # Always cache rodie location for matching
+                    try:
+                        await cache_set_rodie_location(self.scope['user'].id, lat, lng)
+                    except Exception:
+                        pass
+                    # Relay to specific rider if during active ride
+                    if rider_id is not None:
+                        await self.channel_layer.group_send(
+                            f"rider_{rider_id}",
+                            {
+                                "type": "rodie_location",
+                                "lat": lat,
+                                "lng": lng
+                            }
+                        )
                     await self.channel_layer.group_send(
                         "admin_monitoring",
                         {
@@ -178,11 +185,6 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                             "lng": lng
                         }
                     )
-                    # persist rodie's broadcast location to cache (avoid frequent DB writes)
-                    try:
-                        await cache_set_rodie_location(self.scope['user'].id, lat, lng)
-                    except Exception:
-                        pass
             elif msg_type == 'CHAT':
                 request_id = content.get('request_id')
                 text = content.get('text')
