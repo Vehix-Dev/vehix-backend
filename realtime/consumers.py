@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from requests.models import ServiceRequest
 from requests.models_chat import ChatMessage
 from users.models import RiderAvailabilityLog
+from locations.models import RodieLocation
 from django.utils import timezone
 from django.core.cache import cache
 User = get_user_model()
@@ -287,9 +288,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
 
     async def disconnect(self, close_code):
-        user = self.scope["user"]
         try:
-            if user.is_authenticated:
+            user = self.scope.get("user")
+            if user and user.is_authenticated:
                 await self._log_offline(user)
                 await self.channel_layer.group_send(
                     "admin_monitoring",

@@ -38,9 +38,9 @@ class WebSocketService {
 
       // Map role to Django endpoint: RIDER -> rider, RODIE -> rodie, DRIVER -> rodie
       final roleEndpoint = _role == "RIDER" ? "rider" : "rodie";
-      final url = "wss://backend.vehix.ug:443/ws/$roleEndpoint/?token=$token";
+      final url = "wss://backend.vehix.ug/ws/$roleEndpoint/?token=$token";
       
-      debugPrint("🔌 WebSocket connecting to: wss://backend.vehix.ug:443/ws/$roleEndpoint/?token=***");
+      debugPrint("🔌 WebSocket connecting to: wss://backend.vehix.ug/ws/$roleEndpoint/?token=***");
 
       final uri = Uri.parse(url);
       debugPrint("🔌 Parsed URI: $url");
