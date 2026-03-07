@@ -253,12 +253,12 @@ class DepositView(APIView):
         try:
             client = PesapalClient()
             callback_url = request.build_absolute_uri('/api/users/wallet/callback/') 
-            response = client.submit_order(payment, callback_url)
+            phone_number = request.data.get('phone_number')
+            response = client.submit_order(payment, callback_url, phone_number)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
 
-            phone_number = request.data.get('phone_number')
             stk_response = None
             if phone_number:
                 try:
@@ -445,12 +445,12 @@ class RoadiePaymentsView(APIView):
         try:
             client = PesapalClient()
             callback_url = request.build_absolute_uri('/api/users/payments/pesapal/ipn/')
-            response = client.submit_order(payment, callback_url)
+            phone_number = request.data.get('phone_number')
+            response = client.submit_order(payment, callback_url, phone_number)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
 
-            phone_number = request.data.get('phone_number')
             stk_response = None
             if phone_number:
                 try:
