@@ -243,6 +243,12 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def request_expired(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
 
+    async def rodie_status(self, event):
+        await self.send_json({
+            "type": "RODIE_STATUS",
+            "data": event
+        })
+
 
 class RiderConsumer(AsyncJsonWebsocketConsumer):
 
