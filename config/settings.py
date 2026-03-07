@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-import os
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -314,10 +314,10 @@ if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
 # Pesapal Payment Configuration
-PESAPAL_URL = os.environ.get('PESAPAL_URL', 'https://pay.pesapal.com/v3')
-PESAPAL_CONSUMER_KEY = os.environ.get('PESAPAL_CONSUMER_KEY', '')
-PESAPAL_CONSUMER_SECRET = os.environ.get('PESAPAL_CONSUMER_SECRET', '')
-PESAPAL_IPN_ID = os.environ.get('PESAPAL_IPN_ID', '')
+PESAPAL_URL = config('PESAPAL_URL', default='https://pay.pesapal.com/v3')
+PESAPAL_CONSUMER_KEY = config('PESAPAL_CONSUMER_KEY', default='')
+PESAPAL_CONSUMER_SECRET = config('PESAPAL_CONSUMER_SECRET', default='')
+PESAPAL_IPN_ID = config('PESAPAL_IPN_ID', default='')
 
 # Debug: Print Pesapal config (remove in production)
 if DEBUG:
