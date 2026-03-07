@@ -59,7 +59,7 @@ class PesapalClient:
         print(f"Pesapal Auth Failed: {response.status_code} - {response.text}")
         return None
 
-    def submit_order(self, payment, callback_url):
+    def submit_order(self, payment, callback_url, phone_number=None):
         token = self.get_token()
         if not token:
             raise Exception("Failed to authenticate with Pesapal")
@@ -71,6 +71,9 @@ class PesapalClient:
             "Authorization": f"Bearer {token}"
         }
         
+        # Use provided phone number or fall back to user's phone
+        payment_phone = phone_number or payment.user.phone or ""
+        
         # Construct payload
         payload = {
             "id": payment.reference,
@@ -81,7 +84,7 @@ class PesapalClient:
             "notification_id": self.IPN_ID,
             "billing_address": {
                 "email_address": payment.user.email or "user@example.com",
-                "phone_number": payment.user.phone or "",
+                "phone_number": payment_phone,  # Use the provided phone number
                 "country_code": "UG",  # Changed to Uganda
                 "first_name": payment.user.first_name or "User",
                 "middle_name": "",
