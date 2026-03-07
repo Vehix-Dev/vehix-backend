@@ -429,4 +429,13 @@ class ApiService {
       requiresAuth: true,
     );
   }
+
+  /// Rodie Services APIs
+  static Future<dynamic> saveRodieServices(List<int> serviceIds) async {
+    return await post(
+      "/auth/rodie/services/",
+      {"service_ids": serviceIds},
+      requiresAuth: true,
+    );
+  }
 }

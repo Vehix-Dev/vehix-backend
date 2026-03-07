@@ -34,9 +34,15 @@ class _LoginScreenState extends State<LoginScreen> {
       // Only for roadies, check if they need to select services
       if (widget.role == 'RODIE') {
         final userInfo = await ApiService.fetchUserInfo();
-        final servicesSelected = userInfo?['services_selected'] ?? false;
+        
+        // Check if user has any services selected
+        final hasServices = userInfo?['services'] != null && 
+                           (userInfo!['services'] as List).isNotEmpty;
 
-        if (!servicesSelected) {
+        debugPrint("🔍 Roadie services check: hasServices = $hasServices");
+        debugPrint("🔍 User services: ${userInfo?['services']}");
+
+        if (!hasServices) {
           // First time login, show services selection
           Navigator.pushReplacement(
             context,

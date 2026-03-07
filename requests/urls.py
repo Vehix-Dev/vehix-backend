@@ -11,6 +11,7 @@ from .views import (
     RiderRequestsListView,
     RoadieRequestsListView,
     NearbyRodieListView,
+    RateServiceRequestView,
 )
 
 urlpatterns = [
@@ -24,5 +25,6 @@ urlpatterns = [
     path('<int:pk>/enroute/', EnrouteRequestView.as_view(), name='request_enroute'),
     path('<int:pk>/start/', StartRequestView.as_view(), name='request_start'),
     path('<int:pk>/complete/', CompleteRequestView.as_view(), name='request_complete'),
+    path('<int:pk>/rate/', RateServiceRequestView.as_view(), name='request_rate'),
     path('nearby/', NearbyRodieListView.as_view(), name='nearby_rodies'),
 ]
