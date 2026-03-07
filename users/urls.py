@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, UserProfileUpdateView, UserProfilePhotoUploadView
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -59,6 +59,7 @@ urlpatterns = [
     path('wallet/deposit/', DepositView.as_view(), name='wallet_deposit'),
     path('wallet/withdraw/', WithdrawView.as_view(), name='wallet_withdraw'),
     path('roadie/payments/', RoadiePaymentsView.as_view(), name='roadie_payments'),
+    path('payments/status/<str:reference>/', PaymentStatusView.as_view(), name='payment_status'),
     path('payments/pesapal/ipn/', PesapalIPNView.as_view(), name='pesapal_ipn'),
     path('referrals/', MyReferralsView.as_view(), name='my_referrals'),
     path('roadie/status/', RoadieStatusUpdateView.as_view(), name='roadie_status_update'),

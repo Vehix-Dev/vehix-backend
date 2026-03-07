@@ -285,33 +285,67 @@ class WithdrawView(APIView):
         serializer = WithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         amount = serializer.validated_data['amount']
+        phone_number = serializer.validated_data.get('phone_number', request.user.phone)
 
+        # Get or create wallet
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
-        if wallet.balance < amount:
-            return Response({'error': 'Insufficient funds'}, status=status.HTTP_400_BAD_REQUEST)
-
-        wallet.balance -= amount
-        wallet.save()
-
-        import uuid
-        reference = f"WTH-{uuid.uuid4().hex[:12].upper()}"
         
-        Payment.objects.create(
-            user=request.user,
-            amount=amount,
-            transaction_type='WITHDRAWAL',
-            status='PENDING', 
-            reference=reference,
-            description=f"Withdrawal request to {serializer.validated_data.get('phone_number', request.user.phone)}"
-        )
+        # Check sufficient funds
+        if wallet.balance < amount:
+            return Response({
+                'error': 'Insufficient funds', 
+                'available_balance': str(wallet.balance),
+                'requested_amount': str(amount)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        WalletTransaction.objects.create(
-            wallet=wallet,
-            amount=-amount,
-            reason=f"Withdrawal request {reference}"
-        )
+        # Check minimum withdrawal amount (e.g., 100 UGX)
+        if amount < 100:
+            return Response({
+                'error': 'Minimum withdrawal amount is 100 UGX'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'message': 'Withdrawal request submitted', 'reference': reference})
+        try:
+            # Deduct amount from wallet
+            wallet.balance -= amount
+            wallet.save()
+
+            # Create withdrawal request
+            import uuid
+            reference = f"WTH-{uuid.uuid4().hex[:12].upper()}"
+            
+            payment = Payment.objects.create(
+                user=request.user,
+                amount=amount,
+                transaction_type='WITHDRAWAL',
+                status='PENDING', 
+                reference=reference,
+                description=f"Withdrawal request to {phone_number}"
+            )
+
+            # Create wallet transaction
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                amount=-amount,
+                reason=f"Withdrawal request {reference}"
+            )
+
+            return Response({
+                'success': True,
+                'message': 'Withdrawal request submitted successfully',
+                'reference': reference,
+                'amount': str(amount),
+                'phone_number': phone_number,
+                'new_balance': str(wallet.balance)
+            })
+
+        except Exception as e:
+            # Refund the amount if something went wrong
+            wallet.balance += amount
+            wallet.save()
+            return Response({
+                'error': 'Failed to process withdrawal request',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class RoadiePaymentsView(APIView):
@@ -410,7 +444,7 @@ class RoadiePaymentsView(APIView):
 
         try:
             client = PesapalClient()
-            callback_url = request.build_absolute_uri('/api/users/wallet/callback/')
+            callback_url = request.build_absolute_uri('/api/users/payments/pesapal/ipn/')
             response = client.submit_order(payment, callback_url)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
@@ -422,7 +456,7 @@ class RoadiePaymentsView(APIView):
                 try:
                     stk_response = client.submit_mobile_payment(tracking_id, phone_number)
                 except Exception as stk_e:
-                    pass
+                    print(f"STK Push failed: {stk_e}")
 
             return Response({
                 'success': True,
@@ -443,6 +477,65 @@ class RoadiePaymentsView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class PaymentStatusView(APIView):
+    """
+    GET: Check the status of a specific payment
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, reference):
+        try:
+            payment = Payment.objects.get(reference=reference, user=request.user)
+            
+            # If payment is still pending, try to get updated status from Pesapal
+            if payment.status == 'PENDING' and payment.processor_id:
+                try:
+                    from .pesapal import PesapalClient
+                    client = PesapalClient()
+                    status_data = client.get_transaction_status(payment.processor_id)
+                    
+                    if status_data:
+                        pesapal_status = status_data.get('payment_status_description')
+                        if pesapal_status == 'COMPLETED':
+                            payment.status = 'COMPLETED'
+                            payment.save()
+                            
+                            # Credit wallet if this is a deposit
+                            if payment.transaction_type == 'DEPOSIT':
+                                wallet, _ = Wallet.objects.get_or_create(user=payment.user)
+                                wallet.balance += payment.amount
+                                wallet.save()
+                                WalletTransaction.objects.create(
+                                    wallet=wallet,
+                                    amount=payment.amount,
+                                    reason=f"Deposit {payment.reference}"
+                                )
+                        elif pesapal_status == 'FAILED':
+                            payment.status = 'FAILED'
+                            payment.save()
+                except Exception as e:
+                    print(f"Failed to update payment status: {e}")
+
+            return Response({
+                'success': True,
+                'payment': {
+                    'id': payment.id,
+                    'reference': payment.reference,
+                    'amount': str(payment.amount),
+                    'status': payment.status,
+                    'transaction_type': payment.transaction_type,
+                    'created_at': payment.created_at,
+                    'updated_at': payment.updated_at
+                }
+            })
+
+        except Payment.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Payment not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
 class PesapalIPNView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -451,7 +544,7 @@ class PesapalIPNView(APIView):
         merchant_reference = request.query_params.get('OrderMerchantReference')
         
         if not tracking_id or not merchant_reference:
-            return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
+            return Response({'status': 'ignored', 'message': 'Missing parameters'}, status=status.HTTP_200_OK)
 
         from .pesapal import PesapalClient
         from decimal import Decimal
@@ -459,13 +552,19 @@ class PesapalIPNView(APIView):
         try:
             payment = Payment.objects.get(reference=merchant_reference)
         except Payment.DoesNotExist:
-            return Response({'status': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'not found', 'message': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        client = PesapalClient()
-        status_data = client.get_transaction_status(tracking_id)
-        
-        if status_data:
+        try:
+            client = PesapalClient()
+            status_data = client.get_transaction_status(tracking_id)
+            
+            if not status_data:
+                payment.status = 'FAILED'
+                payment.save()
+                return Response({'status': 'failed', 'message': 'Could not verify payment status'}, status=status.HTTP_400_BAD_REQUEST)
+            
             pesapal_status = status_data.get('payment_status_description') 
+            print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}")
             
             if pesapal_status == 'COMPLETED' and payment.status != 'COMPLETED':
                 payment.status = 'COMPLETED'
@@ -480,13 +579,22 @@ class PesapalIPNView(APIView):
                         amount=payment.amount,
                         reason=f"Deposit {payment.reference}"
                     )
+                    print(f"Deposit completed: {payment.amount} added to {payment.user.username}'s wallet")
+                    
             elif pesapal_status == 'FAILED':
-                payment.status = 'FAILED'
-                payment.save()
+                if payment.status != 'FAILED':
+                    payment.status = 'FAILED'
+                    payment.save()
+                    print(f"Payment failed: {payment.reference}")
+                    
+        except Exception as e:
+            print(f"Pesapal IPN Error: {e}")
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
             'orderNotificationType': request.query_params.get('OrderNotificationType'),
             'orderTrackingId': tracking_id,
             'orderMerchantReference': merchant_reference,
-            'status': 200
+            'status': 200,
+            'payment_status': payment.status
         })
