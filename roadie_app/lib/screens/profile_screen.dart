@@ -13,12 +13,31 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? user;
   bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isUploadingPhoto = false;
+  String? _profilePhotoUrl;
   final ImagePicker _picker = ImagePicker();
+
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _usernameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -27,6 +46,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       setState(() {
         user = data;
+        _firstNameController.text = data?['first_name'] ?? '';
+        _lastNameController.text = data?['last_name'] ?? '';
+        _usernameController.text = data?['username'] ?? '';
+        _emailController.text = data?['email'] ?? '';
+        _phoneController.text = data?['phone'] ?? '';
         _isLoading = false;
       });
     }
@@ -50,113 +74,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? "Successfully uploaded $type"
                 : "Failed to upload $type",
           ),
-          backgroundColor: response != null ? Colors.green : Colors.red,
         ),
       );
-      _loadUser(); // Refresh status
+      if (response != null) _loadUser(); // Refresh user data
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (!mounted) return;
+    setState(() => _isSaving = true);
+
+    final updatedData = {
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+      'username': _usernameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+    };
+
+    try {
+      final response = await ApiService.post("/me/", updatedData, requiresAuth: true);
+      if (mounted) {
+        if (response != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Profile updated successfully!")),
+          );
+          _loadUser(); // Refresh to show updated data
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update profile")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile')),
+      appBar: AppBar(
+        title: const Text("Profile"),
+        backgroundColor: const Color(0xFF10223D),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : user == null
-          ? const Center(child: Text("Failed to load profile"))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Profile Photo Section
                   Center(
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.blue.shade100,
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.blue,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: user?['profile_photo'] != null
+                              ? NetworkImage(user!['profile_photo'])
+                              : null,
+                          child: user?['profile_photo'] == null
+                              ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () => _uploadImage('profile_photo'),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFF8C00),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Profile Form
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildTextField(_firstNameController, "First Name", Icons.person),
+                          _buildTextField(_lastNameController, "Last Name", Icons.person_outline),
+                          _buildTextField(_usernameController, "Username", Icons.alternate_email),
+                          _buildTextField(_emailController, "Email", Icons.email),
+                          _buildTextField(_phoneController, "Phone", Icons.phone),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildInfoSection("Personal Info", [
-                    _buildInfoRow(Icons.person, "Username", user!['username']),
-                    _buildInfoRow(Icons.email, "Email", user!['email']),
-                    _buildInfoRow(Icons.phone, "Phone", user!['phone']),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildInfoSection("Wallet", [
-                    _buildInfoRow(
-                      Icons.account_balance_wallet,
-                      "Balance",
-                      "UGX ${user!['wallet']?['balance'] ?? '0.00'}",
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {}, // Future: Wallet Screen
-                            icon: const Icon(Icons.add),
-                            label: const Text("Deposit"),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {}, // Future: Withdrawal
-                            icon: const Icon(Icons.file_download),
-                            label: const Text("Withdraw"),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildInfoSection("KYC & Verification", [
-                    _buildInfoRow(
-                      Icons.verified_user,
-                      "Status",
-                      user!['is_approved'] == true
-                          ? "Approved ✅"
-                          : "Pending Approval ⏳",
-                      color: user!['is_approved'] == true
-                          ? Colors.green
-                          : Colors.orange,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      "Upload Documents",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _buildUploadChip("NIN Front", "NIN_FRONT"),
-                        _buildUploadChip("NIN Back", "NIN_BACK"),
-                        _buildUploadChip("License", "LICENSE_FRONT"),
-                      ],
-                    ),
-                  ]),
-                  const SizedBox(height: 40),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        final navigator = Navigator.of(context);
-                        await ApiService.logout();
-                        if (mounted) {
-                          navigator.pushReplacementNamed('/login');
-                        }
-                      },
-                      icon: const Icon(Icons.logout, color: Colors.red),
-                      label: const Text(
-                        "Logout",
-                        style: TextStyle(color: Colors.red),
+
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveProfile,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF8C00),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      child: _isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Save Changes",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ),
                 ],
@@ -165,56 +213,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue,
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF10223D)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFFF8C00)),
           ),
         ),
-        const Divider(),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(
-    IconData icon,
-    String label,
-    String? value, {
-    Color? color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.w500)),
-          Expanded(
-            child: Text(
-              value ?? "N/A",
-              style: TextStyle(
-                color: color,
-                fontWeight: color != null ? FontWeight.bold : null,
-              ),
-            ),
-          ),
-        ],
       ),
-    );
-  }
-
-  Widget _buildUploadChip(String label, String type) {
-    return ActionChip(
-      avatar: const Icon(Icons.upload_file, size: 16),
-      label: Text(label),
-      onPressed: () => _uploadImage(type),
     );
   }
 }

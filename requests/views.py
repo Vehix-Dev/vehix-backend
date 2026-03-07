@@ -1,5 +1,7 @@
 from rest_framework import generics
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions, status
 from .models import ServiceRequest
 from .serializers import ServiceRequestCreateSerializer
 from .services import find_nearby_rodies
@@ -12,8 +14,6 @@ from asgiref.sync import async_to_sync
 from users.models import Wallet, PlatformConfig
 from rest_framework.exceptions import PermissionDenied
 from decimal import Decimal
-from rest_framework import permissions, status
-from rest_framework.response import Response
 
 try:
     from .serializers import ChatMessageSerializer
@@ -462,3 +462,118 @@ class CompleteRequestView(APIView):
         except Exception:
             pass
         return Response({'detail': 'Service completed'})
+
+
+class RateServiceRequestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, pk):
+        try:
+            service_request = get_object_or_404(ServiceRequest, pk=pk)
+            
+            # Validate that the request is completed
+            if service_request.status != 'COMPLETED':
+                return Response(
+                    {'detail': 'You can only rate completed requests'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get rating data
+            rating = request.data.get('rating')
+            role = request.data.get('role')
+            
+            if not rating or not role:
+                return Response(
+                    {'detail': 'Rating and role are required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate rating value (1-5)
+            try:
+                rating = int(rating)
+                if rating < 1 or rating > 5:
+                    return Response(
+                        {'detail': 'Rating must be between 1 and 5'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'detail': 'Invalid rating format'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate role
+            if role not in ['RIDER', 'RODIE']:
+                return Response(
+                    {'detail': 'Invalid role'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user is authorized to rate
+            if role == 'RIDER' and service_request.rider_id != request.user.id:
+                return Response(
+                    {'detail': 'You can only rate as the rider of this request'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if role == 'RODIE' and service_request.rodie_id != request.user.id:
+                return Response(
+                    {'detail': 'You can only rate as the roadie of this request'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Update the appropriate rating field
+            if role == 'RIDER':
+                service_request.rider_rating = rating
+            elif role == 'RODIE':
+                service_request.ROADIE_rating = rating
+            
+            service_request.save()
+            
+            # Update the rated user's overall rating
+            if role == 'RIDER':
+                # Update roadie's rating
+                self._update_user_rating(service_request.rodie, 'roadie')
+            elif role == 'RODIE':
+                # Update rider's rating
+                self._update_user_rating(service_request.rider, 'rider')
+            
+            return Response({
+                'detail': 'Rating submitted successfully',
+                'rating': rating,
+                'role': role
+            })
+            
+        except Exception as e:
+            return Response(
+                {'detail': f'Error submitting rating: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _update_user_rating(self, user, user_type):
+        """Update user's overall rating based on all their completed requests"""
+        try:
+            if user_type == 'roadie':
+                # Get all ratings given to this roadie by riders
+                ratings = ServiceRequest.objects.filter(
+                    rodie=user,
+                    status='COMPLETED',
+                    rider_rating__isnull=False
+                ).values_list('rider_rating', flat=True)
+            else:  # rider
+                # Get all ratings given to this rider by roadies
+                ratings = ServiceRequest.objects.filter(
+                    rider=user,
+                    status='COMPLETED',
+                    ROADIE_rating__isnull=False
+                ).values_list('ROADIE_rating', flat=True)
+            
+            if ratings:
+                avg_rating = sum(ratings) / len(ratings)
+                # Update user's rating field (assuming User model has rating field)
+                user.rating = round(avg_rating, 1)
+                user.save(update_fields=['rating'])
+                
+        except Exception as e:
+            # Log error but don't fail the rating submission
+            print(f"Error updating user rating: {e}")

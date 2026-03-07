@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? userData;
   bool _isOnline = false;
 
-  final String _tileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  final String _tileTemplate = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
   @override
   void initState() {
@@ -198,29 +198,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: false,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: Colors.white,
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         foregroundColor: const Color(0xFF10223D),
         title: const Text(
           "Roadie Portal",
-          style: TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24),
         ),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_none,
+              color: Color(0xFF10223D),
+              size: 28,
             ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.notifications_none,
-                color: Color(0xFF10223D),
-              ),
-              onPressed: () {},
-            ),
+            onPressed: () {},
           ),
         ],
       ),
@@ -229,34 +224,53 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: currentLocation!,
+              initialCenter: currentLocation ?? const LatLng(0.3356, 32.5830), // Uganda center fallback
               initialZoom: 15,
             ),
             children: [
               TileLayer(
                 urlTemplate: _tileTemplate,
+                subdomains: const ['a', 'b', 'c', 'd'],
+                retinaMode: RetinaMode.isHighDensity(context),
                 userAgentPackageName: 'com.vehix.roadie',
               ),
               MarkerLayer(
                 markers: [
-                  Marker(
-                    point: currentLocation!,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF8C00).withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.my_location,
-                          color: Color(0xFFFF8C00),
-                          size: 30,
-                        ),
+                  if (currentLocation != null)
+                    Marker(
+                      point: currentLocation!,
+                      width: 60,
+                      height: 60,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10223D).withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF8C00), // Roadie color
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFF8C00).withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -336,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showOfferDialog(Map request) {
-    int timeLeft = 10;
+    int timeLeft = 15;
     Timer? dialogTimer;
 
     showDialog(
@@ -349,7 +363,13 @@ class _HomeScreenState extends State<HomeScreen> {
               setDialogState(() => timeLeft--);
             } else {
               timer.cancel();
-              if (Navigator.canPop(context)) Navigator.pop(context);
+              // Close dialog and auto-decline the request when time expires
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+              // Auto-decline the request when timer expires
+              ApiService.declineRequest(request['id']);
+              debugPrint("⏰ Request automatically declined due to timeout");
             }
           });
 
@@ -439,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildInfoRow(
                           Icons.payments,
                           "Potential Fee",
-                          "KES ${request['fee'] ?? '15,000'}",
+                          "UGX ${request['fee'] ?? '15,000'}",
                         ),
                         const SizedBox(height: 24),
                         Row(

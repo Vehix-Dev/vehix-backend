@@ -104,7 +104,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Profile'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ProfileScreen()),
               );
@@ -115,7 +115,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Manage My Services'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ServicesSelectionScreen(role: 'RODIE'),
@@ -128,7 +128,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Wallet'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const WalletScreen()),
               );
@@ -139,7 +139,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('History'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const HistoryScreen()),
               );
@@ -150,7 +150,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Referrals'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ReferralsScreen()),
               );
@@ -161,7 +161,7 @@ class _AppDrawerState extends State<AppDrawer> {
             title: const Text('Help'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const HelpScreen()),
               );
