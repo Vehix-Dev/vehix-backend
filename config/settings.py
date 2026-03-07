@@ -312,3 +312,16 @@ SECURE_REFERRER_POLICY = 'same-origin'
 LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
+
+# Pesapal Payment Configuration
+PESAPAL_URL = os.environ.get('PESAPAL_URL', 'https://pay.pesapal.com/v3')
+PESAPAL_CONSUMER_KEY = os.environ.get('PESAPAL_CONSUMER_KEY', '')
+PESAPAL_CONSUMER_SECRET = os.environ.get('PESAPAL_CONSUMER_SECRET', '')
+PESAPAL_IPN_ID = os.environ.get('PESAPAL_IPN_ID', '')
+
+# Debug: Print Pesapal config (remove in production)
+if DEBUG:
+    print(f"Pesapal URL: {PESAPAL_URL}")
+    print(f"Pesapal Consumer Key: {'SET' if PESAPAL_CONSUMER_KEY else 'NOT SET'}")
+    print(f"Pesapal Consumer Secret: {'SET' if PESAPAL_CONSUMER_SECRET else 'NOT SET'}")
+    print(f"Pesapal IPN ID: {'SET' if PESAPAL_IPN_ID else 'NOT SET'}")
