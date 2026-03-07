@@ -74,7 +74,7 @@ class PesapalClient:
         # Construct payload
         payload = {
             "id": payment.reference,
-            "currency": "KES",  # Or your default currency
+            "currency": "UGX",  # Changed to UGX for Uganda Shillings
             "amount": float(payment.amount),
             "description": payment.description or "Wallet Deposit",
             "callback_url": callback_url,
@@ -82,13 +82,13 @@ class PesapalClient:
             "billing_address": {
                 "email_address": payment.user.email or "user@example.com",
                 "phone_number": payment.user.phone or "",
-                "country_code": "KE",
+                "country_code": "UG",  # Changed to Uganda
                 "first_name": payment.user.first_name or "User",
                 "middle_name": "",
                 "last_name": payment.user.last_name or "Name",
                 "line_1": "",
                 "line_2": "",
-                "city": "",
+                "city": "Kampala",  # Added default city
                 "state": "",
                 "postal_code": "",
                 "zip_code": ""
