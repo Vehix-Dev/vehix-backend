@@ -441,11 +441,7 @@ class StartRequestView(APIView):
             cache.set(f"request_status:{req.id}", 'STARTED', timeout=3600)
         except Exception:
             pass
-        try:
-            if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.started', 'data': {'request_id': req.id}})
-        except Exception:
-            pass
+        # WebSocket broadcast is handled by post_save signal - no duplicate needed here
         return Response({'detail': 'Service started'})
 
 
