@@ -115,6 +115,7 @@ class NearbyRodieListView(APIView):
 
 
 class CreateServiceRequestView(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = ServiceRequestCreateSerializer
 
     def perform_create(self, serializer):
