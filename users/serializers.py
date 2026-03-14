@@ -28,7 +28,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        code = validated_data.pop('referred_by_code', None)
+        referred_by_code = validated_data.pop('referred_by_code', None)
+        referrer = None
+
+        # Find referrer if code was provided and validated
+        if referred_by_code and referred_by_code.strip():
+            referrer = User.objects.filter(referral_code__iexact=referred_by_code.strip()).first()
 
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -38,43 +43,62 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data['last_name'],
             phone=validated_data.get('phone'),
             role=validated_data.get('role'),
-                nin=validated_data.get('nin'),
+            nin=validated_data.get('nin'),
         )
 
         wallet, _ = Wallet.objects.get_or_create(user=user)
 
-        if code:
-            try:
-                referrer = User.objects.filter(referral_code=code).first()
-                if referrer and referrer != user:
-                    ref_wallet, _ = Wallet.objects.get_or_create(user=referrer)
-                    amount = Decimal('100.00')
-                    ref_wallet.balance = ref_wallet.balance + amount
-                    ref_wallet.save()
-                    WalletTransaction.objects.create(wallet=ref_wallet, amount=amount, reason='referral credit')
-                    Referral.objects.create(referrer=referrer, referred=user, amount=amount)
-            except Exception:
-                pass
+        # Process referral if valid referrer was found
+        if referrer and referrer != user:
+            ref_wallet, _ = Wallet.objects.get_or_create(user=referrer)
+            amount = Decimal('100.00')
+            ref_wallet.balance = ref_wallet.balance + amount
+            ref_wallet.save()
+            WalletTransaction.objects.create(wallet=ref_wallet, amount=amount, reason='referral credit')
+            Referral.objects.create(referrer=referrer, referred=user, amount=amount)
 
-        if validated_data.get('role') == 'RODIE':
-            from services.models import ServiceType, RodieService
-            basic_services = ServiceType.objects.filter(category='BASIC', is_active=True)
-            for svc in basic_services:
-                RodieService.objects.get_or_create(rodie=user, service=svc)
+        # Note: Services are no longer automatically assigned to roadies
+        # They must manually select services through the services selection screen
 
         return user
 
     def validate(self, data):
         role = data.get('role')
         nin = data.get('nin')
+        referred_by_code = data.get('referred_by_code')
+        username = data.get('username')
+        email = data.get('email')
+        phone = data.get('phone')
 
-        if role in ('RIDER', 'RODIE', 'MECHANIC'):
+        # NIN is required only for RODIE and MECHANIC roles, not for RIDER
+        if role in ('RODIE', 'MECHANIC'):
             if not nin:
-                raise serializers.ValidationError({'nin': 'NIN is required for riders, roadies, and mechanics'})
+                raise serializers.ValidationError({'nin': 'NIN is required for roadies and mechanics'})
             if len(nin) != 14:
                 raise serializers.ValidationError({'nin': 'NIN must be exactly 14 characters'})
             if User.objects.filter(nin=nin).exists():
                 raise serializers.ValidationError({'nin': 'This NIN is already in use'})
+        elif role == 'RIDER' and nin:
+            # If rider provides NIN, validate it but don't require it
+            if len(nin) != 14:
+                raise serializers.ValidationError({'nin': 'NIN must be exactly 14 characters'})
+            if User.objects.filter(nin=nin).exists():
+                raise serializers.ValidationError({'nin': 'This NIN is already in use'})
+
+        # For RIDER accounts, enforce unique email (username and phone are already unique at DB level)
+        if role == 'RIDER':
+            # Check email uniqueness (case-insensitive)
+            if email and User.objects.filter(email__iexact=email).exists():
+                raise serializers.ValidationError({'email': 'This email address is already registered'})
+
+        # Validate referral code if provided
+        if referred_by_code and referred_by_code.strip():
+            referred_by_code = referred_by_code.strip()
+            referrer = User.objects.filter(referral_code__iexact=referred_by_code).first()
+            if not referrer:
+                raise serializers.ValidationError({
+                    'referred_by_code': 'Invalid referral code. Please enter a valid code or proceed without referral.'
+                })
 
         return data
 

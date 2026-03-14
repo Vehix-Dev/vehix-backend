@@ -171,11 +171,25 @@ class CreateServiceRequestView(generics.CreateAPIView):
         print("Matched Rodies (Final):", matched_usernames)
 
 
-class ChatMessageCreateAPIView(generics.CreateAPIView):
-    """Create a chat message tied to a ServiceRequest and broadcast via channels.
+class ChatMessageListView(generics.ListAPIView):
+    """List all chat messages for a specific service request."""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ChatMessageSerializer
 
-    This endpoint only creates a message and broadcasts it; no history endpoint is provided.
-    """
+    def get_queryset(self):
+        from .models_chat import ChatMessage
+        request_id = self.kwargs.get('pk')
+        req = get_object_or_404(ServiceRequest, id=request_id)
+        
+        # Verify user is part of this request
+        if self.request.user != req.rider and self.request.user != req.rodie:
+            raise PermissionDenied("You are not part of this request")
+        
+        return ChatMessage.objects.filter(service_request=req).order_by('created_at')
+
+
+class ChatMessageCreateAPIView(generics.CreateAPIView):
+    """Create a chat message tied to a ServiceRequest and broadcast via channels."""
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ChatMessageSerializer
 
@@ -465,115 +479,43 @@ class CompleteRequestView(APIView):
 
 
 class RateServiceRequestView(APIView):
+    """Create a rating for a completed service request"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request, pk):
+        from .serializers import RatingCreateSerializer, RatingSerializer
+        from .models_rating import Rating
+        
         try:
-            service_request = get_object_or_404(ServiceRequest, pk=pk)
-            
-            # Validate that the request is completed
-            if service_request.status != 'COMPLETED':
-                return Response(
-                    {'detail': 'You can only rate completed requests'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Get rating data
-            rating = request.data.get('rating')
-            role = request.data.get('role')
-            
-            if not rating or not role:
-                return Response(
-                    {'detail': 'Rating and role are required'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Validate rating value (1-5)
-            try:
-                rating = int(rating)
-                if rating < 1 or rating > 5:
-                    return Response(
-                        {'detail': 'Rating must be between 1 and 5'}, 
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            except (ValueError, TypeError):
-                return Response(
-                    {'detail': 'Invalid rating format'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Validate role
-            if role not in ['RIDER', 'RODIE']:
-                return Response(
-                    {'detail': 'Invalid role'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Check if user is authorized to rate
-            if role == 'RIDER' and service_request.rider_id != request.user.id:
-                return Response(
-                    {'detail': 'You can only rate as the rider of this request'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            if role == 'RODIE' and service_request.rodie_id != request.user.id:
-                return Response(
-                    {'detail': 'You can only rate as the roadie of this request'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Update the appropriate rating field
-            if role == 'RIDER':
-                service_request.rider_rating = rating
-            elif role == 'RODIE':
-                service_request.ROADIE_rating = rating
-            
-            service_request.save()
-            
-            # Update the rated user's overall rating
-            if role == 'RIDER':
-                # Update roadie's rating
-                self._update_user_rating(service_request.rodie, 'roadie')
-            elif role == 'RODIE':
-                # Update rider's rating
-                self._update_user_rating(service_request.rider, 'rider')
-            
-            return Response({
-                'detail': 'Rating submitted successfully',
-                'rating': rating,
-                'role': role
-            })
-            
-        except Exception as e:
+            req = ServiceRequest.objects.get(id=pk)
+        except ServiceRequest.DoesNotExist:
+            return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Add service_request to data
+        data = request.data.copy()
+        data['service_request'] = pk
+        
+        serializer = RatingCreateSerializer(data=data, context={'request': request})
+        
+        if serializer.is_valid():
+            rating = serializer.save()
             return Response(
-                {'detail': f'Error submitting rating: {str(e)}'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                RatingSerializer(rating).data,
+                status=status.HTTP_201_CREATED
             )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    def _update_user_rating(self, user, user_type):
-        """Update user's overall rating based on all their completed requests"""
+    def get(self, request, pk):
+        """Get ratings for a specific request"""
+        from .serializers import RatingSerializer
+        from .models_rating import Rating
+        
         try:
-            if user_type == 'roadie':
-                # Get all ratings given to this roadie by riders
-                ratings = ServiceRequest.objects.filter(
-                    rodie=user,
-                    status='COMPLETED',
-                    rider_rating__isnull=False
-                ).values_list('rider_rating', flat=True)
-            else:  # rider
-                # Get all ratings given to this rider by roadies
-                ratings = ServiceRequest.objects.filter(
-                    rider=user,
-                    status='COMPLETED',
-                    ROADIE_rating__isnull=False
-                ).values_list('ROADIE_rating', flat=True)
-            
-            if ratings:
-                avg_rating = sum(ratings) / len(ratings)
-                # Update user's rating field (assuming User model has rating field)
-                user.rating = round(avg_rating, 1)
-                user.save(update_fields=['rating'])
-                
-        except Exception as e:
-            # Log error but don't fail the rating submission
-            print(f"Error updating user rating: {e}")
+            req = ServiceRequest.objects.get(id=pk)
+        except ServiceRequest.DoesNotExist:
+            return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        ratings = Rating.objects.filter(service_request=req)
+        serializer = RatingSerializer(ratings, many=True)
+        return Response(serializer.data)

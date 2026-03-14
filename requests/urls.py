@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     CreateServiceRequestView,
+    ChatMessageListView,
     ChatMessageCreateAPIView,
     AcceptRequestView,
     DeclineRequestView,
@@ -18,7 +19,8 @@ urlpatterns = [
     path('create/', CreateServiceRequestView.as_view()),
     path('my/', RiderRequestsListView.as_view(), name='rider_my_requests'),
     path('roadie/', RoadieRequestsListView.as_view(), name='roadie_requests'),
-    path('<int:pk>/chat/', ChatMessageCreateAPIView.as_view(), name='request_chat_create'),
+    path('<int:pk>/chat/', ChatMessageListView.as_view(), name='request_chat_list'),
+    path('<int:pk>/chat/send/', ChatMessageCreateAPIView.as_view(), name='request_chat_create'),
     path('<int:pk>/accept/', AcceptRequestView.as_view(), name='request_accept'),
     path('<int:pk>/decline/', DeclineRequestView.as_view(), name='request_decline'),
     path('<int:pk>/cancel/', CancelRequestView.as_view(), name='request_cancel'),
