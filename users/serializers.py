@@ -141,28 +141,18 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    wallet = WalletSerializer(read_only=True)
+    wallet = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     profile_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = (
-            'id',
-            'external_id',
-            'first_name',
-            'last_name',
-            'email',
-            'phone',
-            'username',
-            'role',
-            'referral_code',
-            'nin',
-            'is_approved',
-            'created_at',
-            'updated_at',
-            'wallet',
-            'services',
+        fields = [
+            'id', 'external_id', 'first_name', 'last_name', 'email',
+            'phone', 'username', 'role', 'referral_code', 'nin',
+            'is_approved', 'is_online', 'services_selected',
+            'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
+        ]
             'profile_photo',
         )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
