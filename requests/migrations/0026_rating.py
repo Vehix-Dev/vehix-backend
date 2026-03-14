@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('requests', '0025_alter_servicerequest_rodie'),
+        ('requests', '0008_add_rating_fields'),
     ]
 
     operations = [
