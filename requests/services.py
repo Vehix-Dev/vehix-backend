@@ -81,15 +81,22 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             break
 
         rodie = r.get('rodie')
-        # try to read cached location
+        # Get the distance from find_nearby_rodies result
+        distance_km = r.get('distance', 0)
+        distance_m = distance_km * 1000
+        
+        # Try to get route info for ETA
         loc = cache.get(f"rodie_loc:{rodie.id}")
         if loc:
             try:
-                distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), rider_lat, rider_lng)
+                route_distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), rider_lat, rider_lng)
+                if route_distance_m is not None:
+                    distance_m = route_distance_m
+                duration_s = duration_s
             except Exception:
-                distance_m, duration_s = None, None
+                duration_s = None
         else:
-            distance_m, duration_s = None, None
+            duration_s = None
 
         req_obj = ServiceRequest.objects.get(id=request_id)
         payload = {
@@ -155,19 +162,21 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         if accepted:
             break
 
+    # Check if request was accepted before expiring
     try:
         from django.db import transaction
         with transaction.atomic():
             req = ServiceRequest.objects.get(id=request_id)
+            # Only expire if still REQUESTED (not accepted)
             if req.status == 'REQUESTED':
                 req.status = 'EXPIRED'
                 req.save()
                 # update cache and notify
                 try:
                     cache.set(f"request_status:{req.id}", 'EXPIRED', timeout=300)
+                    async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'request': {'id': req.id}})
                 except Exception:
                     pass
-                async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'request': {'id': req.id}})
     except Exception:
         pass
 
