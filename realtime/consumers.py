@@ -126,7 +126,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def send_request(self, event):
         await self.send_json({
             "type": "NEW_REQUEST",
-            "request": event["data"]
+            "data": event["data"]
         })
 
     async def offer_request(self, event):
