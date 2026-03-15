@@ -118,6 +118,12 @@ class CreateServiceRequestView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ServiceRequestCreateSerializer
 
+    def dispatch(self, request, *args, **kwargs):
+        # Debug logging for auth issues
+        print(f"\n🔐 CREATE REQUEST: auth={request.headers.get('Authorization', 'NONE')[:30]}...")
+        print(f"🔐 User: {request.user} | Auth: {request.user.is_authenticated if hasattr(request.user, 'is_authenticated') else 'N/A'}")
+        return super().dispatch(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         cfg = PlatformConfig.objects.first()
         max_neg = cfg.max_negative_balance if cfg else Decimal('0')
