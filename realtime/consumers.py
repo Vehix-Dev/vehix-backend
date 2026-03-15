@@ -332,7 +332,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def request_update(self, event):
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "request": event.get("request") or event.get("data")
+            "request": event.get("request") or event.get("data"),
+            "status": event.get("status")
         })
 
     async def receive_json(self, content):

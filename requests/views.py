@@ -458,7 +458,7 @@ class EnrouteRequestView(APIView):
             pass
         try:
             if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.enroute', 'data': {'request_id': req.id}})
+                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request_enroute', 'data': {'request_id': req.id}})
         except Exception:
             pass
         return Response({'detail': 'Marked en-route'})
@@ -509,7 +509,7 @@ class CompleteRequestView(APIView):
             pass
         try:
             if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.completed', 'data': {'request_id': req.id}})
+                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request_completed', 'data': {'request_id': req.id}})
         except Exception:
             pass
         return Response({'detail': 'Service completed'})
