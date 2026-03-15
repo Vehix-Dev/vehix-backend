@@ -178,6 +178,15 @@ class UserSerializer(serializers.ModelSerializer):
             return image.original_image.url
         return None
 
+    def get_wallet(self, obj):
+        try:
+            wallet = obj.wallet
+            return {
+                'id': wallet.id,
+                'balance': str(wallet.balance),
+            }
+        except (Wallet.DoesNotExist, AttributeError):
+            return None
 
 
 class ReferralSerializer(serializers.ModelSerializer):
