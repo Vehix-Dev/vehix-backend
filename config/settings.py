@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'requests',
     'locations',
     'images',
+    'realtime',
     'garages',
     'config',
 ]
