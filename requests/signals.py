@@ -28,26 +28,18 @@ def broadcast_request_update(sender, instance, created, **kwargs):
 
     # If request is newly created and REQUESTED, find matching rodies and send offers
     if created and instance.status == 'REQUESTED':
+        # DISABLED: Let notify_rodies handle request sending with proper filtering
+        # The signal was sending requests without wallet checks and causing duplicates
         print(f"🔍 Finding nearby rodies for service: {instance.service_type.name}")
         nearby_rodies = find_nearby_rodies(
             instance.service_type,
             float(instance.rider_lat),
             float(instance.rider_lng)
         )
-        print(f"📡 Found {len(nearby_rodies)} matching rodies:")
-        for item in nearby_rodies:
-            rodie = item.get('rodie')
-            print(f"   💬 Sending to {rodie.username} ({item['distance']:.2f}km away)")
-            try:
-                async_to_sync(channel_layer.group_send)(
-                    f"rodie_{rodie.id}",
-                    {
-                        "type": "send_request",
-                        "data": data
-                    }
-                )
-            except Exception as e:
-                print(f"   ❌ Error sending to {rodie.username}: {e}")
+        print(f"📡 Found {len(nearby_rodies)} matching rodies (notify_rodies will handle filtering)")
+        
+        # DON'T send here - notify_rodies in services.py handles wallet filtering and proper matching
+        print(f"✅ Request broadcasting delegated to notify_rodies with wallet filtering")
     
     # If request is assigned to a specific rodie, send update
     if instance.rodie_id:
