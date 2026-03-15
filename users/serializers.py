@@ -153,8 +153,6 @@ class UserSerializer(serializers.ModelSerializer):
             'is_approved', 'is_online', 'services_selected',
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
         ]
-            'profile_photo',
-        )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
 
     def get_services(self, obj):
