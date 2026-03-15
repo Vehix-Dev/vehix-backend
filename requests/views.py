@@ -230,22 +230,36 @@ class AcceptRequestView(APIView):
 
     def post(self, request, pk):
         user = request.user
+        print(f"DEBUG: AcceptRequestView - User {user.id} ({user.role}) trying to accept request {pk}")
+        
         if user.role != 'RODIE':
+            print(f"DEBUG: AcceptRequestView - Failed: User role is {user.role}, not RODIE")
             return Response({'detail': 'Only roadies can accept requests'}, status=status.HTTP_403_FORBIDDEN)
 
-        req = get_object_or_404(ServiceRequest, id=pk)
+        try:
+            req = ServiceRequest.objects.get(id=pk)
+            print(f"DEBUG: AcceptRequestView - Request {pk} found, status: {req.status}")
+        except ServiceRequest.DoesNotExist:
+            print(f"DEBUG: AcceptRequestView - Failed: Request {pk} does not exist")
+            return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+            
         if req.status != 'REQUESTED':
+            print(f"DEBUG: AcceptRequestView - Failed: Request status is {req.status}, not REQUESTED")
             return Response({'detail': 'Request is not available for acceptance'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not RodieService.objects.filter(rodie=user, service=req.service_type).exists():
+            print(f"DEBUG: AcceptRequestView - Failed: Roadie {user.id} does not offer service {req.service_type.id}")
             return Response({'detail': 'You do not offer this service'}, status=status.HTTP_400_BAD_REQUEST)
 
         cfg = PlatformConfig.objects.first()
         max_neg = cfg.max_negative_balance if cfg else Decimal('0')
         rodie_wallet, _ = Wallet.objects.get_or_create(user=user)
+        print(f"DEBUG: AcceptRequestView - Roadie wallet balance: {rodie_wallet.balance}, max negative: {max_neg}")
         if rodie_wallet.balance < Decimal(-max_neg):
+            print(f"DEBUG: AcceptRequestView - Failed: Wallet balance {rodie_wallet.balance} below max negative {-max_neg}")
             return Response({'detail': 'Rodie wallet below allowed negative balance'}, status=status.HTTP_403_FORBIDDEN)
 
+        print(f"DEBUG: AcceptRequestView - All checks passed, accepting request {pk}")
         req.rodie = user
         req.status = 'ACCEPTED'
         req.accepted_at = timezone.now()
