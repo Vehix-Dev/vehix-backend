@@ -15,8 +15,14 @@ def cache_set_rodie_location(user_id, lat, lng):
     try:
         lat_f, lng_f = float(lat), float(lng)
         cache.set(f"rodie_loc:{user_id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
-        # Persistent storage for matching fallback and history
+        # Update User model for fallback
         User.objects.filter(id=user_id).update(lat=lat_f, lng=lng_f)
+        # CRITICAL: Update RodieLocation table for find_nearby_rodies matching
+        from locations.models import RodieLocation
+        RodieLocation.objects.update_or_create(
+            rodie_id=user_id,
+            defaults={'lat': lat_f, 'lng': lng_f, 'updated_at': timezone.now()}
+        )
     except Exception:
         pass
 
