@@ -123,9 +123,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             if hasattr(self, 'group_name'):
                 await self.channel_layer.group_discard(self.group_name, self.channel_name)
             
+            # FIXED: Don't automatically set roadie offline on disconnect
+            # Roadies should only go offline when they explicitly toggle the switch
             user = self.scope.get("user")
             if user and user.is_authenticated:
-                await self._set_online(user, False)
+                print(f"🔌 [RodieConsumer] {user.username} disconnected - keeping online status as-is")
         except Exception as e:
             import logging; logging.exception("RodieConsumer disconnect error")
 
