@@ -267,14 +267,31 @@ class AcceptRequestView(APIView):
                     resp_data['roadie_lat'] = loc.get('lat')
                     resp_data['roadie_lng'] = loc.get('lng')
 
-                print(f"DEBUG: Acceptance notifying group request_{req.id}")
+                print(f"DEBUG: Acceptance notifying groups for request {req.id}")
+                
+                # Send to rider's personal group for guaranteed delivery
+                rider_group = f"rider_{req.rider.id}"
                 async_to_sync(get_channel_layer().group_send)(
-                    f'request_{req.id}', 
+                    rider_group,
                     {
-                        'type': 'request.accepted', 
+                        'type': 'request_accepted',
+                        'status': 'ACCEPTED',
                         'request': resp_data
                     }
                 )
+                print(f"DEBUG: Sent acceptance to rider group: {rider_group}")
+                
+                # Also send to request group for backup
+                request_group = f'request_{req.id}'
+                async_to_sync(get_channel_layer().group_send)(
+                    request_group,
+                    {
+                        'type': 'request_accepted',
+                        'status': 'ACCEPTED', 
+                        'request': resp_data
+                    }
+                )
+                print(f"DEBUG: Sent acceptance to request group: {request_group}")
         except Exception as e:
             print(f"DEBUG: Acceptance notification error: {e}")
 
