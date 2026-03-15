@@ -268,9 +268,11 @@ class AcceptRequestView(APIView):
                     resp_data['roadie_lng'] = loc.get('lng')
 
                 print(f"DEBUG: Acceptance notifying groups for request {req.id}")
+                print(f"DEBUG: Rider ID: {req.rider.id}, Request ID: {req.id}")
                 
                 # Send to rider's personal group for guaranteed delivery
                 rider_group = f"rider_{req.rider.id}"
+                print(f"DEBUG: Sending to rider group: {rider_group}")
                 async_to_sync(get_channel_layer().group_send)(
                     rider_group,
                     {
@@ -283,6 +285,7 @@ class AcceptRequestView(APIView):
                 
                 # Also send to request group for backup
                 request_group = f'request_{req.id}'
+                print(f"DEBUG: Sending to request group: {request_group}")
                 async_to_sync(get_channel_layer().group_send)(
                     request_group,
                     {
