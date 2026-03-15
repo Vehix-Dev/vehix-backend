@@ -290,6 +290,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add('notifications', self.channel_name)
             await self.accept()
             print(f"✅ [RiderConsumer] Connected successfully for user {user.id}")
+            print(f"✅ [RiderConsumer] Joined groups: {self.group_name}, role_{user.role}, notifications")
         except Exception as e:
             print(f"❌ [RiderConsumer] Connection error: {e}")
             import logging; logging.exception("RiderConsumer connect error")
