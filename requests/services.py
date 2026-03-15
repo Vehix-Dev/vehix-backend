@@ -40,6 +40,7 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
                     loc = {'lat': float(rs.rodie.lat), 'lng': float(rs.rodie.lng)}
         
         if not loc:
+            print(f"⚠️ No location found for rodie {rs.rodie.username}")
             continue
 
         try:
@@ -47,7 +48,9 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
                 rider_lat, rider_lng,
                 float(loc.get('lat')), float(loc.get('lng'))
             )
-        except Exception:
+            print(f"📍 {rs.rodie.username} is {distance:.2f}km away")
+        except Exception as e:
+            print(f"❌ Error calculating distance for {rs.rodie.username}: {e}")
             continue
 
         if distance <= MAX_DISTANCE_KM:
