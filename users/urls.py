@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, submit_feedback
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -66,6 +66,7 @@ urlpatterns = [
     path('auth/platform/config/', PlatformConfigView.as_view(), name='platform_config'),
     path('notifications/', NotificationListCreateView.as_view(), name='my_notifications'),
     path('notifications/<int:pk>/', NotificationRUDView.as_view(), name='my_notifications_rud'),
+    path('feedback/', submit_feedback, name='submit_feedback'),
     path('auth/admin/login/', AdminTokenObtainPairView.as_view(), name='admin_login'),
     path('auth/admin/register/', AdminRegisterView.as_view(), name='admin_register'),
     path('auth/admin/riders/', RiderListCreateView.as_view(), name='admin_riders_list_create'),
