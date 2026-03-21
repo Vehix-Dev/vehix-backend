@@ -172,6 +172,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     # Always cache rodie location for matching
                     try:
                         await cache_set_rodie_location(self.scope['user'].id, lat, lng)
+                        # Broadcast to all nearby riders
+                        await self.broadcast_to_nearby_riders(lat, lng)
                     except Exception:
                         pass
                     # Relay to specific rider if during active ride
@@ -223,6 +225,37 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         except Exception as e:
             print(f"❌ [RodieConsumer] receive_json error: {e}")
             import logging; logging.exception("RodieConsumer receive_json error")
+
+    async def broadcast_to_nearby_riders(self, lat, lng):
+        """Broadcast this roadie's location to all nearby riders"""
+        try:
+            from django.core.cache import cache
+            # Get all online riders
+            from users.models import RiderAvailabilityLog
+            recent_riders = RiderAvailabilityLog.objects.filter(
+                went_offline_at__isnull=True
+            ).select_related('user').filter(user__role='RIDER')
+            
+            for rider_log in recent_riders:
+                rider_id = rider_log.user.id
+                rider_loc = cache.get(f"rider_loc:{rider_id}")
+                if rider_loc:
+                    # Simple distance check (you can improve this with proper distance calculation)
+                    distance = abs(float(rider_loc['lat']) - float(lat)) + abs(float(rider_loc['lng']) - float(lng))
+                    if distance < 0.01:  # Rough proximity check (about 1km)
+                        await self.channel_layer.group_send(
+                            f"rider_{rider_id}",
+                            {
+                                "type": "rodie_location",
+                                "lat": lat,
+                                "lng": lng,
+                                "username": self.scope["user"].username,
+                                "service_type": getattr(self.scope["user"], 'service_type', 'TOWING')
+                            }
+                        )
+                        print(f"📍 [RodieConsumer] Sent roadie {self.scope['user'].id} location to rider {rider_id}")
+        except Exception as e:
+            print(f"❌ [RodieConsumer] Error broadcasting to nearby riders: {e}")
 
     async def chat_message(self, event):
         await self.send_json({
@@ -287,6 +320,39 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     def _log_offline(self, user):
         RiderAvailabilityLog.objects.filter(user=user, went_offline_at__isnull=True).update(went_offline_at=timezone.now())
 
+    @database_sync_to_async
+    def _get_nearby_rodies(self, lat, lng):
+        """Get nearby roadies - same logic as AvailabilityConsumer"""
+        results = []
+        try:
+            qs = User.objects.filter(role='RODIE')
+            try:
+                qs = qs.filter(is_online=True)
+            except Exception:
+                pass
+
+            for u in qs.all():
+                # Prefer RodieLocation as the canonical source of truth for rodie position
+                try:
+                    rl = RodieLocation.objects.get(rodie=u)
+                    rodie_lat = rl.lat
+                    rodie_lng = rl.lng
+                except RodieLocation.DoesNotExist:
+                    rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
+                    rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
+
+                if rodie_lat is not None and rodie_lng is not None:
+                    results.append({
+                        'id': u.id,
+                        'username': getattr(u, 'username', f'Roadie_{u.id}'),
+                        'lat': rodie_lat,
+                        'lng': rodie_lng,
+                        'service_type': getattr(u, 'service_type', 'TOWING'),
+                    })
+        except Exception:
+            return []
+        return results
+
     async def connect(self):
         user = self.scope["user"]
         try:
@@ -317,10 +383,29 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.accept()
             print(f"✅ [RiderConsumer] Connected successfully for user {user.id}")
             print(f"✅ [RiderConsumer] Joined groups: {self.group_name}, role_{user.role}, notifications")
+            
+            # Send nearby roadies on connection
+            await self.send_nearby_roadies()
         except Exception as e:
             print(f"❌ [RiderConsumer] Connection error: {e}")
             import logging; logging.exception("RiderConsumer connect error")
             await self.close()
+
+    async def send_nearby_roadies(self):
+        """Send nearby roadies to this rider"""
+        try:
+            # Get rider's current location from cache
+            from django.core.cache import cache
+            rider_loc = cache.get(f"rider_loc:{self.scope['user'].id}")
+            if rider_loc:
+                nearby = await self._get_nearby_rodies(rider_loc['lat'], rider_loc['lng'])
+                await self.send_json({
+                    "type": "NEARBY_LIST",
+                    "roadies": nearby
+                })
+                print(f"📍 [RiderConsumer] Sent {len(nearby)} nearby roadies to rider {self.scope['user'].id}")
+        except Exception as e:
+            print(f"❌ [RiderConsumer] Error sending nearby roadies: {e}")
 
     async def disconnect(self, close_code):
         try:
@@ -344,7 +429,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             "type": "RODIE_LOCATION",
             "lat": event["lat"],
-            "lng": event["lng"]
+            "lng": event["lng"],
+            "username": event.get("username", "Roadie"),
+            "service_type": event.get("service_type", "TOWING")
         })
 
     async def request_update(self, event):
@@ -364,6 +451,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 if lat is not None and lng is not None:
                     try:
                         await cache_set_rider_location(user.id, lat, lng)
+                        # Send nearby roadies after location update
+                        await self.send_nearby_roadies()
                     except Exception:
                         pass
                     await self.channel_layer.group_send(
