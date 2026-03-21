@@ -149,7 +149,8 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         # Perform the update
         response = super().update(request, *args, **kwargs)
         
-        # Check if approval status changed
+        # Refresh instance from database to get latest state
+        instance.refresh_from_db()
         new_approved = instance.is_approved
         print(f"DEBUG: After update - user {instance.id}, is_approved = {new_approved}")
         print(f"DEBUG: Approval status changed: {old_approved != new_approved}")
