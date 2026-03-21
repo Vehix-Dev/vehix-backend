@@ -144,12 +144,16 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         """Override update to send WebSocket notification when approval status changes"""
         instance = self.get_object()
         old_approved = instance.is_approved
+        print(f"DEBUG: Before update - user {instance.id}, is_approved = {old_approved}")
         
         # Perform the update
         response = super().update(request, *args, **kwargs)
         
         # Check if approval status changed
         new_approved = instance.is_approved
+        print(f"DEBUG: After update - user {instance.id}, is_approved = {new_approved}")
+        print(f"DEBUG: Approval status changed: {old_approved != new_approved}")
+        
         if old_approved != new_approved:
             try:
                 if get_channel_layer and async_to_sync:
