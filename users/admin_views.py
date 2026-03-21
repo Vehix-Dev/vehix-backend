@@ -140,6 +140,47 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return User.objects.filter(role='RODIE', is_deleted=False)
     
+    def update(self, request, *args, **kwargs):
+        """Override update to send WebSocket notification when approval status changes"""
+        instance = self.get_object()
+        old_approved = instance.is_approved
+        
+        # Perform the update
+        response = super().update(request, *args, **kwargs)
+        
+        # Check if approval status changed
+        new_approved = instance.is_approved
+        if old_approved != new_approved:
+            try:
+                if get_channel_layer and async_to_sync:
+                    channel_layer = get_channel_layer()
+                    group = f'user_{instance.id}'
+                    
+                    if new_approved:
+                        # Send approval notification
+                        message = {
+                            'type': 'account.approved',
+                            'user_id': instance.id,
+                            'is_approved': True,
+                            'message': 'Your Vehix account has been approved!'
+                        }
+                        print(f" Sent approval WebSocket to roadie {instance.id}")
+                    else:
+                        # Send unapproval notification
+                        message = {
+                            'type': 'account.unapproved',
+                            'user_id': instance.id,
+                            'is_approved': False,
+                            'message': 'Your Vehix account has been unapproved.'
+                        }
+                        print(f" Sent unapproval WebSocket to roadie {instance.id}")
+                    
+                    async_to_sync(channel_layer.group_send)(group, message)
+            except Exception as e:
+                print(f" Failed to send approval WebSocket: {e}")
+        
+        return response
+    
     def get(self, request, *args, **kwargs):
         """Override GET to include summary statistics"""
         instance = self.get_object()

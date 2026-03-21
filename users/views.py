@@ -598,3 +598,41 @@ class PesapalIPNView(APIView):
             'status': 200,
             'payment_status': payment.status
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_feedback(request):
+    """
+    Submit user feedback to support/CRM
+    """
+    try:
+        message = request.data.get('message', '').strip()
+        feedback_type = request.data.get('type', 'app_feedback')
+        
+        if not message:
+            return Response(
+                {'error': 'Message cannot be empty'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Here you can:
+        # 1. Save to database
+        # 2. Send email to support
+        # 3. Integrate with CRM system
+        # 4. Send notification to admin
+        
+        # For now, just log it (in production, implement proper storage)
+        print(f"Feedback received from {request.user.username}: {message}")
+        print(f"Type: {feedback_type}")
+        
+        return Response(
+            {'success': 'Feedback submitted successfully'}, 
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Exception as e:
+        return Response(
+            {'error': 'Failed to submit feedback'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
