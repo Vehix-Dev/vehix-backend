@@ -159,7 +159,8 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             try:
                 if get_channel_layer and async_to_sync:
                     channel_layer = get_channel_layer()
-                    group = f'user_{instance.id}'
+                    # Roadie consumers join group "rodie_{user_id}"
+                    group = f'rodie_{instance.id}'
                     
                     if new_approved:
                         # Send approval notification
