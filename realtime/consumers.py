@@ -257,6 +257,24 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "data": event
         })
 
+    async def account_approved(self, event):
+        """Handle account approval notification"""
+        await self.send_json({
+            'type': 'account.approved',
+            'user_id': event.get('user_id'),
+            'is_approved': event.get('is_approved'),
+            'message': event.get('message')
+        })
+
+    async def account_unapproved(self, event):
+        """Handle account unapproval notification"""
+        await self.send_json({
+            'type': 'account.unapproved',
+            'user_id': event.get('user_id'),
+            'is_approved': event.get('is_approved'),
+            'message': event.get('message')
+        })
+
 
 class RiderConsumer(AsyncJsonWebsocketConsumer):
 
