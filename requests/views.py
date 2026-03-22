@@ -523,6 +523,9 @@ class RateServiceRequestView(APIView):
         from .serializers import RatingCreateSerializer, RatingSerializer
         from .models_rating import Rating
         
+        print(f"🔍 RATING DEBUG: User {request.user.username} (ID: {request.user.id}) submitting rating for request {pk}")
+        print(f"🔍 RATING DEBUG: User current_login_id: {request.user.current_login_id}")
+        
         try:
             req = ServiceRequest.objects.get(id=pk)
         except ServiceRequest.DoesNotExist:
@@ -535,11 +538,16 @@ class RateServiceRequestView(APIView):
         serializer = RatingCreateSerializer(data=data, context={'request': request})
         
         if serializer.is_valid():
+            print(f"🔍 RATING DEBUG: Serializer valid, creating rating...")
             rating = serializer.save()
+            print(f"🔍 RATING DEBUG: Rating created successfully, user login_id after save: {request.user.current_login_id}")
+            
             return Response(
                 RatingSerializer(rating).data,
                 status=status.HTTP_201_CREATED
             )
+        else:
+            print(f"🔍 RATING DEBUG: Serializer errors: {serializer.errors}")
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
