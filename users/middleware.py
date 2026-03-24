@@ -25,21 +25,29 @@ def get_user(user_id, token_login_id=None):
 
 class JwtAuthMiddleware(BaseMiddleware):
     async def __call__(self, scope, receive, send):
-        query_string = scope.get("query_string", b"").decode()
-        params = parse_qs(query_string)
-        token = params.get("token", [None])[0]
+        try:
+            query_string = scope.get("query_string", b"").decode()
+            params = parse_qs(query_string)
+            token = params.get("token", [None])[0]
 
-        scope["user"] = AnonymousUser()
+            scope["user"] = AnonymousUser()
 
-        if token:
-            try:
-                UntypedToken(token)
-                payload = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-                user_id = payload.get("user_id")
-                login_id = payload.get("login_id")
-                if user_id:
-                    scope["user"] = await get_user(user_id, login_id)
-            except Exception:
-                pass
+            if token:
+                try:
+                    UntypedToken(token)
+                    payload = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                    user_id = payload.get("user_id")
+                    login_id = payload.get("login_id")
+                    if user_id:
+                        scope["user"] = await get_user(user_id, login_id)
+                        print(f"✅ WS Auth: User {user_id} authenticated successfully")
+                except Exception as e:
+                    print(f"⚠️ WS Auth: Token validation failed - {e}")
+                    pass
 
-        return await super().__call__(scope, receive, send)
+            return await super().__call__(scope, receive, send)
+        except Exception as e:
+            print(f"❌ WS Middleware Error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
