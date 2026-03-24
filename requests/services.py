@@ -69,6 +69,15 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
     from .models import ServiceRequest
 
     for r in rodies:
+        # Check if request was cancelled before offering to next roadie
+        try:
+            status = cache.get(f"request_status:{request_id}")
+            if status == 'CANCELLED':
+                print(f"🚫 Request {request_id} was cancelled - stopping sequential offers before next roadie")
+                return
+        except Exception:
+            pass
+            
         if time.time() - start >= expiry_seconds:
             try:
                 # Final DB check before expiring
@@ -146,8 +155,11 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                 if status == 'ACCEPTED':
                     accepted = True
                     break
-                if status == 'DECLINED':
-                    # Move to next roadie immediately if declined
+                if status in ['DECLINED', 'CANCELLED']:
+                    # Move to next roadie immediately if declined, or stop entirely if cancelled
+                    if status == 'CANCELLED':
+                        print(f"🚫 Request {request_id} was cancelled by rider - stopping sequential offers")
+                        return  # Exit the entire function
                     break
             except Exception:
                 pass
@@ -162,12 +174,12 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         if accepted:
             break
 
-    # Check if request was accepted before expiring
+    # Check if request was accepted, cancelled, or needs expiry
     try:
         from django.db import transaction
         with transaction.atomic():
             req = ServiceRequest.objects.get(id=request_id)
-            # Only expire if still REQUESTED (not accepted)
+            # Only expire if still REQUESTED (not accepted or cancelled)
             if req.status == 'REQUESTED':
                 req.status = 'EXPIRED'
                 req.save()
@@ -177,6 +189,8 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                     async_to_sync(channel_layer.group_send)(f'request_{req.id}', {'type': 'request.expired', 'request': {'id': req.id}})
                 except Exception:
                     pass
+            elif req.status == 'CANCELLED':
+                print(f"🚫 Request {request_id} was cancelled - not expiring")
     except Exception:
         pass
 

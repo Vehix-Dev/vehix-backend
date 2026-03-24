@@ -14,9 +14,11 @@ from .views import (
     NearbyRodieListView,
     RateServiceRequestView,
 )
+from .api_cancellation import CancellationReasonsView
 
 urlpatterns = [
     path('create/', CreateServiceRequestView.as_view()),
+    path('cancellation-reasons/', CancellationReasonsView.as_view(), name='cancellation_reasons'),
     path('my/', RiderRequestsListView.as_view(), name='rider_my_requests'),
     path('roadie/', RoadieRequestsListView.as_view(), name='roadie_requests'),
     path('<int:pk>/chat/', ChatMessageListView.as_view(), name='request_chat_list'),
