@@ -400,8 +400,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     results.append({
                         'id': u.id,
                         'username': getattr(u, 'username', f'Roadie_{u.id}'),
-                        'lat': rodie_lat,
-                        'lng': rodie_lng,
+                        'lat': float(rodie_lat),
+                        'lng': float(rodie_lng),
                         'service_type': getattr(u, 'service_type', 'TOWING'),
                     })
         except Exception:
@@ -481,16 +481,20 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             import logging; logging.exception("RiderConsumer disconnect error")
 
     async def rodie_location(self, event):
-        await self.send_json({
+        message = {
             "type": "RODIE_LOCATION",
             "lat": event["lat"],
             "lng": event["lng"],
-            "distance_km": event.get("distance_km"),
-            "eta_seconds": event.get("eta_seconds"),
             "rodie_id": event.get("rodie_id"),
             "username": event.get("username", "Roadie"),
             "service_type": event.get("service_type", "TOWING")
-        })
+        }
+        # Only include distance and ETA if they have valid values
+        if event.get("distance_km") is not None:
+            message["distance_km"] = event["distance_km"]
+        if event.get("eta_seconds") is not None:
+            message["eta_seconds"] = event["eta_seconds"]
+        await self.send_json(message)
 
     async def request_update(self, event):
         await self.send_json({
@@ -671,14 +675,15 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
                     rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
                     rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
 
-                results.append({
-                    'rodie_id': u.id,
-                    'username': getattr(u, 'username', None),
-                    'distance_meters': None,
-                    'eta_seconds': None,
-                    'lat': rodie_lat,
-                    'lng': rodie_lng,
-                })
+                if rodie_lat is not None and rodie_lng is not None:
+                    results.append({
+                        'rodie_id': u.id,
+                        'username': getattr(u, 'username', None),
+                        'distance_meters': None,
+                        'eta_seconds': None,
+                        'lat': float(rodie_lat),
+                        'lng': float(rodie_lng),
+                    })
         except Exception:
             return []
         return results
