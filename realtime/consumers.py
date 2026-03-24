@@ -178,12 +178,48 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         pass
                     # Relay to specific rider if during active ride
                     if rider_id is not None:
+                        # Calculate distance and ETA for the specific rider
+                        distance_km = None
+                        eta_seconds = None
+                        
+                        try:
+                            from requests.models import ServiceRequest
+                            from locations.models import RodieLocation
+                            from asgiref.sync import database_sync_to_async
+                            
+                            # Get the active request between this roadie and rider
+                            async def get_active_request():
+                                return await database_sync_to_async(
+                                    ServiceRequest.objects.filter
+                                )(
+                                    rodie_id=self.scope['user'].id,
+                                    rider_id=rider_id,
+                                    status__in=['ACCEPTED', 'EN_ROUTE']
+                                ).first()
+                            
+                            request = await get_active_request()
+                            if request and request.rider_lat and request.rider_lng:
+                                # Calculate distance
+                                from .utils import calculate_distance_km
+                                distance_km = calculate_distance_km(
+                                    float(lat), float(lng),
+                                    float(request.rider_lat), float(request.rider_lng)
+                                )
+                                
+                                # Estimate ETA (assuming 30 km/h average speed in city)
+                                eta_seconds = int((distance_km / 30) * 3600)
+                        except Exception as e:
+                            print(f"Error calculating ETA: {e}")
+                        
                         await self.channel_layer.group_send(
                             f"rider_{rider_id}",
                             {
                                 "type": "rodie_location",
                                 "lat": lat,
-                                "lng": lng
+                                "lng": lng,
+                                "distance_km": distance_km,
+                                "eta_seconds": eta_seconds,
+                                "rodie_id": self.scope["user"].id
                             }
                         )
                     await self.channel_layer.group_send(
@@ -283,6 +319,25 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_expired(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
+
+    async def request_cancelled(self, event):
+        """Handle request cancellation by rider"""
+        await self.send_json({
+            "type": "REQUEST_CANCELLED",
+            "request_id": event.get("request_id"),
+            "message": event.get("message"),
+            "status": "CANCELLED"
+        })
+        # Clear any active offer for this roadie if it matches the cancelled request
+        try:
+            from django.core.cache import cache
+            user_id = self.scope['user'].id
+            active_offer = cache.get(f"active_offer:{user_id}")
+            if active_offer and active_offer.get("id") == event.get("request_id"):
+                cache.delete(f"active_offer:{user_id}")
+                print(f"🚫 Cleared active offer {event.get('request_id')} for roadie {user_id} due to cancellation")
+        except Exception as e:
+            print(f"❌ Error clearing active offer for cancelled request: {e}")
 
     async def rodie_status(self, event):
         await self.send_json({
@@ -430,6 +485,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "type": "RODIE_LOCATION",
             "lat": event["lat"],
             "lng": event["lng"],
+            "distance_km": event.get("distance_km"),
+            "eta_seconds": event.get("eta_seconds"),
+            "rodie_id": event.get("rodie_id"),
             "username": event.get("username", "Roadie"),
             "service_type": event.get("service_type", "TOWING")
         })
@@ -533,6 +591,14 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_declined(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "DECLINED", "request": event.get("request")})
+
+    async def request_cancelled(self, event):
+        """Handle request cancellation confirmation"""
+        await self.send_json({
+            "type": "REQUEST_CANCELLED",
+            "request_id": event.get("request_id"),
+            "status": "CANCELLED"
+        })
 
     async def request_proximity(self, event):
         await self.send_json({

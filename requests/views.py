@@ -346,6 +346,37 @@ class CancelRequestView(APIView):
         user = request.user
         req = get_object_or_404(ServiceRequest, id=pk)
         
+        # Get cancellation reason data
+        reason_id = request.data.get('reason_id')
+        custom_reason_text = request.data.get('custom_reason_text', '').strip()
+        
+        # Validate reason is provided
+        if not reason_id:
+            return Response(
+                {'detail': 'Cancellation reason is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from .models import CancellationReason, RequestCancellation
+            cancellation_reason = CancellationReason.objects.get(
+                id=reason_id, 
+                role=user.role, 
+                is_active=True
+            )
+        except CancellationReason.DoesNotExist:
+            return Response(
+                {'detail': 'Invalid cancellation reason'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate custom text if required
+        if cancellation_reason.requires_custom_text and not custom_reason_text:
+            return Response(
+                {'detail': 'Please provide additional details for this cancellation reason'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # Minimum distance in km (100 meters = 0.1 km)
         MIN_CANCEL_DISTANCE_KM = 0.1
 
@@ -353,48 +384,72 @@ class CancelRequestView(APIView):
         current_lat = request.data.get('current_lat')
         current_lng = request.data.get('current_lng')
 
-        if user.role == 'RIDER' and req.rider_id == user.id:
-            # Rider can cancel if request is not yet accepted or in certain statuses
-            if req.status in ['REQUESTED', 'ACCEPTED']:
-                # Check distance if accepted
-                if req.status == 'ACCEPTED' and req.rodie:
-                    if current_lat and current_lng:
-                        try:
-                            # Get rodie's current location
-                            rodie_loc = RodieLocation.objects.get(rodie=req.rodie)
-                            dist_km = calculate_distance_km(
-                                float(current_lat), float(current_lng),
-                                float(rodie_loc.lat), float(rodie_loc.lng)
-                            )
-                            if dist_km < MIN_CANCEL_DISTANCE_KM:
-                                return Response(
-                                    {
-                                        'detail': f'Distance should be more than {int(MIN_CANCEL_DISTANCE_KM * 1000)} meters to cancel',
-                                        'min_distance_meters': int(MIN_CANCEL_DISTANCE_KM * 1000),
-                                        'current_distance_meters': max(1, int(dist_km * 1000))
-                                    },
-                                    status=status.HTTP_403_FORBIDDEN
-                                )
-                        except RodieLocation.DoesNotExist:
-                            # No location for rodie, allow cancel
-                            pass
-                    else:
-                        # No location provided, deny for safety
-                        return Response(
-                            {'detail': 'Current location required to cancel accepted request'},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+        # Calculate distance and time to arrival if applicable
+        distance_at_cancellation = None
+        time_to_arrival_at_cancellation = None
+        
+        if req.status == 'ACCEPTED' and req.rodie and current_lat and current_lng:
+            try:
+                from locations.models import RodieLocation
+                rodie_loc = RodieLocation.objects.get(rodie=req.rodie)
+                distance_at_cancellation = calculate_distance_km(
+                    float(current_lat), float(current_lng),
+                    float(rodie_loc.lat), float(rodie_loc.lng)
+                )
                 
+                # Estimate time to arrival (assuming 30 km/h average speed in city)
+                time_to_arrival_at_cancellation = int((distance_at_cancellation / 30) * 3600)
+            except RodieLocation.DoesNotExist:
+                pass
+
+        if user.role == 'RIDER' and req.rider_id == user.id:
+            # Rider can only cancel if request has not been accepted yet
+            if req.status == 'REQUESTED':
                 req.status = 'CANCELLED'
                 req.save()
+                
+                # Create cancellation record
+                RequestCancellation.objects.create(
+                    request=req,
+                    cancelled_by=user,
+                    reason=cancellation_reason,
+                    custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
+                    distance_at_cancellation=distance_at_cancellation,
+                    time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
+                )
+                
                 try:
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
-                except Exception:
-                    pass
+                    
+                    # Broadcast cancellation to all roadies who might have received this request
+                    channel_layer = get_channel_layer()
+                    # Send to all roadies in the role group
+                    async_to_sync(channel_layer.group_send)(
+                        'role_RODIE',
+                        {
+                            "type": "request.cancelled",
+                            "request_id": req.id,
+                            "message": f"Request #{req.id} has been cancelled by the rider"
+                        }
+                    )
+                    
+                    # Also send to the specific request group if it exists
+                    async_to_sync(channel_layer.group_send)(
+                        f'request_{req.id}',
+                        {
+                            "type": "request.cancelled",
+                            "request_id": req.id,
+                            "status": "CANCELLED"
+                        }
+                    )
+                    
+                    print(f"🚫 Broadcasted cancellation for request {req.id} to all roadies")
+                except Exception as e:
+                    print(f"❌ Error broadcasting cancellation: {e}")
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': f'Cannot cancel request with status {req.status}'},
+                    {'detail': 'Cannot cancel request: Once a roadie has accepted your request, cancellation is no longer available. Contact support if you need assistance.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
@@ -425,10 +480,36 @@ class CancelRequestView(APIView):
                 
                 req.status = 'CANCELLED'
                 req.save()
+                
+                # Create cancellation record
+                RequestCancellation.objects.create(
+                    request=req,
+                    cancelled_by=user,
+                    reason=cancellation_reason,
+                    custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
+                    distance_at_cancellation=dist_km if current_lat and current_lng else None,
+                    time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
+                )
+                
                 try:
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
-                except Exception:
-                    pass
+                    
+                    # Broadcast cancellation to rider
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'rider_{req.rider.id}',
+                        {
+                            "type": "request.cancelled",
+                            "request_id": req.id,
+                            "message": f"Roadie has cancelled request #{req.id}",
+                            "reason": cancellation_reason.reason
+                        }
+                    )
+                    
+                    print(f"🚫 Roadie cancelled request {req.id} - reason: {cancellation_reason.reason}")
+                except Exception as e:
+                    print(f"❌ Error broadcasting roadie cancellation: {e}")
+                
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
