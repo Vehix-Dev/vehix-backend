@@ -14,11 +14,19 @@ except Exception:
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender_id = serializers.IntegerField(source='sender.id', read_only=True)
+    sender_role = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'service_request', 'sender_id', 'text', 'created_at')
+        fields = ('id', 'service_request', 'sender_id', 'sender_role', 'text', 'created_at')
         read_only_fields = ('created_at', 'sender_id')
+
+    def get_sender_role(self, obj):
+        if obj.sender_id == obj.service_request.rider_id:
+            return 'RIDER'
+        if obj.service_request.rodie_id and obj.sender_id == obj.service_request.rodie_id:
+            return 'RODIE'
+        return 'UNKNOWN'
 
 
 class ServiceRequestCreateSerializer(serializers.ModelSerializer):
