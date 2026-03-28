@@ -1,3 +1,5 @@
+from django.core.cache import cache
+from locations.utils import calculate_distance_km
 from rest_framework import serializers
 from .models import ServiceRequest
 from services.models import ServiceType
@@ -62,6 +64,8 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     rodie_phone = serializers.CharField(source='rodie.phone', read_only=True)
     rider_name = serializers.SerializerMethodField()
     rodie_name = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
+    eta_seconds = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
@@ -69,7 +73,8 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'id', 'service_type', 'service_type_name', 'rider_id', 'rodie_id', 
             'rider_name', 'rodie_name', 'rider_phone', 'rodie_phone',
             'status', 'rider_lat', 'rider_lng', 'accepted_at', 'en_route_at', 
-            'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at'
+            'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at',
+            'distance_km', 'eta_seconds'
         )
         read_only_fields = ('accepted_at', 'en_route_at', 'started_at', 'completed_at', 'created_at', 'updated_at')
 
@@ -81,6 +86,26 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     def get_rodie_name(self, obj):
         if obj.rodie:
             return f"{obj.rodie.first_name} {obj.rodie.last_name}".strip() or obj.rodie.username
+        return None
+
+    def get_distance_km(self, obj):
+        if obj.rodie_id and obj.rider_lat and obj.rider_lng:
+            loc = cache.get(f"rodie_loc:{obj.rodie_id}")
+            if loc:
+                try:
+                    return calculate_distance_km(
+                        float(loc['lat']), float(loc['lng']),
+                        float(obj.rider_lat), float(obj.rider_lng)
+                    )
+                except Exception:
+                    return None
+        return None
+
+    def get_eta_seconds(self, obj):
+        dist = self.get_distance_km(obj)
+        if dist is not None:
+            # Estimate 30 km/h
+            return int((dist / 30) * 3600)
         return None
 
 
@@ -98,51 +123,8 @@ class RatingSerializer(serializers.ModelSerializer):
         if obj.rater:
             return f"{obj.rater.first_name} {obj.rater.last_name}".strip() or obj.rater.username
         return None
-    
+
     def get_rated_user_name(self, obj):
         if obj.rated_user:
             return f"{obj.rated_user.first_name} {obj.rated_user.last_name}".strip() or obj.rated_user.username
         return None
-
-
-class RatingCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Rating
-        fields = ('service_request', 'rating', 'comment')
-    
-    def validate_service_request(self, value):
-        user = self.context['request'].user
-        
-        # Check if request is completed
-        if value.status != 'COMPLETED':
-            raise serializers.ValidationError("Can only rate completed requests")
-        
-        # Check if user is part of this request
-        if user != value.rider and user != value.rodie:
-            raise serializers.ValidationError("You are not part of this request")
-        
-        # Check if user already rated this request
-        if Rating and Rating.objects.filter(service_request=value, rater=user).exists():
-            raise serializers.ValidationError("You have already rated this request")
-        
-        return value
-    
-    def create(self, validated_data):
-        user = self.context['request'].user
-        service_request = validated_data['service_request']
-        
-        # Determine who is being rated
-        if user == service_request.rider:
-            rated_user = service_request.rodie
-        else:
-            rated_user = service_request.rider
-        
-        rating = Rating.objects.create(
-            service_request=service_request,
-            rater=user,
-            rated_user=rated_user,
-            rating=validated_data['rating'],
-            comment=validated_data.get('comment', '')
-        )
-        
-        return rating
