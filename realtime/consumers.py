@@ -208,7 +208,6 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         try:
                             from requests.models import ServiceRequest
                             from locations.models import RodieLocation
-                            from asgiref.sync import database_sync_to_async
                             
                             # Get the active request between this roadie and rider
                             async def get_active_request():
