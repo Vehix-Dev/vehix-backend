@@ -281,6 +281,8 @@ class AcceptRequestView(APIView):
                     resp_data['roadie_lat'] = loc.get('lat')
                     resp_data['roadie_lng'] = loc.get('lng')
 
+                print(f"📊 BACKEND ACCEPT BROADCAST DATA: {resp_data}")
+
                 print(f"DEBUG: Acceptance notifying groups for request {req.id}")
                 print(f"DEBUG: Rider ID: {req.rider.id}, Request ID: {req.id}")
                 
