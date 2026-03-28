@@ -168,8 +168,14 @@ class CreateServiceRequestView(generics.CreateAPIView):
         
         print(f"✅ MATCHED RODIES (after wallet/filters): {matched_usernames}\n")
         
-        from requests.services import notify_rodies
-        notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
+        # BACKGROUND NOTIFICATION: Return the response immediately while notifications proceed in the background.
+        from threading import Thread
+        Thread(
+            target=notify_rodies, 
+            args=(filtered, request_obj), 
+            kwargs={'offer_seconds': 15, 'expiry_seconds': 90},
+            daemon=True
+        ).start()
         # mark ephemeral request status in cache so notify worker can poll without DB locks
         try:
             cache.set(f"request_status:{request_obj.id}", 'REQUESTED', timeout=120)
@@ -294,8 +300,6 @@ class AcceptRequestView(APIView):
                 if loc:
                     resp_data['roadie_lat'] = loc.get('lat')
                     resp_data['roadie_lng'] = loc.get('lng')
-
-                print(f"📊 BACKEND ACCEPT BROADCAST DATA: {resp_data}")
 
                 print(f"DEBUG: Acceptance notifying groups for request {req.id}")
                 print(f"DEBUG: Rider ID: {req.rider.id}, Request ID: {req.id}")
