@@ -170,6 +170,7 @@ class CreateServiceRequestView(generics.CreateAPIView):
         
         # BACKGROUND NOTIFICATION: Return the response immediately while notifications proceed in the background.
         from threading import Thread
+        from .services import notify_rodies
         Thread(
             target=notify_rodies, 
             args=(filtered, request_obj), 
