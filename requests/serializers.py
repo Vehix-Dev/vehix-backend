@@ -17,11 +17,12 @@ except Exception:
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender_id = serializers.IntegerField(source='sender.id', read_only=True)
     sender_role = serializers.SerializerMethodField()
+    sender_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'service_request', 'sender_id', 'sender_role', 'text', 'created_at')
-        read_only_fields = ('created_at', 'sender_id')
+        fields = ('id', 'service_request', 'sender_id', 'sender_role', 'sender_name', 'text', 'is_read', 'created_at')
+        read_only_fields = ('created_at', 'sender_id', 'is_read')
 
     def get_sender_role(self, obj):
         if obj.sender_id == obj.service_request.rider_id:
@@ -29,6 +30,10 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         if obj.service_request.rodie_id and obj.sender_id == obj.service_request.rodie_id:
             return 'RODIE'
         return 'UNKNOWN'
+
+    def get_sender_name(self, obj):
+        name = f"{obj.sender.first_name} {obj.sender.last_name}".strip()
+        return name or obj.sender.username
 
 
 class ServiceRequestCreateSerializer(serializers.ModelSerializer):
