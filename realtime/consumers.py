@@ -158,7 +158,30 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def request_update(self, event):
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "request": event.get("request") or event.get("data")
+            "request": event.get("request") or event.get("data"),
+            "status": event.get("status")
+        })
+
+    async def chat_message(self, event):
+        await self.send_json({
+            'type': 'CHAT_MESSAGE',
+            'request_id': event.get('request_id'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
+        })
+
+    async def chat_notification(self, event):
+        await self.send_json({
+            'type': 'CHAT_NOTIFICATION',
+            'request_id': event.get('request_id'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
         })
 
     async def receive_json(self, content):
