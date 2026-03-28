@@ -365,6 +365,13 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             'message': event.get('message')
         })
 
+    async def request_proximity(self, event):
+        await self.send_json({
+            "type": "REQUEST_PROXIMITY",
+            "distance_km": event.get("distance_km"),
+            "eta_seconds": event.get("eta_seconds")
+        })
+
 
 class RiderConsumer(AsyncJsonWebsocketConsumer):
 
