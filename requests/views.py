@@ -424,8 +424,8 @@ class CancelRequestView(APIView):
                 pass
 
         if user.role == 'RIDER' and req.rider_id == user.id:
-            # Rider can only cancel if request has not been accepted yet
-            if req.status == 'REQUESTED':
+            # Rider can cancel if request has not started yet
+            if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
                 req.status = 'CANCELLED'
                 req.save()
                 
@@ -440,38 +440,40 @@ class CancelRequestView(APIView):
                 )
                 
                 try:
+                    # Update cache so sequential notification thread stops
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
                     
-                    # Broadcast cancellation to all roadies who might have received this request
                     channel_layer = get_channel_layer()
-                    # Send to all roadies in the role group
+                    
+                    # 1. Notify ALL rodies (stops the sound/notification popup for those who haven't accepted)
                     async_to_sync(channel_layer.group_send)(
                         'role_RODIE',
                         {
                             "type": "request.cancelled",
                             "request_id": req.id,
-                            "message": f"Request #{req.id} has been cancelled by the rider"
+                            "message": f"Service Request #{req.id} has been cancelled."
                         }
                     )
                     
-                    # Also send to the specific request group if it exists
+                    # 2. Notify the specific rodie if they already accepted (active ride screen)
                     async_to_sync(channel_layer.group_send)(
                         f'request_{req.id}',
                         {
                             "type": "request.cancelled",
                             "request_id": req.id,
-                            "status": "CANCELLED"
+                            "status": "CANCELLED",
+                            "message": "The Rider has cancelled this request."
                         }
                     )
                     
-                    print(f"🚫 Broadcasted cancellation for request {req.id} to all roadies")
+                    print(f"🚫 Broadcasted cancellation for request {req.id} to all parties")
                 except Exception as e:
                     print(f"❌ Error broadcasting cancellation: {e}")
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': 'Cannot cancel request: Once a roadie has accepted your request, cancellation is no longer available. Contact support if you need assistance.'},
-                    status=status.HTTP_403_FORBIDDEN
+                    {'detail': 'Cannot cancel request: The service has already started.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         # Rodie can cancel if request is accepted/en_route/started
