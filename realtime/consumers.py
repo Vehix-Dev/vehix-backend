@@ -257,7 +257,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
-                await self.send_json({"type": "PONG"})
+                timestamp = content.get('timestamp')
+                await self.send_json({"type": "PONG", "timestamp": timestamp})
         except Exception as e:
             print(f"❌ [RodieConsumer] receive_json error: {e}")
             import logging; logging.exception("RodieConsumer receive_json error")
@@ -552,7 +553,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     )
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
-                await self.send_json({"type": "PONG"})
+                timestamp = content.get('timestamp')
+                await self.send_json({"type": "PONG", "timestamp": timestamp})
         except Exception as e:
             print(f"❌ [RiderConsumer] receive_json error: {e}")
             import logging; logging.exception("RiderConsumer receive_json error")
