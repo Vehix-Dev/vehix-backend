@@ -236,21 +236,43 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 request_id = content.get('request_id')
                 text = content.get('text')
                 if request_id and text:
+                    user = self.scope['user']
+                    sender_name = f"{user.first_name} {user.last_name}".strip() or user.username
                     await database_sync_to_async(ChatMessage.objects.create)(
                         service_request_id=request_id,
-                        sender=self.scope['user'],
+                        sender=user,
                         text=text
                     )
+                    now_iso = timezone.now().isoformat()
+                    # Broadcast to the request room (both parties if joined)
                     await self.channel_layer.group_send(
                         f"request_{request_id}",
                         {
                             'type': 'chat.message',
-                            'sender_id': self.scope['user'].id,
+                            'request_id': request_id,
+                            'sender_id': user.id,
                             'sender_role': 'RODIE',
+                            'sender_name': sender_name,
                             'text': text,
-                            'created_at': timezone.now().isoformat(),
+                            'created_at': now_iso,
                         }
                     )
+                    # Also send a notification to the rider's personal channel
+                    # so they see a badge even if they haven't joined the request room
+                    rider_id = await self._get_rider_id_for_request(request_id)
+                    if rider_id:
+                        await self.channel_layer.group_send(
+                            f"rider_{rider_id}",
+                            {
+                                'type': 'chat.notification',
+                                'request_id': request_id,
+                                'sender_id': user.id,
+                                'sender_role': 'RODIE',
+                                'sender_name': sender_name,
+                                'text': text,
+                                'created_at': now_iso,
+                            }
+                        )
             elif msg_type == 'JOIN_REQUEST':
                 req_id = content.get('request_id')
                 if req_id:
@@ -295,11 +317,33 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         except Exception as e:
             print(f"❌ [RodieConsumer] Error broadcasting to nearby riders: {e}")
 
+    @database_sync_to_async
+    def _get_rider_id_for_request(self, request_id):
+        try:
+            req = ServiceRequest.objects.get(id=request_id)
+            return req.rider_id
+        except ServiceRequest.DoesNotExist:
+            return None
+
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
+            'request_id': event.get('request_id'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
+        })
+
+    async def chat_notification(self, event):
+        """Forward chat notification — the app ignores it if chat is already open"""
+        await self.send_json({
+            'type': 'CHAT_NOTIFICATION',
+            'request_id': event.get('request_id'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
             'text': event.get('text'),
             'created_at': event.get('created_at'),
         })
@@ -544,21 +588,42 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 request_id = content.get('request_id')
                 text = content.get('text')
                 if request_id and text:
+                    user = self.scope['user']
+                    sender_name = f"{user.first_name} {user.last_name}".strip() or user.username
                     await database_sync_to_async(ChatMessage.objects.create)(
                         service_request_id=request_id,
-                        sender=self.scope['user'],
+                        sender=user,
                         text=text
                     )
+                    now_iso = timezone.now().isoformat()
+                    # Broadcast to the request room
                     await self.channel_layer.group_send(
                         f"request_{request_id}",
                         {
                             'type': 'chat.message',
-                            'sender_id': self.scope['user'].id,
+                            'request_id': request_id,
+                            'sender_id': user.id,
                             'sender_role': 'RIDER',
+                            'sender_name': sender_name,
                             'text': text,
-                            'created_at': timezone.now().isoformat(),
+                            'created_at': now_iso,
                         }
                     )
+                    # Also send notification to the roadie's personal channel
+                    rodie_id = await self._get_rodie_id_for_request(request_id)
+                    if rodie_id:
+                        await self.channel_layer.group_send(
+                            f"rodie_{rodie_id}",
+                            {
+                                'type': 'chat.notification',
+                                'request_id': request_id,
+                                'sender_id': user.id,
+                                'sender_role': 'RIDER',
+                                'sender_name': sender_name,
+                                'text': text,
+                                'created_at': now_iso,
+                            }
+                        )
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
                 timestamp = content.get('timestamp')
@@ -579,11 +644,33 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "data": event
         })
 
+    @database_sync_to_async
+    def _get_rodie_id_for_request(self, request_id):
+        try:
+            req = ServiceRequest.objects.get(id=request_id)
+            return req.rodie_id
+        except ServiceRequest.DoesNotExist:
+            return None
+
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
+            'request_id': event.get('request_id'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
+        })
+
+    async def chat_notification(self, event):
+        """Forward chat notification — the app ignores it if chat is already open"""
+        await self.send_json({
+            'type': 'CHAT_NOTIFICATION',
+            'request_id': event.get('request_id'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
             'text': event.get('text'),
             'created_at': event.get('created_at'),
         })
