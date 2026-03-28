@@ -219,7 +219,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                                 "lng": lng,
                                 "distance_km": distance_km,
                                 "eta_seconds": eta_seconds,
-                                "rodie_id": self.scope["user"].id
+                                "rodie_id": self.scope["user"].id,
+                                "rodie_name": self.scope["user"].username,
                             }
                         )
                     await self.channel_layer.group_send(
