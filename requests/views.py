@@ -260,6 +260,20 @@ class AcceptRequestView(APIView):
             return Response({'detail': 'Rodie wallet below allowed negative balance'}, status=status.HTTP_403_FORBIDDEN)
 
         print(f"DEBUG: AcceptRequestView - All checks passed, accepting request {pk}")
+        
+        # Immediate Location Update: Ensure we have coordinates for the Rider broadcast
+        lat = request.data.get('lat')
+        lng = request.data.get('lng')
+        if lat and lng:
+            try:
+                lat_f, lng_f = float(lat), float(lng)
+                cache.set(f"rodie_loc:{user.id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
+                user.lat, user.lng = lat_f, lng_f
+                user.save(update_fields=['lat', 'lng'])
+                print(f"📍 DEBUG: AcceptRequestView - Updated Roadie {user.id} location to {lat_f}, {lng_f}")
+            except Exception as e:
+                print(f"⚠️ DEBUG: AcceptRequestView - Failed to update location: {e}")
+
         req.rodie = user
         req.status = 'ACCEPTED'
         req.accepted_at = timezone.now()
