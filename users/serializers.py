@@ -144,14 +144,20 @@ class UserSerializer(serializers.ModelSerializer):
     wallet = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     profile_photo = serializers.SerializerMethodField()
+    id_card_front = serializers.SerializerMethodField()
+    id_card_back = serializers.SerializerMethodField()
+    license_photo = serializers.SerializerMethodField()
+    vehicle_photo = serializers.SerializerMethodField()
+    is_verified = serializers.BooleanField(source='is_approved', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'external_id', 'first_name', 'last_name', 'email',
             'phone', 'username', 'role', 'referral_code', 'nin',
-            'is_approved', 'is_online', 'services_selected',
+            'is_approved', 'is_verified', 'is_online', 'services_selected',
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
+            'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
         ]
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
 
@@ -168,15 +174,30 @@ class UserSerializer(serializers.ModelSerializer):
             } for r in qs
         ]
 
-    def get_profile_photo(self, obj):
+    def _get_user_image(self, obj, image_type):
         from images.models import UserImage
-        # Get latest profile photo
-        image = UserImage.objects.filter(user=obj, image_type='PROFILE').order_by('-created_at').first()
+        image = UserImage.objects.filter(user=obj, image_type=image_type).order_by('-created_at').first()
         if image and image.original_image:
             if 'request' in self.context:
                 return self.context['request'].build_absolute_uri(image.original_image.url)
             return image.original_image.url
         return None
+
+    def get_profile_photo(self, obj):
+        return self._get_user_image(obj, 'PROFILE')
+
+    def get_id_card_front(self, obj):
+        # Handle both naming conventions (ID_CARD_FRONT from some views, NIN_FRONT from others)
+        return self._get_user_image(obj, 'NIN_FRONT') or self._get_user_image(obj, 'ID_CARD_FRONT')
+
+    def get_id_card_back(self, obj):
+        return self._get_user_image(obj, 'NIN_BACK') or self._get_user_image(obj, 'ID_CARD_BACK')
+
+    def get_license_photo(self, obj):
+        return self._get_user_image(obj, 'LICENSE')
+
+    def get_vehicle_photo(self, obj):
+        return self._get_user_image(obj, 'VEHICLE')
 
     def get_wallet(self, obj):
         try:
