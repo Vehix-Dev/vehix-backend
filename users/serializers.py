@@ -149,6 +149,10 @@ class UserSerializer(serializers.ModelSerializer):
     license_photo = serializers.SerializerMethodField()
     vehicle_photo = serializers.SerializerMethodField()
     is_verified = serializers.BooleanField(source='is_approved', read_only=True)
+    rating = serializers.SerializerMethodField()
+    total_assists = serializers.SerializerMethodField()
+    total_rides = serializers.SerializerMethodField()
+    total_jobs = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -158,6 +162,7 @@ class UserSerializer(serializers.ModelSerializer):
             'is_approved', 'is_verified', 'is_online', 'services_selected',
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
             'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
+            'rating', 'total_assists', 'total_rides', 'total_jobs',
         ]
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
 
@@ -208,6 +213,24 @@ class UserSerializer(serializers.ModelSerializer):
             }
         except (Wallet.DoesNotExist, AttributeError):
             return None
+
+    def get_rating(self, obj):
+        from requests.models_rating import Rating
+        from django.db.models import Avg
+        avg = Rating.objects.filter(rated_user=obj).aggregate(Avg('rating'))['rating__avg']
+        return float(avg) if avg is not None else 0.0
+
+    def get_total_assists(self, obj):
+        from requests.models import ServiceRequest
+        if obj.role == 'RIDER':
+            return ServiceRequest.objects.filter(rider=obj, status='COMPLETED').count()
+        return ServiceRequest.objects.filter(rodie=obj, status='COMPLETED').count()
+
+    def get_total_rides(self, obj):
+        return self.get_total_assists(obj)
+
+    def get_total_jobs(self, obj):
+        return self.get_total_assists(obj)
 
 
 class ReferralSerializer(serializers.ModelSerializer):
