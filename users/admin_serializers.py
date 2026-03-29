@@ -7,6 +7,12 @@ User = get_user_model()
 class AdminUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     wallet = None
+    profile_photo = serializers.SerializerMethodField()
+    id_card_front = serializers.SerializerMethodField()
+    id_card_back = serializers.SerializerMethodField()
+    license_photo = serializers.SerializerMethodField()
+    vehicle_photo = serializers.SerializerMethodField()
+
     try:
         from .serializers import WalletSerializer
         wallet = WalletSerializer(read_only=True)
@@ -16,9 +22,38 @@ class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'id', 'external_id', 'first_name', 'last_name', 'email', 'phone', 'username', 'password', 'role', 'referral_code', 'nin', 'is_approved', 'created_at', 'updated_at', 'wallet', 'is_active', 'is_deleted',
+            'id', 'external_id', 'first_name', 'last_name', 'email', 'phone', 
+            'username', 'password', 'role', 'referral_code', 'nin', 
+            'is_approved', 'created_at', 'updated_at', 'wallet', 
+            'is_active', 'is_deleted', 'profile_photo', 'id_card_front', 
+            'id_card_back', 'license_photo', 'vehicle_photo',
         )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
+
+    def _get_user_image(self, obj, image_type):
+        from images.models import UserImage
+        image = UserImage.objects.filter(user=obj, image_type=image_type).order_by('-created_at').first()
+        if image and image.original_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(image.original_image.url)
+            return image.original_image.url
+        return None
+
+    def get_profile_photo(self, obj):
+        return self._get_user_image(obj, 'PROFILE')
+
+    def get_id_card_front(self, obj):
+        return self._get_user_image(obj, 'NIN_FRONT') or self._get_user_image(obj, 'ID_CARD_FRONT')
+
+    def get_id_card_back(self, obj):
+        return self._get_user_image(obj, 'NIN_BACK') or self._get_user_image(obj, 'ID_CARD_BACK')
+
+    def get_license_photo(self, obj):
+        return self._get_user_image(obj, 'LICENSE')
+
+    def get_vehicle_photo(self, obj):
+        return self._get_user_image(obj, 'VEHICLE')
         extra_kwargs = {
             'role': {'required': False},
             'email': {'required': False},
