@@ -29,7 +29,7 @@ class RegisterView(generics.CreateAPIView):
 
 class MeView(APIView):
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
 
@@ -43,7 +43,7 @@ class UserProfileUpdateView(APIView):
 
     def get(self, request):
         """Get current user profile"""
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
     def patch(self, request):
@@ -58,7 +58,7 @@ class UserProfileUpdateView(APIView):
             return Response({
                 'success': True,
                 'message': 'Profile updated successfully',
-                'user': UserSerializer(request.user).data
+                'user': UserSerializer(request.user, context={'request': request}).data
             }, status=status.HTTP_200_OK)
         return Response({
             'success': False,
