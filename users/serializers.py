@@ -154,6 +154,8 @@ class UserSerializer(serializers.ModelSerializer):
     total_rides = serializers.SerializerMethodField()
     total_jobs = serializers.SerializerMethodField()
     trial_days_left = serializers.ReadOnlyField()
+    trial_end_date = serializers.ReadOnlyField()
+    max_negative_balance = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -164,9 +166,14 @@ class UserSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
             'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
             'rating', 'total_assists', 'total_rides', 'total_jobs',
-            'trial_days_left', 'trial_end_date',
+            'trial_days_left', 'trial_end_date', 'max_negative_balance',
         ]
-        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at', 'trial_days_left')
+        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at', 'trial_days_left', 'trial_end_date', 'max_negative_balance')
+
+    def get_max_negative_balance(self, obj):
+        from .models import PlatformConfig
+        config = PlatformConfig.objects.first()
+        return float(config.max_negative_balance) if config else 0.0
 
     def get_services(self, obj):
         if getattr(obj, 'role', None) not in ('RODIE', 'MECHANIC'):
