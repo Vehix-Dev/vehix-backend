@@ -26,19 +26,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 print(f"DEBUG AUTH: Username '{username}' not found. Trying lookup by email and phone.", flush=True)
                 try:
                     # First try email lookup
-                    user_obj = User.objects.get(email__iexact=username)
-                    print(f"DEBUG AUTH: Found user {user_obj.username} by email {username}", flush=True)
-                    attrs[self.username_field] = user_obj.username
-                except User.DoesNotExist:
-                    print(f"DEBUG AUTH: No user found with email '{username}'. Trying phone lookup.", flush=True)
-                    try:
-                        # Then try phone lookup
-                        user_obj = User.objects.get(phone=username)
-                        print(f"DEBUG AUTH: Found user {user_obj.username} by phone {username}", flush=True)
+                    user_obj = User.objects.filter(email__iexact=username).first()
+                    if user_obj:
+                        print(f"DEBUG AUTH: Found user {user_obj.username} by email {username}", flush=True)
                         attrs[self.username_field] = user_obj.username
-                    except User.DoesNotExist:
-                        print(f"DEBUG AUTH: No user found with phone '{username}'", flush=True)
-                        pass
+                    else:
+                        print(f"DEBUG AUTH: No user found with email '{username}'. Trying phone lookup.", flush=True)
+                        # Then try phone lookup
+                        user_obj = User.objects.filter(phone=username).first()
+                        if user_obj:
+                            print(f"DEBUG AUTH: Found user {user_obj.username} by phone {username}", flush=True)
+                            attrs[self.username_field] = user_obj.username
+                        else:
+                            print(f"DEBUG AUTH: No user found with phone '{username}'", flush=True)
+                except Exception as e:
+                    print(f"DEBUG AUTH Error during lookup: {e}")
             else:
                  print(f"DEBUG AUTH: User found by exact username '{username}'", flush=True)
 

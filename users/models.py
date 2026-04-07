@@ -67,7 +67,36 @@ class User(AbstractUser):
         help_text="Tracks if roadie has selected services on first login"
     )
 
+    trial_end_date = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="The date when the user's free trial expires."
+    )
+
+    @property
+    def trial_days_left(self):
+        """Returns the number of days left in the free trial, or 0 if expired/not applicable."""
+        if not self.trial_end_date:
+            return 0
+        from django.utils import timezone
+        diff = self.trial_end_date - timezone.now()
+        return max(0, diff.days + 1) # Add 1 to count today
+
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        
+        # Lock in trial end date for new roadies
+        if is_new and self.role in ('RODIE', 'MECHANIC'):
+            try:
+                from django.apps import apps
+                ConfigModel = apps.get_model('users', 'PlatformConfig')
+                config = ConfigModel.objects.first()
+                if config and config.trial_days > 0:
+                    from datetime import timedelta
+                    self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
+            except Exception:
+                pass
+
         if not self.external_id:
             if self.role == 'RIDER':
                 prefix = 'R'

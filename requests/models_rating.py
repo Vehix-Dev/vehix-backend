@@ -46,10 +46,10 @@ class Rating(models.Model):
         return f"Rating({self.rater.username} → {self.rated_user.username}: {self.rating}★)"
     
     def save(self, *args, **kwargs):
-        # Auto-set rated_user based on rater role
+        # Auto-set rated_user based on rater role using IDs for reliability
         if not self.rated_user_id:
-            if self.rater == self.service_request.rider:
-                self.rated_user = self.service_request.rodie
-            elif self.rater == self.service_request.rodie:
-                self.rated_user = self.service_request.rider
+            if self.rater_id == self.service_request.rider_id:
+                self.rated_user_id = self.service_request.rodie_id
+            elif self.rater_id == self.service_request.rodie_id:
+                self.rated_user_id = self.service_request.rider_id
         super().save(*args, **kwargs)

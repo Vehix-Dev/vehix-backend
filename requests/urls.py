@@ -13,6 +13,7 @@ from .views import (
     RoadieRequestsListView,
     NearbyRodieListView,
     RateServiceRequestView,
+    ArrivedRequestView,
 )
 from .api_cancellation import CancellationReasonsView
 
@@ -26,6 +27,7 @@ urlpatterns = [
     path('<int:pk>/accept/', AcceptRequestView.as_view(), name='request_accept'),
     path('<int:pk>/decline/', DeclineRequestView.as_view(), name='request_decline'),
     path('<int:pk>/cancel/', CancelRequestView.as_view(), name='request_cancel'),
+    path('<int:pk>/arrived/', ArrivedRequestView.as_view(), name='request_arrived'),
     path('<int:pk>/enroute/', EnrouteRequestView.as_view(), name='request_enroute'),
     path('<int:pk>/start/', StartRequestView.as_view(), name='request_start'),
     path('<int:pk>/complete/', CompleteRequestView.as_view(), name='request_complete'),
