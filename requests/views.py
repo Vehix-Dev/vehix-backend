@@ -131,6 +131,14 @@ class CreateServiceRequestView(generics.CreateAPIView):
         return super().dispatch(request, *args, **kwargs)
 
     def perform_create(self, serializer):
+        # Prevent multiple active requests for the same rider
+        active_request = ServiceRequest.objects.filter(
+            rider=self.request.user,
+            status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+        ).first()
+        if active_request:
+            raise PermissionDenied(f'You already have an active request (#{active_request.id}) in progress.')
+
         cfg = PlatformConfig.objects.first()
         max_neg = cfg.max_negative_balance if cfg else Decimal('0')
         rider_wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
