@@ -7,6 +7,7 @@ from threading import Thread
 import time
 from .osrm import get_route_info
 from django.db import transaction
+from .models import ServiceRequest
 
 MAX_DISTANCE_KM = 50 # Increased for development/testing
 
@@ -18,11 +19,16 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     """
     eligible_rodies = []
 
+    # Filter out busy roadies (those with active requests)
+    busy_rodie_ids = ServiceRequest.objects.filter(
+        status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+    ).exclude(rodie__isnull=True).values_list('rodie_id', flat=True)
+
     rodie_services = RodieService.objects.filter(
         service=service_type,
         rodie__is_active=True,
-        rodie__is_online=True  # Only online rodies
-    ).select_related('rodie')
+        rodie__is_online=True
+    ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
 
     for rs in rodie_services:
         # read ephemeral rodie location from cache; skip if not available
@@ -66,7 +72,6 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
     """Background thread: send offer to each rodie in order, wait `offer_seconds` for acceptance, expire after `expiry_seconds`."""
     channel_layer = get_channel_layer()
     start = time.time()
-    from .models import ServiceRequest
 
     for r in rodies:
         # Check if request was cancelled before offering to next roadie
