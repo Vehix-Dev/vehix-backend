@@ -80,26 +80,30 @@ class User(AbstractUser):
             return 0
         from django.utils import timezone
         diff = self.trial_end_date - timezone.now()
-        return max(0, diff.days + 1) # Add 1 to count today
+        total_seconds = diff.total_seconds()
+        if total_seconds <= 0:
+            return 0
+        # diff.days returns floor, but we want to include today. 
+        # For example, if 0.5 days left, it should show 1 day.
+        return int(total_seconds // 86400) + 1
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
+        from django.utils import timezone
         
-        # Lock in trial end date for roadies only when they are APPROVED
-        if not is_new and self.role in ('RODIE', 'MECHANIC'):
+        # Lock in trial end date when they are APPROVED for the first time
+        if not is_new and self.is_approved and not self.trial_end_date:
             try:
-                # Get the current state from DB to check for approval transition
+                # If trial_end_date is None, it means it hasn't started yet.
+                # Setting it the first time they are approved ensures it starts 
+                # only when they can actually use the platform.
+                # Once set, it stays fixed even if the user is unapproved then re-approved.
                 from django.apps import apps
-                UserModel = apps.get_model('users', 'User')
-                old_instance = UserModel.objects.filter(pk=self.pk).first()
-                
-                if old_instance and not old_instance.is_approved and self.is_approved and not self.trial_end_date:
-                    ConfigModel = apps.get_model('users', 'PlatformConfig')
-                    config = ConfigModel.objects.first()
-                    if config and config.trial_days > 0:
-                        from datetime import timedelta
-                        self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
-                        # We don't return here, continue with external_id logic
+                ConfigModel = apps.get_model('users', 'PlatformConfig')
+                config = ConfigModel.objects.first()
+                if config and config.trial_days > 0:
+                    from datetime import timedelta
+                    self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
             except Exception as e:
                 import logging
                 logging.error(f"Error setting trial date: {e}")
