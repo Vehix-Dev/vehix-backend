@@ -72,11 +72,15 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     distance_km = serializers.SerializerMethodField()
     eta_seconds = serializers.SerializerMethodField()
 
+    rider_username = serializers.ReadOnlyField(source='rider.username')
+    rodie_username = serializers.ReadOnlyField(source='rodie.username')
+
     class Meta:
         model = ServiceRequest
         fields = (
             'id', 'service_type', 'service_type_name', 'rider_id', 'rodie_id', 
-            'rider_name', 'rodie_name', 'rider_phone', 'rodie_phone',
+            'rider_name', 'rodie_name', 'rider_username', 'rodie_username', 
+            'rider_phone', 'rodie_phone',
             'status', 'rider_lat', 'rider_lng', 'accepted_at', 'en_route_at', 
             'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at',
             'distance_km', 'eta_seconds'
@@ -133,3 +137,35 @@ class RatingSerializer(serializers.ModelSerializer):
         if obj.rated_user:
             return f"{obj.rated_user.first_name} {obj.rated_user.last_name}".strip() or obj.rated_user.username
         return None
+
+
+class RatingCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Rating
+        fields = ('service_request', 'rating', 'comment')
+    
+    def validate(self, data):
+        request = self.context['request']
+        service_request = data.get('service_request')
+        user = request.user
+        
+        # Verify user is either roadie or rider for this request
+        if user.id != service_request.rider_id and user.id != (service_request.rodie_id or 0):
+            raise serializers.ValidationError("You are not part of this service request.")
+        
+        # Verify request is completed or cancelled
+        if service_request.status not in ('COMPLETED', 'CANCELLED'):
+            # Allow rating for cancelled requests too (sometimes riders rate roadies who don't show up)
+            if service_request.status != 'COMPLETED':
+                raise serializers.ValidationError("You can only rate a finished service.")
+                
+        # Check if already rated by this user
+        if Rating.objects.filter(service_request=service_request, rater=user).exists():
+            raise serializers.ValidationError("You have already rated this service request.")
+            
+        return data
+        
+    def create(self, validated_data):
+        request = self.context['request']
+        validated_data['rater'] = request.user
+        return super().create(validated_data)

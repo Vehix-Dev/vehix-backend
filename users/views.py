@@ -197,6 +197,19 @@ class RoadieStatusUpdateView(APIView):
         is_online = request.data.get('is_online')
         if is_online is None:
             return Response({'error': 'is_online field required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 1. Enforce account approval for going online
+        if bool(is_online) and not request.user.is_approved:
+            return Response({
+                'error': 'Account Pending Approval'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        # 2. Enforce service selection for going online
+        if bool(is_online) and not getattr(request.user, 'services_selected', False):
+            return Response({
+                'error': 'Select a service to provide'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         request.user.is_online = bool(is_online)
         request.user.save() 
         try:
@@ -204,8 +217,21 @@ class RoadieStatusUpdateView(APIView):
                 channel_layer = get_channel_layer()
                 group_user = f'user_{request.user.id}'
                 group_rodie = f'rodie_{request.user.id}'
-                async_to_sync(channel_layer.group_send)(group_user, {'type': 'user.status', 'is_online': request.user.is_online, 'user_id': request.user.id})
-                async_to_sync(channel_layer.group_send)(group_rodie, {'type': 'rodie.status', 'is_online': request.user.is_online, 'rodie_id': request.user.id})
+                group_riders = 'role_RIDER'
+
+                status_payload = {
+                    'type': 'rodie.status', 
+                    'is_online': request.user.is_online, 
+                    'rodie_id': request.user.id,
+                    'username': request.user.username,
+                    'lat': float(request.user.lat) if (request.user.is_online and request.user.lat) else None,
+                    'lng': float(request.user.lng) if (request.user.is_online and request.user.lng) else None,
+                }
+
+                async_to_sync(channel_layer.group_send)(group_user, status_payload)
+                async_to_sync(channel_layer.group_send)(group_rodie, status_payload)
+                # Broadcast to all riders so their maps update instantly
+                async_to_sync(channel_layer.group_send)(group_riders, status_payload)
         except Exception:
             pass
         return Response({'is_online': request.user.is_online})
@@ -300,10 +326,10 @@ class WithdrawView(APIView):
                 'requested_amount': str(amount)
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check minimum withdrawal amount (e.g., 100 UGX)
-        if amount < 100:
+        # Check minimum withdrawal amount (e.g., 5000 UGX)
+        if amount < 5000:
             return Response({
-                'error': 'Minimum withdrawal amount is 100 UGX'
+                'error': 'Minimum withdrawal amount is UGX 5,000 (transaction charges inclusive if applicable)'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -602,6 +628,7 @@ class PesapalIPNView(APIView):
         })
 
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_feedback(request):
@@ -632,9 +659,51 @@ def submit_feedback(request):
             {'success': 'Feedback submitted successfully'}, 
             status=status.HTTP_201_CREATED
         )
-        
     except Exception as e:
         return Response(
-            {'error': 'Failed to submit feedback'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
         )
+
+
+class UserProfilePasswordChangeView(APIView):
+    """
+    Allow authenticated user to change their own password
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        
+        if not current_password or not new_password:
+            return Response(
+                {'error': 'Current and new password are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        user = request.user
+        
+        # Verify current password
+        if not user.check_password(current_password):
+            return Response(
+                {'error': 'Invalid current password'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Optional: Additional password strength validation
+        if len(new_password) < 6:
+            return Response(
+                {'error': 'New password must be at least 6 characters'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Set and save new password
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Password updated successfully'
+        })
+

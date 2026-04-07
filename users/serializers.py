@@ -153,6 +153,7 @@ class UserSerializer(serializers.ModelSerializer):
     total_assists = serializers.SerializerMethodField()
     total_rides = serializers.SerializerMethodField()
     total_jobs = serializers.SerializerMethodField()
+    trial_days_left = serializers.ReadOnlyField()
 
     class Meta:
         model = User
@@ -163,8 +164,9 @@ class UserSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
             'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
             'rating', 'total_assists', 'total_rides', 'total_jobs',
+            'trial_days_left',
         ]
-        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
+        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at', 'trial_days_left')
 
     def get_services(self, obj):
         if getattr(obj, 'role', None) not in ('RODIE', 'MECHANIC'):
@@ -218,7 +220,8 @@ class UserSerializer(serializers.ModelSerializer):
         from requests.models_rating import Rating
         from django.db.models import Avg
         avg = Rating.objects.filter(rated_user=obj).aggregate(Avg('rating'))['rating__avg']
-        return float(avg) if avg is not None else 0.0
+        # Default to 5.0 for new users instead of 0.0
+        return float(avg) if avg is not None else 5.0
 
     def get_total_assists(self, obj):
         from requests.models import ServiceRequest

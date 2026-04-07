@@ -88,6 +88,7 @@ class ServiceRequest(models.Model):
         ('REQUESTED', 'Requested'),
         ('ACCEPTED', 'Accepted'),
         ('EN_ROUTE', 'En Route'),
+        ('ARRIVED', 'Arrived'),
         ('STARTED', 'Service Started'),
         ('COMPLETED', 'Completed'),
         ('CANCELLED', 'Cancelled'),
@@ -129,6 +130,7 @@ class ServiceRequest(models.Model):
     is_paid = models.BooleanField(default=False)
     accepted_at = models.DateTimeField(null=True, blank=True)
     en_route_at = models.DateTimeField(null=True, blank=True)
+    arrived_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

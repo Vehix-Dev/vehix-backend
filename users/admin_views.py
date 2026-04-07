@@ -164,26 +164,38 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                     
                     if new_approved:
                         # Send approval notification
+                        title = "Account Approved"
+                        body = "Your Vehix account has been approved! You can now go online."
                         message = {
                             'type': 'account.approved',
                             'user_id': instance.id,
                             'is_approved': True,
-                            'message': 'Your Vehix account has been approved!'
+                            'message': body
                         }
                         print(f" Sent approval WebSocket to roadie {instance.id}")
                     else:
                         # Send unapproval notification
+                        title = "Account Unapproved"
+                        body = "Your Vehix account has been unapproved. Please contact support."
                         message = {
                             'type': 'account.unapproved',
                             'user_id': instance.id,
                             'is_approved': False,
-                            'message': 'Your Vehix account has been unapproved.'
+                            'message': body
                         }
                         print(f" Sent unapproval WebSocket to roadie {instance.id}")
                     
+                    # Create persistent notification in database
+                    Notification.objects.create(
+                        user=instance,
+                        title=title,
+                        body=body,
+                        data=message
+                    )
+                    
                     async_to_sync(channel_layer.group_send)(group, message)
             except Exception as e:
-                print(f" Failed to send approval WebSocket: {e}")
+                print(f" Failed to send approval notification: {e}")
         
         return response
     

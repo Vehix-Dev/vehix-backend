@@ -36,6 +36,9 @@ class RiderRequestsListView(generics.ListAPIView):
         status_filter = self.request.query_params.get('status')
         if status_filter == 'active':
             qs = qs.filter(status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'STARTED'])
+        else:
+            # Only return expired, completed and cancelled for history
+            qs = qs.filter(status__in=['COMPLETED', 'CANCELLED', 'EXPIRED'])
         return qs
 
 
@@ -52,7 +55,10 @@ class RoadieRequestsListView(generics.ListAPIView):
         
         status_filter = self.request.query_params.get('status')
         if status_filter == 'active':
-            qs = qs.filter(status__in=['ACCEPTED', 'EN_ROUTE', 'STARTED'])
+            qs = qs.filter(status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED'])
+        else:
+            # Only return expired, completed and cancelled for history
+            qs = qs.filter(status__in=['COMPLETED', 'CANCELLED', 'EXPIRED'])
         return qs
 
 
@@ -476,9 +482,9 @@ class CancelRequestView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Rodie can cancel if request is accepted/en_route/started
+        # Rodie can cancel if request is accepted or en_route
         if user.role == 'RODIE' and req.rodie_id == user.id:
-            if req.status in ['ACCEPTED', 'EN_ROUTE', 'STARTED']:
+            if req.status in ['ACCEPTED', 'EN_ROUTE']:
                 # Check distance
                 if current_lat and current_lng:
                     dist_km = calculate_distance_km(
@@ -536,11 +542,45 @@ class CancelRequestView(APIView):
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': f'Cannot cancel request with status {req.status}'},
+                    {'detail': f'Cannot cancel request with status {req.status}. Once you arrive, you must fulfill the job.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
         return Response({'detail': 'Not authorized to cancel'}, status=status.HTTP_403_FORBIDDEN)
+
+
+class ArrivedRequestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        if user.role != 'RODIE':
+            return Response({'detail': 'Only roadies can confirm arrival'}, status=status.HTTP_403_FORBIDDEN)
+        req = get_object_or_404(ServiceRequest, id=pk)
+        if req.rodie_id != user.id:
+            return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+        
+        req.status = 'ARRIVED'
+        req.arrived_at = timezone.now()
+        req.save()
+        
+        try:
+            cache.set(f"request_status:{req.id}", 'ARRIVED', timeout=3600)
+        except Exception:
+            pass
+            
+        try:
+            if get_channel_layer and async_to_sync:
+                from .serializers import ServiceRequestSerializer
+                data = ServiceRequestSerializer(req).data
+                async_to_sync(get_channel_layer().group_send)(
+                    f'request_{req.id}', 
+                    {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
+                )
+        except Exception:
+            pass
+            
+        return Response({'detail': 'Marked as arrived'})
 
 
 class EnrouteRequestView(APIView):
