@@ -164,7 +164,7 @@ class UserSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'wallet', 'services', 'profile_photo',
             'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
             'rating', 'total_assists', 'total_rides', 'total_jobs',
-            'trial_days_left',
+            'trial_days_left', 'trial_end_date',
         ]
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at', 'trial_days_left')
 
