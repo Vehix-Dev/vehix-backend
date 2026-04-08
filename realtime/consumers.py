@@ -199,6 +199,22 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         await self.broadcast_to_nearby_riders(lat, lng)
                     except Exception:
                         pass
+                        
+                    # RELIABILITY: If rider_id is missing but roadie is in a ride, find the rider
+                    if rider_id is None:
+                        try:
+                            # Use cache or DB to find if this roadie has an active ride
+                            def get_active_rider():
+                                req = ServiceRequest.objects.filter(
+                                    rodie_id=self.scope['user'].id,
+                                    status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+                                ).first()
+                                return req.rider_id if req else None
+                            
+                            rider_id = await database_sync_to_async(get_active_rider)()
+                        except Exception:
+                            pass
+
                     # Relay to specific rider if during active ride
                     if rider_id is not None:
                         # Calculate distance and ETA for the specific rider
@@ -210,16 +226,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                             from locations.models import RodieLocation
                             
                             # Get the active request between this roadie and rider
-                            async def get_active_request():
-                                return await database_sync_to_async(
-                                    ServiceRequest.objects.filter
-                                )(
+                            def fetch_active_request():
+                                return ServiceRequest.objects.filter(
                                     rodie_id=self.scope['user'].id,
                                     rider_id=rider_id,
-                                    status__in=['ACCEPTED', 'EN_ROUTE']
+                                    status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
                                 ).first()
                             
-                            request = await get_active_request()
+                            request = await database_sync_to_async(fetch_active_request)()
                             if request and request.rider_lat and request.rider_lng:
                                 # Calculate distance
                                 from .utils import calculate_distance_km
@@ -590,8 +604,30 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                         await cache_set_rider_location(user.id, lat, lng)
                         # Send nearby roadies after location update
                         await self.send_nearby_roadies()
+                        
+                        # RELAY: Also relay rider location to the assigned roadie if in an active ride
+                        def get_active_rodie():
+                            req = ServiceRequest.objects.filter(
+                                rider_id=user.id,
+                                status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+                            ).first()
+                            return req.rodie_id if req else None
+                        
+                        rodie_id = await database_sync_to_async(get_active_rodie)()
+                        if rodie_id:
+                            await self.channel_layer.group_send(
+                                f"rodie_{rodie_id}",
+                                {
+                                    "type": "RIDER_LOCATION",
+                                    "lat": lat,
+                                    "lng": lng,
+                                    "rider_id": user.id,
+                                    "rider_name": f"{user.first_name} {user.last_name}".strip() or user.username
+                                }
+                            )
                     except Exception:
                         pass
+
                     await self.channel_layer.group_send(
                         "admin_monitoring",
                         {
