@@ -4,6 +4,8 @@ from django.utils import timezone
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.db import transaction
 
 User = get_user_model()
 
@@ -169,52 +171,64 @@ def charge_service_fee_initial(sender, instance, created, **kwargs):
     return
 
 
-def charge_fee_for_request(instance):
-    """Charge platform service fee to the rodie's wallet for the given ServiceRequest instance.
-    Returns True if charging succeeded and fee_charged was set, False otherwise.
+def charge_fee_for_request(request_id):
+    """Charge platform service fee to the rodie's wallet.
+    Accepts request_id to be thread-safe.
     """
     try:
+        instance = ServiceRequest.objects.get(id=request_id)
+        if not instance.rodie or instance.fee_charged:
+            return True
         from users.models import Wallet, PlatformConfig, WalletTransaction
-        cfg = PlatformConfig.objects.first()
+        cfg = cache.get("platform_config")
+        if not cfg:
+            cfg = PlatformConfig.objects.first()
+            if cfg:
+                cache.set("platform_config", cfg, timeout=3600)
+        
         fee = cfg.service_fee if cfg else Decimal('0')
         trial_days = cfg.trial_days if cfg else 0
 
-        if instance.rodie:
-            user_age_days = (timezone.now() - instance.rodie.created_at).days
-            if user_age_days < trial_days:
-                instance.fee_charged = True
-                instance.save(update_fields=['fee_charged'])
-                return True
+        # Trial check
+        user_age_days = (timezone.now() - instance.rodie.created_at).days
+        if user_age_days < trial_days:
+            ServiceRequest.objects.filter(id=instance.id).update(fee_charged=True)
+            return True
 
-            existing = WalletTransaction.objects.filter(reason=f'service fee for request {instance.id}', wallet__user=instance.rodie)
-            if existing.exists():
-                instance.fee_charged = True
-                instance.save(update_fields=['fee_charged'])
-                return True
+        # Check if already charged in this or another transaction
+        existing = WalletTransaction.objects.filter(
+            reason=f'service fee for request {instance.id}', 
+            wallet__user=instance.rodie
+        ).exists()
+        
+        if existing:
+            ServiceRequest.objects.filter(id=instance.id).update(fee_charged=True)
+            return True
+
+        # Perform charging
+        with transaction.atomic():
             wallet, _ = Wallet.objects.get_or_create(user=instance.rodie)
-            wallet.balance = wallet.balance - Decimal(fee)
-            wallet.save()
-            WalletTransaction.objects.create(wallet=wallet, amount=Decimal(-fee), reason=f'service fee for request {instance.id}')
-        instance.fee_charged = True
-        instance.save(update_fields=['fee_charged'])
+            wallet.balance -= Decimal(fee)
+            wallet.save(update_fields=['balance'])
+            
+            WalletTransaction.objects.create(
+                wallet=wallet, 
+                amount=Decimal(-fee), 
+                reason=f'service fee for request {instance.id}'
+            )
+            
+            # Update request status directly to avoid re-triggering signals
+            ServiceRequest.objects.filter(id=instance.id).update(fee_charged=True)
+            
         return True
-    except Exception:
+    except Exception as e:
+        print(f"❌ Error charging fee: {e}")
         return False
 
 
 @receiver(post_save, sender=ServiceRequest)
 def charge_service_fee(sender, instance, created, **kwargs):
-    if instance.status == 'COMPLETED':
-        try:
-            from users.models import WalletTransaction
-            tx_exists = False
-            if instance.rodie:
-                tx_exists = WalletTransaction.objects.filter(reason=f'service fee for request {instance.id}', wallet__user=instance.rodie).exists()
-            if tx_exists:
-                if not instance.fee_charged:
-                    instance.fee_charged = True
-                    instance.save(update_fields=['fee_charged'])
-            else:
-                charge_fee_for_request(instance)
-        except Exception:
-            pass
+    if instance.status == 'COMPLETED' and not instance.fee_charged:
+        import threading
+        # Run fee charging in a background thread to eliminate UI latency
+        threading.Thread(target=charge_fee_for_request, args=(instance.id,), daemon=True).start()
