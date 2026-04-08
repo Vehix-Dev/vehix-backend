@@ -99,7 +99,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
             await self.channel_layer.group_add('notifications', self.channel_name)
-            await self._set_online(user, True)
+            # # await self._set_online(user, True)  # Disabled auto-online on connect
             await self.accept()
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
 
