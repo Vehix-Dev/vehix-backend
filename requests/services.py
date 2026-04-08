@@ -123,10 +123,13 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             "distance_meters": distance_m,
             "distance_km": round((distance_m or 0) / 1000.0, 1),
             "fee": 15000,  # Placeholder for now
+            "rider_username": req_obj.rider.username,
+            "rider_phone": req_obj.rider.phone,
             "rider": {
                 "id": req_obj.rider.id,
                 "first_name": req_obj.rider.first_name,
                 "last_name": req_obj.rider.last_name,
+                "username": req_obj.rider.username,
                 "phone": req_obj.rider.phone,
             }
         }

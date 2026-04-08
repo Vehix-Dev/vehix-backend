@@ -32,8 +32,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         return 'UNKNOWN'
 
     def get_sender_name(self, obj):
-        name = f"{obj.sender.first_name} {obj.sender.last_name}".strip()
-        return name or obj.sender.username
+        return obj.sender.username
 
 
 class ServiceRequestCreateSerializer(serializers.ModelSerializer):
@@ -89,12 +88,12 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
 
     def get_rider_name(self, obj):
         if obj.rider:
-            return f"{obj.rider.first_name} {obj.rider.last_name}".strip() or obj.rider.username
+            return obj.rider.username
         return None
 
     def get_rodie_name(self, obj):
         if obj.rodie:
-            return f"{obj.rodie.first_name} {obj.rodie.last_name}".strip() or obj.rodie.username
+            return obj.rodie.username
         return None
 
     def get_distance_km(self, obj):
