@@ -652,22 +652,27 @@ class CompleteRequestView(APIView):
         req.status = 'COMPLETED'
         req.completed_at = timezone.now()
         req.save()
+        
         try:
             cache.set(f"request_status:{req.id}", 'COMPLETED', timeout=3600)
         except Exception:
             pass
-        try:
-            from .models import charge_fee_for_request
-            charge_fee_for_request(req)
-        except Exception:
-            pass
+
+        # Broadcast COMPLETION immediately to reduce latency for the rider
         try:
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request_completed', 'request': data})
-        except Exception:
-            pass
+                async_to_sync(get_channel_layer().group_send)(
+                    f'request_{req.id}', 
+                    {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
+                )
+        except Exception as e:
+            print(f"⚠️ Error broadcasting completion: {e}")
+
+        # Fee charging is handled by post_save signal in models.py
+        # no need for redundant blocking call here
+        
         return Response({'detail': 'Service completed'})
 
 
