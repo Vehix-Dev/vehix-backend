@@ -162,6 +162,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "status": event.get("status")
         })
 
+    async def request_cancelled(self, event):
+        """Handle request cancellation confirmation"""
+        await self.send_json({
+            "type": "REQUEST_CANCELLED",
+            "request_id": event.get("request_id"),
+            "status": "CANCELLED"
+        })
+
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
