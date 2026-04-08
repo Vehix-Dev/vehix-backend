@@ -581,8 +581,16 @@ class ArrivedRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                
+                # Send to request group
                 async_to_sync(get_channel_layer().group_send)(
                     f'request_{req.id}', 
+                    {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
+                )
+                
+                # Guaranteed delivery to rider's personal channel
+                async_to_sync(get_channel_layer().group_send)(
+                    f'rider_{req.rider.id}',
                     {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
                 )
         except Exception:
@@ -612,7 +620,18 @@ class EnrouteRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request_enroute', 'request': data})
+                
+                # Send to request group
+                async_to_sync(get_channel_layer().group_send)(
+                    f'request_{req.id}', 
+                    {'type': 'request_enroute', 'request': data}
+                )
+                
+                # Guaranteed delivery to rider's personal channel
+                async_to_sync(get_channel_layer().group_send)(
+                    f'rider_{req.rider.id}',
+                    {'type': 'request_enroute', 'request': data}
+                )
         except Exception:
             pass
         return Response({'detail': 'Marked en-route'})
@@ -632,10 +651,23 @@ class StartRequestView(APIView):
         req.started_at = timezone.now()
         req.save()
         try:
-            cache.set(f"request_status:{req.id}", 'STARTED', timeout=3600)
+            if get_channel_layer and async_to_sync:
+                from .serializers import ServiceRequestSerializer
+                data = ServiceRequestSerializer(req).data
+                
+                # Send to request group
+                async_to_sync(get_channel_layer().group_send)(
+                    f'request_{req.id}', 
+                    {'type': 'request_started', 'status': 'STARTED', 'request': data}
+                )
+                
+                # Guaranteed delivery to rider's personal channel
+                async_to_sync(get_channel_layer().group_send)(
+                    f'rider_{req.rider.id}',
+                    {'type': 'request_started', 'status': 'STARTED', 'request': data}
+                )
         except Exception:
             pass
-        # WebSocket broadcast is handled by post_save signal - no duplicate needed here
         return Response({'detail': 'Service started'})
 
 
@@ -663,8 +695,16 @@ class CompleteRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                
+                # Send to request group
                 async_to_sync(get_channel_layer().group_send)(
                     f'request_{req.id}', 
+                    {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
+                )
+                
+                # Guaranteed delivery to rider's personal channel
+                async_to_sync(get_channel_layer().group_send)(
+                    f'rider_{req.rider.id}',
                     {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
                 )
         except Exception as e:
