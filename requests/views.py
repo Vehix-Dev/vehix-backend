@@ -493,26 +493,12 @@ class CancelRequestView(APIView):
         # Rodie can cancel if request is accepted or en_route
         if user.role == 'RODIE' and req.rodie_id == user.id:
             if req.status in ['ACCEPTED', 'EN_ROUTE']:
-                # Check distance
+                # Calculate distance for record keeping if location is provided
+                dist_km = None
                 if current_lat and current_lng:
                     dist_km = calculate_distance_km(
                         float(current_lat), float(current_lng),
                         float(req.rider_lat), float(req.rider_lng)
-                    )
-                    if dist_km < MIN_CANCEL_DISTANCE_KM:
-                        return Response(
-                            {
-                                'detail': f'Distance should be more than {int(MIN_CANCEL_DISTANCE_KM * 1000)} meters to cancel',
-                                'min_distance_meters': int(MIN_CANCEL_DISTANCE_KM * 1000),
-                                'current_distance_meters': max(1, int(dist_km * 1000))
-                            },
-                            status=status.HTTP_403_FORBIDDEN
-                        )
-                else:
-                    # No location provided, deny for safety
-                    return Response(
-                        {'detail': 'Current location required to cancel'},
-                        status=status.HTTP_400_BAD_REQUEST
                     )
                 
                 req.status = 'CANCELLED'
