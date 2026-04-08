@@ -480,6 +480,18 @@ class CancelRequestView(APIView):
                             "message": "The Rider has cancelled this request."
                         }
                     )
+
+                    # 3. Guaranteed delivery to the specific rodie's personal channel
+                    if req.rodie:
+                        async_to_sync(channel_layer.group_send)(
+                            f'rodie_{req.rodie.id}',
+                            {
+                                "type": "request_cancelled",
+                                "request_id": req.id,
+                                "status": "CANCELLED",
+                                "message": "The Rider has cancelled this request."
+                            }
+                        )
                     
                     print(f"🚫 Broadcasted cancellation for request {req.id} to all parties")
                 except Exception as e:
