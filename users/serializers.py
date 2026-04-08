@@ -48,14 +48,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         wallet, _ = Wallet.objects.get_or_create(user=user)
 
-        # Process referral if valid referrer was found
+        # Create referral record if valid referrer was found
+        # No immediate crediting; rewards are earned when the referred user completes their first Job/Assist
         if referrer and referrer != user:
-            ref_wallet, _ = Wallet.objects.get_or_create(user=referrer)
-            amount = Decimal('100.00')
-            ref_wallet.balance = ref_wallet.balance + amount
-            ref_wallet.save()
-            WalletTransaction.objects.create(wallet=ref_wallet, amount=amount, reason='referral credit')
-            Referral.objects.create(referrer=referrer, referred=user, amount=amount)
+            Referral.objects.create(referrer=referrer, referred=user, amount=Decimal('1000.00'), is_credited=False)
 
         # Note: Services are no longer automatically assigned to roadies
         # They must manually select services through the services selection screen
@@ -245,11 +241,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ReferralSerializer(serializers.ModelSerializer):
     referrer = UserSerializer(read_only=True)
-    referred = UserSerializer(read_only=True)
+    referred_user = UserSerializer(source='referred', read_only=True)
 
     class Meta:
         model = Referral
-        fields = ('id', 'referrer', 'referred', 'amount', 'created_at')
+        fields = ('id', 'referrer', 'referred_user', 'amount', 'is_credited', 'created_at')
 
 
 class PlatformConfigSerializer(serializers.ModelSerializer):

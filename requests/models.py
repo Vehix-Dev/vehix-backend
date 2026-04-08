@@ -171,12 +171,59 @@ def charge_service_fee_initial(sender, instance, created, **kwargs):
     return
 
 
+def process_referral_reward(user_id):
+    """Check if the user was referred and award the referrer if this is their first completion."""
+    try:
+        from users.models import Referral, Wallet, WalletTransaction, User
+        user = User.objects.get(id=user_id)
+        
+        # Check if user was referred and reward not yet paid
+        referral = Referral.objects.filter(referred=user, is_credited=False).first()
+        if not referral:
+            return
+
+        # Count total completions for this user (including the one just finished)
+        completions = ServiceRequest.objects.filter(
+            models.Q(rider=user) | models.Q(rodie=user),
+            status='COMPLETED'
+        ).count()
+
+        if completions == 1:
+            with transaction.atomic():
+                # Re-fetch with lock
+                ref = Referral.objects.select_for_update().get(id=referral.id)
+                if ref.is_credited:
+                    return
+
+                # Award the referrer
+                ref_wallet, _ = Wallet.objects.get_or_create(user=ref.referrer)
+                ref_wallet.balance += ref.amount
+                ref_wallet.save(update_fields=['balance'])
+                
+                WalletTransaction.objects.create(
+                    wallet=ref_wallet,
+                    amount=ref.amount,
+                    reason=f"Referral reward: {user.username} first assist"
+                )
+                
+                ref.is_credited = True
+                ref.save(update_fields=['is_credited'])
+                print(f"🎁 UGX {ref.amount} referral reward paid to {ref.referrer.username} for {user.username}")
+    except Exception as e:
+        print(f"❌ Error processing referral reward: {e}")
+
+
 def charge_fee_for_request(request_id):
-    """Charge platform service fee to the rodie's wallet.
-    Accepts request_id to be thread-safe.
-    """
+    """Charge platform service fee and process referral rewards."""
     try:
         instance = ServiceRequest.objects.get(id=request_id)
+        
+        # 1. Process Referral Rewards (for both Rider and Roadie)
+        process_referral_reward(instance.rider_id)
+        if instance.rodie_id:
+            process_referral_reward(instance.rodie_id)
+            
+        # 2. Charge Fee to Roadie
         if not instance.rodie or instance.fee_charged:
             return True
         from users.models import Wallet, PlatformConfig, WalletTransaction
