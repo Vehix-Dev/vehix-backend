@@ -239,11 +239,12 @@ class WalletTransaction(models.Model):
 class Referral(models.Model):
     referrer = models.ForeignKey('users.User', related_name='referrals_made', on_delete=models.CASCADE)
     referred = models.ForeignKey('users.User', related_name='referred_by_user', on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00)
+    is_credited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Referral {self.referrer.username} -> {self.referred.username}: {self.amount}"
+        return f"Referral {self.referrer.username} -> {self.referred.username}: {self.amount} (Paid: {self.is_credited})"
 
 
 class PlatformConfig(models.Model):
