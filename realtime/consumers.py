@@ -99,7 +99,34 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
             await self.channel_layer.group_add('notifications', self.channel_name)
-            # # await self._set_online(user, True)  # Disabled auto-online on connect
+            
+            # --- AUTO-REJOIN ACTIVE REQUESTS ---
+            try:
+                from requests.models import ServiceRequest
+                from django.db.models import Q
+                def get_active_request_id():
+                    req = ServiceRequest.objects.filter(
+                        rodie_id=user.id,
+                        status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+                    ).first()
+                    return req
+                
+                req = await database_sync_to_async(get_active_request_id)()
+                if req:
+                    await self.channel_layer.group_add(f"request_{req.id}", self.channel_name)
+                    print(f"🔄 [RodieConsumer] Auto-rejoined request group: request_{req.id}")
+                    
+                    # Send current state immediately to sync UI
+                    from requests.serializers import ServiceRequestSerializer
+                    serializer_data = await database_sync_to_async(lambda: ServiceRequestSerializer(req).data)()
+                    await self.send_json({
+                        "type": "REQUEST_UPDATE",
+                        "status": req.status,
+                        "request": serializer_data
+                    })
+            except Exception as e:
+                print(f"⚠️ [RodieConsumer] Error auto-rejoining active request: {e}")
+
             await self.accept()
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
 
@@ -460,6 +487,16 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "eta_seconds": event.get("eta_seconds")
         })
 
+    async def rider_location(self, event):
+        """Relay rider's real-time location to the roadie"""
+        await self.send_json({
+            "type": "RIDER_LOCATION",
+            "lat": event.get("lat"),
+            "lng": event.get("lng"),
+            "rider_id": event.get("rider_id"),
+            "rider_name": event.get("rider_name")
+        })
+
 
 class RiderConsumer(AsyncJsonWebsocketConsumer):
 
@@ -532,6 +569,32 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
             await self.channel_layer.group_add('notifications', self.channel_name)
+
+            # --- AUTO-REJOIN ACTIVE REQUESTS ---
+            try:
+                from requests.models import ServiceRequest
+                def get_active_request():
+                    return ServiceRequest.objects.filter(
+                        rider_id=user.id,
+                        status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+                    ).first()
+                
+                req = await database_sync_to_async(get_active_request)()
+                if req:
+                    await self.channel_layer.group_add(f"request_{req.id}", self.channel_name)
+                    print(f"🔄 [RiderConsumer] Auto-rejoined request group: request_{req.id}")
+                    
+                    # Send current state immediately to sync UI
+                    from requests.serializers import ServiceRequestSerializer
+                    serializer_data = await database_sync_to_async(lambda: ServiceRequestSerializer(req).data)()
+                    await self.send_json({
+                        "type": "REQUEST_UPDATE",
+                        "status": req.status,
+                        "request": serializer_data
+                    })
+            except Exception as e:
+                print(f"⚠️ [RiderConsumer] Error auto-rejoining active request: {e}")
+
             await self.accept()
             print(f"✅ [RiderConsumer] Connected successfully for user {user.id}")
             print(f"✅ [RiderConsumer] Joined groups: {self.group_name}, role_{user.role}, notifications")
