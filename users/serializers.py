@@ -162,7 +162,12 @@ class UserSerializer(serializers.ModelSerializer):
             'rating', 'total_assists', 'total_rides', 'total_jobs',
             'trial_days_left', 'trial_end_date', 'max_negative_balance',
         ]
-        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at', 'trial_days_left', 'trial_end_date', 'max_negative_balance')
+        read_only_fields = (
+            'id', 'external_id', 'username', 'first_name', 'last_name', 
+            'role', 'referral_code', 'nin', 'is_approved', 'is_verified', 
+            'is_online', 'services_selected', 'created_at', 'updated_at', 
+            'trial_days_left', 'trial_end_date', 'max_negative_balance'
+        )
 
     def get_max_negative_balance(self, obj):
         from .models import PlatformConfig
