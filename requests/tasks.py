@@ -172,3 +172,18 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
     finally:
         # Always release the matching lock
         cache.delete(match_lock_key)
+
+@shared_task(bind=True, max_retries=5)
+def process_completion_task(self, request_id):
+    """Charge fee and handle referral rewards on completion."""
+    from .models import charge_fee_for_request
+    try:
+        # We call the model method but we are now in worker context
+        success = charge_fee_for_request(request_id)
+        if not success:
+            raise Exception("Fee charging logic failed internally")
+        return f"Successfully processed completion for Request #{request_id}"
+    except Exception as exc:
+        # Retry with exponential backoff if possible
+        logger.error(f"❌ Error in process_completion_task for Request #{request_id}: {exc}")
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))

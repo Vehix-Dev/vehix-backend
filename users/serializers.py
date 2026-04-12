@@ -81,11 +81,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             if User.objects.filter(nin=nin).exists():
                 raise serializers.ValidationError({'nin': 'This NIN is already in use'})
 
-        # For RIDER accounts, enforce unique email (username and phone are already unique at DB level)
-        if role == 'RIDER':
-            # Check email uniqueness (case-insensitive)
-            if email and User.objects.filter(email__iexact=email).exists():
-                raise serializers.ValidationError({'email': 'This email address is already registered'})
+        # Enforce unique email for all platform accounts (username and phone are already unique at DB level)
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({'email': 'This email address is already registered'})
 
         # Validate referral code if provided
         if referred_by_code and referred_by_code.strip():
