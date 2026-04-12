@@ -8,6 +8,7 @@ import time
 from .osrm import get_route_info
 from django.db import transaction
 from .models import ServiceRequest
+from .tasks import sequential_offers_task
 
 MAX_DISTANCE_KM = 50 # Increased for development/testing
 
@@ -27,10 +28,19 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     rodie_services = RodieService.objects.filter(
         service=service_type,
         rodie__is_active=True,
-        rodie__is_online=True
+        rodie__is_online=True,
+        rodie__is_approved=True
     ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
-
+    
+    # Filter out locked rodies (those currently being offered a job)
+    filtered_services = []
     for rs in rodie_services:
+        if not cache.get(f"rodie_locked:{rs.rodie_id}"):
+            filtered_services.append(rs)
+        else:
+            print(f"🔒 Rodie {rs.rodie.username} is currently locked by another offer - skipping from initial pool")
+    
+    for rs in filtered_services:
         # read ephemeral rodie location from cache; skip if not available
         loc = cache.get(f"rodie_loc:{rs.rodie.id}")
         
@@ -203,29 +213,28 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         pass
 
 
-def notify_rodies(rodies, request_obj, offer_seconds=10, expiry_seconds=90):
-    """Start a background thread to offer the request to rodies one-by-one."""
+def notify_rodies(rodies, request_obj, offer_seconds=15, expiry_seconds=90):
+    """Start a Celery task to offer the request to rodies one-by-one."""
     try:
-        t = Thread(target=_sequential_offers, args=(rodies, request_obj.id, request_obj.rider_lat, request_obj.rider_lng, request_obj.service_type.id, offer_seconds, expiry_seconds), daemon=True)
-        t.start()
-    except Exception:
-        channel_layer = get_channel_layer()
+        # Prepare serializable rodie details
+        rodie_details = []
         for r in rodies:
-            try:
-                async_to_sync(channel_layer.group_send)(
-                    f"rodie_{r['rodie'].id}",
-                    {
-                        "type": "send_request",
-                        "data": {
-                            "request_id": request_obj.id,
-                            "service_id": request_obj.service_type.id,
-                            "service_name": str(request_obj.service_type),
-                            "rider_id": request_obj.rider.id,
-                            "rider_name": request_obj.rider.get_full_name(),
-                            "lat": float(request_obj.rider_lat),
-                            "lng": float(request_obj.rider_lng),
-                        }
-                    }
-                )
-            except Exception:
-                pass
+            rodie_details.append({
+                'id': r['rodie'].id,
+                'distance': float(r['distance'])
+            })
+            
+        sequential_offers_task.delay(
+            request_id=request_obj.id,
+            rodie_details=rodie_details,
+            rider_lat=float(request_obj.rider_lat),
+            rider_lng=float(request_obj.rider_lng),
+            service_type_id=request_obj.service_type.id,
+            offer_seconds=offer_seconds,
+            expiry_seconds=expiry_seconds
+        )
+        print(f"🚀 [Celery] Dispatched matching task for Request #{request_obj.id}")
+    except Exception as e:
+        print(f"❌ Failed to dispatch Celery task: {e}")
+        # Log to old thread method as fallback? 
+        # Actually safer to let it fail or log properly.

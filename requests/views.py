@@ -182,15 +182,9 @@ class CreateServiceRequestView(generics.CreateAPIView):
         
         print(f"✅ MATCHED RODIES (after wallet/filters): {matched_usernames}\n")
         
-        # BACKGROUND NOTIFICATION: Return the response immediately while notifications proceed in the background.
-        from threading import Thread
+        # Celery Dispatch: Use external tasks for reliability
         from .services import notify_rodies
-        Thread(
-            target=notify_rodies, 
-            args=(filtered, request_obj), 
-            kwargs={'offer_seconds': 15, 'expiry_seconds': 90},
-            daemon=True
-        ).start()
+        notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
         # mark ephemeral request status in cache so notify worker can poll without DB locks
         try:
             cache.set(f"request_status:{request_obj.id}", 'REQUESTED', timeout=120)
@@ -254,100 +248,92 @@ class AcceptRequestView(APIView):
         print(f"DEBUG: AcceptRequestView - User {user.id} ({user.role}) trying to accept request {pk}")
         
         if user.role != 'RODIE':
-            print(f"DEBUG: AcceptRequestView - Failed: User role is {user.role}, not RODIE")
             return Response({'detail': 'Only roadies can accept requests'}, status=status.HTTP_403_FORBIDDEN)
 
-        try:
-            req = ServiceRequest.objects.get(id=pk)
-            print(f"DEBUG: AcceptRequestView - Request {pk} found, status: {req.status}")
-        except ServiceRequest.DoesNotExist:
-            print(f"DEBUG: AcceptRequestView - Failed: Request {pk} does not exist")
-            return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+        if not user.is_approved:
+            return Response({'detail': 'Your account is not yet approved for service.'}, status=status.HTTP_403_FORBIDDEN)
             
-        if req.status != 'REQUESTED':
-            print(f"DEBUG: AcceptRequestView - Failed: Request status is {req.status}, not REQUESTED")
-            return Response({'detail': 'Request is not available for acceptance'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.is_active:
+            return Response({'detail': 'Your account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
 
-        if not RodieService.objects.filter(rodie=user, service=req.service_type).exists():
-            print(f"DEBUG: AcceptRequestView - Failed: Roadie {user.id} does not offer service {req.service_type.id}")
-            return Response({'detail': 'You do not offer this service'}, status=status.HTTP_400_BAD_REQUEST)
-
-        cfg = PlatformConfig.objects.first()
-        max_neg = cfg.max_negative_balance if cfg else Decimal('0')
-        rodie_wallet, _ = Wallet.objects.get_or_create(user=user)
-        print(f"DEBUG: AcceptRequestView - Roadie wallet balance: {rodie_wallet.balance}, max negative: {max_neg}")
-        if rodie_wallet.balance < Decimal(-max_neg):
-            print(f"DEBUG: AcceptRequestView - Failed: Wallet balance {rodie_wallet.balance} below max negative {-max_neg}")
-            return Response({'detail': 'Rodie wallet below allowed negative balance'}, status=status.HTTP_403_FORBIDDEN)
-
-        print(f"DEBUG: AcceptRequestView - All checks passed, accepting request {pk}")
-        
-        # Immediate Location Update: Ensure we have coordinates for the Rider broadcast
-        lat = request.data.get('lat')
-        lng = request.data.get('lng')
-        if lat and lng:
+        with transaction.atomic():
             try:
-                lat_f, lng_f = float(lat), float(lng)
-                cache.set(f"rodie_loc:{user.id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
-                user.lat, user.lng = lat_f, lng_f
-                user.save(update_fields=['lat', 'lng'])
-                print(f"📍 DEBUG: AcceptRequestView - Updated Roadie {user.id} location to {lat_f}, {lng_f}")
-            except Exception as e:
-                print(f"⚠️ DEBUG: AcceptRequestView - Failed to update location: {e}")
+                # Use select_for_update to lock the row during this transaction
+                req = ServiceRequest.objects.select_for_update().get(id=pk)
+            except ServiceRequest.DoesNotExist:
+                return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+            # 1. Check if request is still available
+            if req.status != 'REQUESTED':
+                return Response({'detail': f'Request status is {req.status}, no longer available.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        req.rodie = user
-        req.status = 'ACCEPTED'
-        req.accepted_at = timezone.now()
-        req.save()
-        try:
+            # 2. Safety check: Ensure the roadie isn't already on another active job
+            active_job_exists = ServiceRequest.objects.filter(
+                rodie=user,
+                status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).exists()
+            
+            if active_job_exists:
+                return Response({'detail': 'You already have an active request in progress.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # 3. Validation checks (Services, Wallet)
+            if not RodieService.objects.filter(rodie=user, service=req.service_type).exists():
+                return Response({'detail': 'You do not offer this service'}, status=status.HTTP_400_BAD_REQUEST)
+
+            cfg = PlatformConfig.objects.first()
+            max_neg = cfg.max_negative_balance if cfg else Decimal('0')
+            rodie_wallet, _ = Wallet.objects.get_or_create(user=user)
+            if rodie_wallet.balance < Decimal(-max_neg):
+                return Response({'detail': 'Rodie wallet below allowed negative balance'}, status=status.HTTP_403_FORBIDDEN)
+
+            # 4. Success - Commit the assignment
+            req.rodie = user
+            req.status = 'ACCEPTED'
+            req.accepted_at = timezone.now()
+            req.save()
+            
+            # Clear location lock if it exists
+            cache.delete(f"rodie_locked:{user.id}")
             cache.set(f"request_status:{req.id}", 'ACCEPTED', timeout=3600)
-        except Exception:
-            pass
 
-        try:
-            if get_channel_layer and async_to_sync:
+            # 5. Notify parties
+            try:
                 from .serializers import ServiceRequestSerializer
                 serializer = ServiceRequestSerializer(req)
                 resp_data = serializer.data
                 
-                # Include roadie's current location for the map
-                loc = cache.get(f"rodie_loc:{user.id}")
-                if loc:
-                    resp_data['roadie_lat'] = loc.get('lat')
-                    resp_data['roadie_lng'] = loc.get('lng')
+                # Include roadie's current location relay
+                lat = request.data.get('lat')
+                lng = request.data.get('lng')
+                if lat and lng:
+                    resp_data['roadie_lat'] = float(lat)
+                    resp_data['roadie_lng'] = float(lng)
 
-                print(f"DEBUG: Acceptance notifying groups for request {req.id}")
-                print(f"DEBUG: Rider ID: {req.rider.id}, Request ID: {req.id}")
+                channel_layer = get_channel_layer()
                 
-                # Send to rider's personal group for guaranteed delivery
-                rider_group = f"rider_{req.rider.id}"
-                print(f"DEBUG: Sending to rider group: {rider_group}")
-                async_to_sync(get_channel_layer().group_send)(
-                    rider_group,
+                # Notify Rider
+                async_to_sync(channel_layer.group_send)(
+                    f"rider_{req.rider.id}",
                     {
                         'type': 'request_accepted',
                         'status': 'ACCEPTED',
                         'request': resp_data
                     }
                 )
-                print(f"DEBUG: Sent acceptance to rider group: {rider_group}")
                 
-                # Also send to request group for backup
-                request_group = f'request_{req.id}'
-                print(f"DEBUG: Sending to request group: {request_group}")
-                async_to_sync(get_channel_layer().group_send)(
-                    request_group,
+                # Notify Request Room
+                async_to_sync(channel_layer.group_send)(
+                    f'request_{req.id}',
                     {
                         'type': 'request_accepted',
                         'status': 'ACCEPTED', 
                         'request': resp_data
                     }
                 )
-                print(f"DEBUG: Sent acceptance to request group: {request_group}")
-        except Exception as e:
-            print(f"DEBUG: Acceptance notification error: {e}")
+            except Exception as e:
+                print(f"DEBUG: Acceptance notification error: {e}")
 
-        return Response({'detail': 'Request accepted', 'request_id': req.id})
+            return Response({'detail': 'Request accepted', 'request_id': req.id})
 
 
 class DeclineRequestView(APIView):
@@ -477,7 +463,8 @@ class CancelRequestView(APIView):
                             "type": "request_cancelled",
                             "request_id": req.id,
                             "status": "CANCELLED",
-                            "message": "The Rider has cancelled this request."
+                            "message": "The Rider has cancelled this request.",
+                            "reason": cancellation_reason.reason
                         }
                     )
 
@@ -489,7 +476,8 @@ class CancelRequestView(APIView):
                                 "type": "request_cancelled",
                                 "request_id": req.id,
                                 "status": "CANCELLED",
-                                "message": "The Rider has cancelled this request."
+                                "message": "The Rider has cancelled this request.",
+                                "reason": cancellation_reason.reason
                             }
                         )
                     
