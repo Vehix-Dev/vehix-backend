@@ -428,6 +428,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def request_started(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
 
+    async def request_arrived(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
+
     async def request_completed(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
 
@@ -812,6 +815,25 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_started(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
+
+    async def request_arrived(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
+
+    async def rodie_location(self, event):
+        """Forward live roadie location to rider's map"""
+        await self.send_json({
+            "type": "rodie_location",
+            "lat": event.get("lat"),
+            "lng": event.get("lng"),
+            "username": event.get("username"),
+            "service_type": event.get("service_type")
+        })
+
+    async def account_approved(self, event):
+        await self.send_json({"type": "account.approved", "data": event.get("data")})
+
+    async def account_unapproved(self, event):
+        await self.send_json({"type": "account.unapproved", "data": event.get("data")})
 
     async def request_completed(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})

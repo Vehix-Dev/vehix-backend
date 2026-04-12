@@ -276,6 +276,10 @@ def charge_fee_for_request(request_id):
 @receiver(post_save, sender=ServiceRequest)
 def charge_service_fee(sender, instance, created, **kwargs):
     if instance.status == 'COMPLETED' and not instance.fee_charged:
-        import threading
-        # Run fee charging in a background thread to eliminate UI latency
-        threading.Thread(target=charge_fee_for_request, args=(instance.id,), daemon=True).start()
+        try:
+            from .tasks import process_completion_task
+            process_completion_task.delay(instance.id)
+        except Exception as e:
+            # Fallback to thread if celery is not available
+            import threading
+            threading.Thread(target=charge_fee_for_request, args=(instance.id,), daemon=True).start()
