@@ -12,8 +12,12 @@ class User(AbstractUser):
     username = models.CharField(
         max_length=150,
         help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.',
-        # Redefine without unique=True to allow role-based scoping
     )
+
+    # Use external_id as the unique identifier for Django's auth system 
+    # to allow duplicate usernames/emails/phones across roles.
+    USERNAME_FIELD = 'external_id'
+    REQUIRED_FIELDS = ['username', 'email']
 
     ROLE_CHOICES = (
         ('RIDER', 'Rider'),
@@ -57,7 +61,7 @@ class User(AbstractUser):
     updated_at = models.DateTimeField(auto_now=True)
 
     external_id = models.CharField(
-        max_length=10,
+        max_length=20,
         unique=True,
         blank=True,
         null=True,
