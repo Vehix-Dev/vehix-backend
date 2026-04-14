@@ -7,6 +7,7 @@ import re
 import uuid
 
 
+class User(AbstractUser):
     # Username is unique per role - same username can be used as RIDER and RODIE
     username = models.CharField(
         max_length=150,
