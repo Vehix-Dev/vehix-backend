@@ -150,8 +150,21 @@ class MyWalletView(APIView):
 
     def get(self, request):
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
-        serializer = WalletSerializer(wallet)
-        return Response(serializer.data)
+        
+        # Get all payments and wallet transactions
+        payments = Payment.objects.filter(user=request.user).order_by('-created_at')
+        transactions = WalletTransaction.objects.filter(wallet=wallet).order_by('-created_at')
+        
+        # Combine and serialize using the history serializer
+        combined = list(payments) + list(transactions)
+        combined.sort(key=lambda x: x.created_at, reverse=True)
+        
+        from .serializers import WalletSerializer, TransactionHistorySerializer
+        history_data = TransactionHistorySerializer(combined, many=True).data
+        wallet_data = WalletSerializer(wallet).data
+        wallet_data['transactions'] = history_data  # Overlay combined history
+        
+        return Response(wallet_data)
 
 
 class MyReferralsView(generics.ListAPIView):
@@ -261,44 +274,38 @@ class DepositView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        serializer = DepositSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        amount = serializer.validated_data['amount']
-
         import uuid
         from .pesapal import PesapalClient
-        
+
         reference = f"DEP-{uuid.uuid4().hex[:12].upper()}"
+        # Amount is 0/placeholder — Pesapal page lets the user set their own amount
         payment = Payment.objects.create(
             user=request.user,
-            amount=amount,
+            amount=0,
             transaction_type='DEPOSIT',
             status='PENDING',
             reference=reference,
-            description=f"Deposit of {amount}"
+            description=f"Wallet deposit by {request.user.username}"
         )
 
         try:
             client = PesapalClient()
-            callback_url = request.build_absolute_uri('/api/users/wallet/callback/') 
-            phone_number = request.data.get('phone_number')
-            response = client.submit_order(payment, callback_url, phone_number)
+            callback_url = request.build_absolute_uri('/api/users/wallet/callback/')
+            response = client.submit_order(payment, callback_url, phone_number=None)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
 
-            stk_response = None
-            if phone_number:
-                try:
-                    stk_response = client.submit_mobile_payment(tracking_id, phone_number)
-                except Exception as stk_e:
-                    pass
+            redirect_url = response.get('redirect_url')
+            if not redirect_url:
+                payment.status = 'FAILED'
+                payment.save()
+                return Response({'error': 'Could not generate payment link. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
             return Response({
                 'payment_id': payment.id,
-                'redirect_url': response.get('redirect_url'),
+                'redirect_url': redirect_url,
                 'reference': reference,
-                'stk_pushed': stk_response is not None and stk_response.get('status') == '200'
             })
         except Exception as e:
             payment.status = 'FAILED'
@@ -326,11 +333,8 @@ class WithdrawView(APIView):
                 'requested_amount': str(amount)
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check minimum withdrawal amount (e.g., 5000 UGX)
-        if amount < 5000:
-            return Response({
-                'error': 'Minimum withdrawal amount is UGX 5,000 (transaction charges inclusive if applicable)'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Maximum withdrawal (5,000 UGX) is handled by WithdrawSerializer validation.
+        # We can add a smaller minimum check here if needed, or just let the serializer handle it.
 
         try:
             # Deduct amount from wallet
@@ -446,16 +450,12 @@ class RoadiePaymentsView(APIView):
         })
 
     def post(self, request):
-        # Only roadies can make deposits
+        # Only roadies can make deposits here (though they can also use /wallet/deposit/ now)
         if request.user.role != 'RODIE':
             return Response(
                 {'error': 'Only roadies can make deposits'},
                 status=status.HTTP_403_FORBIDDEN
             )
-
-        serializer = DepositSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        amount = serializer.validated_data['amount']
 
         import uuid
         from .pesapal import PesapalClient
@@ -463,37 +463,27 @@ class RoadiePaymentsView(APIView):
         reference = f"DEP-{uuid.uuid4().hex[:12].upper()}"
         payment = Payment.objects.create(
             user=request.user,
-            amount=amount,
+            amount=0, # Placeholder, updated via IPN/Status check
             transaction_type='DEPOSIT',
             status='PENDING',
             reference=reference,
-            description=f"Wallet Deposit - {amount} KES"
+            description=f"Wallet deposit by {request.user.username}"
         )
 
         try:
             client = PesapalClient()
             callback_url = request.build_absolute_uri('/api/users/payments/pesapal/ipn/')
-            phone_number = request.data.get('phone_number')
-            response = client.submit_order(payment, callback_url, phone_number)
+            response = client.submit_order(payment, callback_url, phone_number=None)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
-
-            stk_response = None
-            if phone_number:
-                try:
-                    stk_response = client.submit_mobile_payment(tracking_id, phone_number)
-                except Exception as stk_e:
-                    print(f"STK Push failed: {stk_e}")
 
             return Response({
                 'success': True,
                 'payment_id': payment.id,
                 'redirect_url': response.get('redirect_url'),
                 'reference': reference,
-                'amount': str(amount),
-                'stk_pushed': stk_response is not None and stk_response.get('status') == '200',
-                'message': 'Payment initiated. Complete the payment to add funds to your wallet.'
+                'message': 'Payment initiated. Proceed to Pesapal to complete your deposit.'
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
             payment.status = 'FAILED'
@@ -501,7 +491,7 @@ class RoadiePaymentsView(APIView):
             return Response({
                 'success': False,
                 'error': str(e),
-                'message': 'Failed to initiate payment. Please try again.'
+                'message': 'Failed to initiate payment.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -524,6 +514,10 @@ class PaymentStatusView(APIView):
                     
                     if status_data:
                         pesapal_status = status_data.get('payment_status_description')
+                        # Correctly capture the actual amount paid from Pesapal response
+                        actual_amount = status_data.get('amount', payment.amount)
+                        payment.amount = actual_amount
+                        
                         if pesapal_status == 'COMPLETED':
                             payment.status = 'COMPLETED'
                             payment.save()
@@ -531,11 +525,11 @@ class PaymentStatusView(APIView):
                             # Credit wallet if this is a deposit
                             if payment.transaction_type == 'DEPOSIT':
                                 wallet, _ = Wallet.objects.get_or_create(user=payment.user)
-                                wallet.balance += payment.amount
+                                wallet.balance += Decimal(str(actual_amount))
                                 wallet.save()
                                 WalletTransaction.objects.create(
                                     wallet=wallet,
-                                    amount=payment.amount,
+                                    amount=actual_amount,
                                     reason=f"Deposit {payment.reference}"
                                 )
                         elif pesapal_status == 'FAILED':
@@ -592,7 +586,9 @@ class PesapalIPNView(APIView):
                 return Response({'status': 'failed', 'message': 'Could not verify payment status'}, status=status.HTTP_400_BAD_REQUEST)
             
             pesapal_status = status_data.get('payment_status_description') 
-            print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}")
+            actual_amount = status_data.get('amount', payment.amount)
+            payment.amount = actual_amount
+            print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}, Amount: {actual_amount}")
             
             if pesapal_status == 'COMPLETED' and payment.status != 'COMPLETED':
                 payment.status = 'COMPLETED'
@@ -600,11 +596,11 @@ class PesapalIPNView(APIView):
                 
                 if payment.transaction_type == 'DEPOSIT':
                     wallet, _ = Wallet.objects.get_or_create(user=payment.user)
-                    wallet.balance += payment.amount
+                    wallet.balance += Decimal(str(actual_amount))
                     wallet.save()
                     WalletTransaction.objects.create(
                         wallet=wallet,
-                        amount=payment.amount,
+                        amount=actual_amount,
                         reason=f"Deposit {payment.reference}"
                     )
                     print(f"Deposit completed: {payment.amount} added to {payment.user.username}'s wallet")

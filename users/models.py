@@ -15,16 +15,17 @@ class User(AbstractUser):
         ('ADMIN', 'Admin'),
     )
 
-    email = models.EmailField(unique=True)
+    # Email is unique per role — same email can be used as RIDER and RODIE
+    email = models.EmailField()
 
     role = models.CharField(
         max_length=10,
         choices=ROLE_CHOICES
     )
 
+    # Phone is unique per role — same phone can be used as RIDER and RODIE
     phone = models.CharField(
-        max_length=20,
-        unique=True
+        max_length=20
     )
 
     referral_code = models.CharField(
@@ -75,6 +76,15 @@ class User(AbstractUser):
         help_text="The date when the user's free trial expires."
     )
 
+    class Meta:
+        constraints = [
+            # Email + role must be unique (same email can exist for RIDER and RODIE)
+            models.UniqueConstraint(fields=['email', 'role'], name='unique_email_per_role'),
+            # Phone + role must be unique
+            models.UniqueConstraint(fields=['phone', 'role'], name='unique_phone_per_role'),
+            # Username is globally unique (inherited from AbstractUser -- keep it simple)
+        ]
+
     @property
     def trial_days_left(self):
         """Returns the number of days left in the free trial, or 0 if expired/not applicable."""
@@ -92,20 +102,22 @@ class User(AbstractUser):
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         from django.utils import timezone
-        
-        # Lock in trial end date when they are APPROVED for the first time
+
+        # Lock in trial end date when approved for the FIRST time
+        # Detect approval by comparing to current DB state
         if not is_new and self.is_approved and not self.trial_end_date:
             try:
-                # If trial_end_date is None, it means it hasn't started yet.
-                # Setting it the first time they are approved ensures it starts 
-                # only when they can actually use the platform.
-                # Once set, it stays fixed even if the user is unapproved then re-approved.
-                from django.apps import apps
-                ConfigModel = apps.get_model('users', 'PlatformConfig')
-                config = ConfigModel.objects.first()
-                if config and config.trial_days > 0:
-                    from datetime import timedelta
-                    self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
+                old = User.objects.filter(pk=self.pk).values('is_approved', 'trial_end_date').first()
+                was_approved = old['is_approved'] if old else False
+                had_trial = old['trial_end_date'] if old else None
+                # Only set trial if this is a FIRST approval (wasn't approved before)
+                if not was_approved and not had_trial:
+                    from django.apps import apps
+                    ConfigModel = apps.get_model('users', 'PlatformConfig')
+                    config = ConfigModel.objects.first()
+                    if config and config.trial_days > 0:
+                        from datetime import timedelta
+                        self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
             except Exception as e:
                 import logging
                 logging.error(f"Error setting trial date: {e}")

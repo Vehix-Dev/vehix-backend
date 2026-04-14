@@ -514,14 +514,17 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _get_nearby_rodies(self, lat, lng):
-        """Get nearby roadies - same logic as AvailabilityConsumer"""
+        """Get nearby roadies visible to riders — only approved, services-selected, online roadies."""
         results = []
         try:
-            qs = User.objects.filter(role='RODIE')
-            try:
-                qs = qs.filter(is_online=True)
-            except Exception:
-                pass
+            qs = User.objects.filter(
+                role='RODIE',
+                is_online=True,
+                is_approved=True,
+                services_selected=True,
+                is_deleted=False,
+                is_active=True,
+            )
 
             for u in qs.all():
                 # Prefer RodieLocation as the canonical source of truth for rodie position
@@ -530,16 +533,15 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     rodie_lat = rl.lat
                     rodie_lng = rl.lng
                 except RodieLocation.DoesNotExist:
-                    rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
-                    rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
+                    rodie_lat = getattr(u, 'lat', None)
+                    rodie_lng = getattr(u, 'lng', None)
 
                 if rodie_lat is not None and rodie_lng is not None:
                     results.append({
                         'id': u.id,
-                        'username': getattr(u, 'username', f'Roadie_{u.id}'),
+                        'username': u.username,
                         'lat': float(rodie_lat),
                         'lng': float(rodie_lng),
-                        'service_type': getattr(u, 'service_type', 'TOWING'),
                     })
         except Exception:
             return []
@@ -610,18 +612,19 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
 
     async def send_nearby_roadies(self):
-        """Send nearby roadies to this rider"""
+        """Send nearby roadies to this rider — always send on connect, filter when location is known."""
         try:
-            # Get rider's current location from cache
             from django.core.cache import cache
             rider_loc = cache.get(f"rider_loc:{self.scope['user'].id}")
-            if rider_loc:
-                nearby = await self._get_nearby_rodies(rider_loc['lat'], rider_loc['lng'])
-                await self.send_json({
-                    "type": "NEARBY_LIST",
-                    "roadies": nearby
-                })
-                print(f"📍 [RiderConsumer] Sent {len(nearby)} nearby roadies to rider {self.scope['user'].id}")
+            # Use rider location if available, otherwise (0,0) to get all roadies
+            lat = rider_loc['lat'] if rider_loc else 0
+            lng = rider_loc['lng'] if rider_loc else 0
+            nearby = await self._get_nearby_rodies(lat, lng)
+            await self.send_json({
+                "type": "NEARBY_LIST",
+                "roadies": nearby
+            })
+            print(f"📍 [RiderConsumer] Sent {len(nearby)} nearby roadies to rider {self.scope['user'].id}")
         except Exception as e:
             print(f"❌ [RiderConsumer] Error sending nearby roadies: {e}")
 
@@ -771,10 +774,14 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def rodie_status(self, event):
+        """Relay roadie online/offline toggle to riders so their maps update in real time."""
         await self.send_json({
             "type": "RODIE_STATUS",
             "data": event
         })
+
+    async def request_expired(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
 
     @database_sync_to_async
     def _get_rodie_id_for_request(self, request_id):

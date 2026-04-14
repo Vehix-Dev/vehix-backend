@@ -5,7 +5,6 @@ from django.core.cache import cache
 from django.db import transaction
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from channels.db import database_sync_to_async
 from requests.models import ServiceRequest
 from services.models import ServiceType
 
@@ -107,16 +106,20 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                 logger.error(f"❌ Failed to fetch request/service info: {e}")
                 continue
 
-            # 6. Live Eligibility Check
+            # 6. Live Eligibility Check (direct ORM — we are in a sync Celery worker)
             try:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
-                def check_eligibility():
-                    return User.objects.filter(id=rodie_id, is_online=True, is_active=True, is_approved=True).exists()
-                
-                is_eligible = async_to_sync(database_sync_to_async(check_eligibility))()
+                is_eligible = User.objects.filter(
+                    id=rodie_id,
+                    is_online=True,
+                    is_active=True,
+                    is_approved=True,
+                    services_selected=True,  # must have selected services
+                    is_deleted=False,
+                ).exists()
                 if not is_eligible:
-                    logger.info(f"📵 Rodie {rodie_id} went offline/disabled. Skipping.")
+                    logger.info(f"📵 Rodie {rodie_id} ineligible (offline/unapproved/no services). Skipping.")
                     continue
             except Exception as e:
                 logger.warning(f"⚠️ Eligibility check failed for {rodie_id}: {e}")
@@ -160,13 +163,36 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     pass
                 time.sleep(1)
                 
-            # Cleanup turn
+            # Cleanup turn (lock release BEFORE resetting status to avoid race)
             cache.delete(f"rodie_locked:{rodie_id}")
             cache.delete(f"active_offer:{rodie_id}")
+            # Reset DECLINED -> REQUESTED so next roadie sees a fresh status
+            current_status = cache.get(f"request_status:{request_id}")
+            if current_status == 'DECLINED':
+                cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
 
-        # 9. Expiration
-        from .views import expire_request
-        expire_request(request_id)
+        # 9. Expiration — inline since there is no separate expire_request function
+        try:
+            with transaction.atomic():
+                req = ServiceRequest.objects.select_for_update().get(id=request_id)
+                if req.status == 'REQUESTED':
+                    req.status = 'EXPIRED'
+                    req.save(update_fields=['status'])
+                    cache.set(f"request_status:{request_id}", 'EXPIRED', timeout=300)
+                    try:
+                        async_to_sync(channel_layer.group_send)(
+                            f'request_{request_id}',
+                            {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}
+                        )
+                        async_to_sync(channel_layer.group_send)(
+                            f'rider_{req.rider_id}',
+                            {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}
+                        )
+                    except Exception:
+                        pass
+                    logger.info(f"⌛ Request #{request_id} EXPIRED — no roadie accepted")
+        except Exception as e:
+            logger.error(f"❌ Error expiring request #{request_id}: {e}")
         return "Expired"
 
     finally:

@@ -9,6 +9,7 @@ from services.models import RodieService
 from locations.utils import calculate_distance_km
 from locations.models import RodieLocation
 from django.core.cache import cache
+from django.db import transaction
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from users.models import Wallet, PlatformConfig
@@ -181,7 +182,22 @@ class CreateServiceRequestView(generics.CreateAPIView):
         matched_usernames = [r['rodie'].username for r in filtered]
         
         print(f"✅ MATCHED RODIES (after wallet/filters): {matched_usernames}\n")
-        
+
+        if not filtered:
+            # No roadies available — expire the request immediately and notify rider
+            print(f"⚠️ No eligible roadies found for Request #{request_obj.id}. Expiring immediately.")
+            request_obj.status = 'EXPIRED'
+            request_obj.save(update_fields=['status'])
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'rider_{request_obj.rider.id}',
+                    {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_obj.id}}
+                )
+            except Exception:
+                pass
+            return
+
         # Celery Dispatch: Use external tasks for reliability
         from .services import notify_rodies
         notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
