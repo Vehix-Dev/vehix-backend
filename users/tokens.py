@@ -15,34 +15,45 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         username = attrs.get(self.username_field)
         password = attrs.get('password')
-        print(f"DEBUG AUTH: Attempting login for username/email/phone: '{username}'", flush=True)
+        
+        # Determine target role if we are in a subclass
+        target_role = getattr(self, 'target_role', None)
+        
+        print(f"DEBUG AUTH: Attempting login for username/email/phone: '{username}' (Target Role: {target_role})", flush=True)
 
-        # Try to resolve username from email or phone if username not found
         if username:
             from django.contrib.auth import get_user_model
             User = get_user_model()
-            # Check if user exists with this username
-            if not User.objects.filter(username=username).exists():
-                print(f"DEBUG AUTH: Username '{username}' not found. Trying lookup by email and phone.", flush=True)
+            
+            # Use role in filter if target_role is set
+            role_filter = {'role': target_role} if target_role else {}
+            
+            # Check if user exists with this username + role
+            user_query = User.objects.filter(username=username, **role_filter)
+            
+            if not user_query.exists():
+                print(f"DEBUG AUTH: No match for exact username '{username}' with role '{target_role}'. Trying lookup by email and phone.", flush=True)
                 try:
-                    # First try email lookup
-                    user_obj = User.objects.filter(email__iexact=username).first()
+                    # First try email lookup + role
+                    user_obj = User.objects.filter(email__iexact=username, **role_filter).first()
                     if user_obj:
-                        print(f"DEBUG AUTH: Found user {user_obj.username} by email {username}", flush=True)
+                        print(f"DEBUG AUTH: Found user {user_obj.username} by email {username} with role {user_obj.role}", flush=True)
                         attrs[self.username_field] = user_obj.username
                     else:
-                        print(f"DEBUG AUTH: No user found with email '{username}'. Trying phone lookup.", flush=True)
-                        # Then try phone lookup
-                        user_obj = User.objects.filter(phone=username).first()
+                        print(f"DEBUG AUTH: No user found with email '{username}' and role '{target_role}'. Trying phone lookup.", flush=True)
+                        # Then try phone lookup + role
+                        user_obj = User.objects.filter(phone=username, **role_filter).first()
                         if user_obj:
-                            print(f"DEBUG AUTH: Found user {user_obj.username} by phone {username}", flush=True)
+                            print(f"DEBUG AUTH: Found user {user_obj.username} by phone {username} with role {user_obj.role}", flush=True)
                             attrs[self.username_field] = user_obj.username
                         else:
-                            print(f"DEBUG AUTH: No user found with phone '{username}'", flush=True)
+                            print(f"DEBUG AUTH: No user found with phone '{username}' and role '{target_role}'", flush=True)
                 except Exception as e:
                     print(f"DEBUG AUTH Error during lookup: {e}")
             else:
-                 print(f"DEBUG AUTH: User found by exact username '{username}'", flush=True)
+                 user_obj = user_query.first()
+                 print(f"DEBUG AUTH: User found by exact username '{username}' and role '{user_obj.role}'", flush=True)
+                 attrs[self.username_field] = user_obj.username
 
         try:
             data = super().validate(attrs)
@@ -73,13 +84,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'phone': self.user.phone,
             'role': self.user.role,
             'external_id': self.user.external_id,
-            'services_selected': self.user.services_selected,
-            'is_approved': self.user.is_approved,
+            'services_selected': getattr(self.user, 'services_selected', False),
+            'is_approved': getattr(self.user, 'is_approved', False),
         }
             
         return data
 
 class RiderTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
+    target_role = 'RIDER'
     def validate(self, attrs):
         data = super().validate(attrs)
         if self.user.role != 'RIDER':
@@ -87,6 +99,7 @@ class RiderTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
         return data
 
 class RoadieTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
+    target_role = 'RODIE'
     def validate(self, attrs):
         data = super().validate(attrs)
         print(f"DEBUG ROADIE LOGIN: User role is {self.user.role}", flush=True)

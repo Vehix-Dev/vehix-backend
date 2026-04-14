@@ -7,7 +7,13 @@ import re
 import uuid
 
 
-class User(AbstractUser):
+    # Username is unique per role - same username can be used as RIDER and RODIE
+    username = models.CharField(
+        max_length=150,
+        help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.',
+        # Redefine without unique=True to allow role-based scoping
+    )
+
     ROLE_CHOICES = (
         ('RIDER', 'Rider'),
         ('RODIE', 'Rodie'),
@@ -82,7 +88,8 @@ class User(AbstractUser):
             models.UniqueConstraint(fields=['email', 'role'], name='unique_email_per_role'),
             # Phone + role must be unique
             models.UniqueConstraint(fields=['phone', 'role'], name='unique_phone_per_role'),
-            # Username is globally unique (inherited from AbstractUser -- keep it simple)
+            # Username + role must be unique
+            models.UniqueConstraint(fields=['username', 'role'], name='unique_username_per_role'),
         ]
 
     @property
@@ -105,13 +112,18 @@ class User(AbstractUser):
 
         # Lock in trial end date when approved for the FIRST time
         # Detect approval by comparing to current DB state
-        if not is_new and self.is_approved and not self.trial_end_date:
+        if self.is_approved and not self.trial_end_date:
             try:
-                old = User.objects.filter(pk=self.pk).values('is_approved', 'trial_end_date').first()
-                was_approved = old['is_approved'] if old else False
-                had_trial = old['trial_end_date'] if old else None
-                # Only set trial if this is a FIRST approval (wasn't approved before)
-                if not was_approved and not had_trial:
+                # For existing records, check if they were already approved
+                if not is_new:
+                    old = User.objects.filter(pk=self.pk).values('is_approved', 'trial_end_date').first()
+                    was_approved = old['is_approved'] if old else False
+                    had_trial = old['trial_end_date'] if old else None
+                    if was_approved or had_trial:
+                        # Already had a trial or was approved, don't reset
+                        raise ValueError("Already approved or had trial")
+                
+                # New record or transitioning from unapproved
                     from django.apps import apps
                     ConfigModel = apps.get_model('users', 'PlatformConfig')
                     config = ConfigModel.objects.first()

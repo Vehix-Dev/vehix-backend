@@ -96,11 +96,13 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'phone': 'This phone number is already registered for this role.'
                 })
 
-        # Username is globally unique across all roles
-        if username and User.objects.filter(username__iexact=username).exists():
-            raise serializers.ValidationError({
-                'username': 'This username is already taken.'
-            })
+        # Username must be unique within the same role
+        # (same username CAN be used as both RIDER and RODIE)
+        if username and role:
+            if User.objects.filter(username__iexact=username, role=role).exists():
+                raise serializers.ValidationError({
+                    'username': 'This username is already taken for this role.'
+                })
 
         # Validate referral code if provided
         if referred_by_code and referred_by_code.strip():
@@ -360,20 +362,20 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         user = self.instance
-        if User.objects.exclude(id=user.id).filter(email=value).exists():
-            raise serializers.ValidationError("This email is already in use.")
+        if User.objects.exclude(id=user.id).filter(email=value, role=user.role).exists():
+            raise serializers.ValidationError("This email is already in use for this role.")
         return value
 
     def validate_phone(self, value):
         user = self.instance
-        if User.objects.exclude(id=user.id).filter(phone=value).exists():
-            raise serializers.ValidationError("This phone number is already in use.")
+        if User.objects.exclude(id=user.id).filter(phone=value, role=user.role).exists():
+            raise serializers.ValidationError("This phone number is already in use for this role.")
         return value
 
     def validate_username(self, value):
         user = self.instance
-        if User.objects.exclude(id=user.id).filter(username=value).exists():
-            raise serializers.ValidationError("This username is already taken.")
+        if User.objects.exclude(id=user.id).filter(username=value, role=user.role).exists():
+            raise serializers.ValidationError("This username is already taken for this role.")
         return value
 
     def update(self, instance, validated_data):
