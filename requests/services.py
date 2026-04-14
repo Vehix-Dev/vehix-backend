@@ -29,7 +29,9 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
         service=service_type,
         rodie__is_active=True,
         rodie__is_online=True,
-        rodie__is_approved=True
+        rodie__is_approved=True,
+        rodie__services_selected=True,  # must have explicitly selected services
+        rodie__is_deleted=False,
     ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
     
     # Filter out locked rodies (those currently being offered a job)
@@ -214,7 +216,9 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
 
 
 def notify_rodies(rodies, request_obj, offer_seconds=15, expiry_seconds=90):
-    """Start a Celery task to offer the request to rodies one-by-one."""
+    """Start a Celery task to offer the request to rodies one-by-one.
+    Falls back to a background daemon thread if Celery is unavailable.
+    """
     try:
         # Prepare serializable rodie details
         rodie_details = []
@@ -233,8 +237,15 @@ def notify_rodies(rodies, request_obj, offer_seconds=15, expiry_seconds=90):
             offer_seconds=offer_seconds,
             expiry_seconds=expiry_seconds
         )
-        print(f"🚀 [Celery] Dispatched matching task for Request #{request_obj.id}")
+        print(f"\U0001f680 [Celery] Dispatched matching task for Request #{request_obj.id}")
     except Exception as e:
-        print(f"❌ Failed to dispatch Celery task: {e}")
-        # Log to old thread method as fallback? 
-        # Actually safer to let it fail or log properly.
+        print(f"\u26a0\ufe0f [Celery] Task dispatch failed for Request #{request_obj.id}: {e}")
+        print(f"\U0001f504 [Fallback] Starting background thread matching for Request #{request_obj.id}")
+        # Fallback: run matching in a daemon thread so at least the request gets dispatched
+        Thread(
+            target=_sequential_offers,
+            args=(rodies, request_obj.id, float(request_obj.rider_lat), float(request_obj.rider_lng), request_obj.service_type.id),
+            kwargs={'offer_seconds': offer_seconds, 'expiry_seconds': expiry_seconds},
+            daemon=True,
+            name=f"matching-req-{request_obj.id}"
+        ).start()

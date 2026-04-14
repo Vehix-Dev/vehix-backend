@@ -81,9 +81,26 @@ class RegisterSerializer(serializers.ModelSerializer):
             if User.objects.filter(nin=nin).exists():
                 raise serializers.ValidationError({'nin': 'This NIN is already in use'})
 
-        # Enforce unique email for all platform accounts (username and phone are already unique at DB level)
-        if email and User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError({'email': 'This email address is already registered'})
+        # Email must be unique within the same role
+        # (same email CAN be used as both RIDER and RODIE)
+        if email and role:
+            if User.objects.filter(email__iexact=email, role=role).exists():
+                raise serializers.ValidationError({
+                    'email': 'This email address is already registered for this role.'
+                })
+
+        # Phone must be unique within the same role
+        if phone and role:
+            if User.objects.filter(phone=phone, role=role).exists():
+                raise serializers.ValidationError({
+                    'phone': 'This phone number is already registered for this role.'
+                })
+
+        # Username is globally unique across all roles
+        if username and User.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError({
+                'username': 'This username is already taken.'
+            })
 
         # Validate referral code if provided
         if referred_by_code and referred_by_code.strip():
@@ -265,15 +282,20 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class DepositSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('1.00'))
+    """No amount required — Pesapal page lets user enter amount themselves."""
+    pass
 
 
 class WithdrawSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('1.00'))
     phone_number = serializers.CharField(max_length=20, required=False)
-    
+
     def validate_amount(self, value):
-        # Balance check will be done in the view
+        from decimal import Decimal
+        if value > Decimal('5000.00'):
+            raise serializers.ValidationError(
+                'Maximum withdrawal amount is UGX 5,000 per transaction.'
+            )
         return value
 
 
