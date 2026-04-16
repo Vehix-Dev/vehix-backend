@@ -165,9 +165,17 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def offer_request(self, event):
+        """Standard handler for sequential offers"""
         await self.send_json({
             "type": "OFFER_REQUEST",
             "request": event.get("request")
+        })
+
+    async def new_request(self, event):
+        """Redundant handler to match some older app versions calling it 'new_request'"""
+        await self.send_json({
+            "type": "OFFER_REQUEST",
+            "request": event.get("request") or event.get("data")
         })
 
     async def user_status(self, event):
@@ -230,6 +238,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     # Always cache rodie location for matching
                     try:
                         await cache_set_rodie_location(self.scope['user'].id, lat, lng)
+                        # NEW: Update Truly Online heartbeat
+                        await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=60)
                         # Broadcast to all nearby riders
                         await self.broadcast_to_nearby_riders(lat, lng)
                     except Exception:
@@ -352,6 +362,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
                 timestamp = content.get('timestamp')
+                # NEW: Update Truly Online heartbeat
+                try:
+                    await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=60)
+                except Exception:
+                    pass
                 await self.send_json({"type": "PONG", "timestamp": timestamp})
         except Exception as e:
             print(f"❌ [RodieConsumer] receive_json error: {e}")
@@ -662,6 +677,14 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         if event.get("eta_seconds") is not None:
             message["eta_seconds"] = event["eta_seconds"]
         await self.send_json(message)
+
+    async def request_proximity(self, event):
+        """Update the Rider's UI with the distance/ETA of the roadie currently being offered the job."""
+        await self.send_json({
+            "type": "REQUEST_PROXIMITY",
+            "distance_km": event.get("distance_km"),
+            "eta_seconds": event.get("eta_seconds")
+        })
 
     async def request_update(self, event):
         await self.send_json({
