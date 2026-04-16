@@ -42,38 +42,38 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             user_obj = User.objects.filter(username=username, **role_filter).first()
             
             if not user_obj:
-                print(f"DEBUG AUTH: No match for exact username '{username}' with role '{target_role}'. Trying email.", flush=True)
                 # 2. Try email match
                 user_obj = User.objects.filter(email__iexact=username, **role_filter).first()
             
             if not user_obj:
-                print(f"DEBUG AUTH: No match for email '{username}' with role '{target_role}'. Trying phone.", flush=True)
                 # 3. Try phone match
                 user_obj = User.objects.filter(phone=username, **role_filter).first()
 
             if user_obj:
-                print(f"DEBUG AUTH: Found user {user_obj.external_id} with role {user_obj.role}", flush=True)
+                print(f"DEBUG AUTH: Found user {user_obj.username} (ExtID: {user_obj.external_id}, Role: {user_obj.role}, Active: {user_obj.is_active})", flush=True)
+                
+                # Check password manually for debugging
+                pw_match = user_obj.check_password(password)
+                print(f"DEBUG AUTH: Password match test: {pw_match}", flush=True)
+                
                 # Set the key that TokenObtainPairSerializer expects (self.username_field)
                 attrs[self.username_field] = user_obj.external_id
                 
-                # CRITICAL: Remove 'username' from attrs. 
-                # Django's authenticate() has a 'username' parameter. If we pass both 
-                # 'username' and 'external_id' (which is our USERNAME_FIELD), 
-                # 'username' takes precedence in the function signature, but it 
-                # refers to the human username (e.g. 'john') instead of the 
-                # USERNAME_FIELD value ('R001'). 
+                # CRITICAL: Remove 'username' from attrs to avoid conflict with authenticate() arguments
                 if 'username' in attrs and 'username' != self.username_field:
                     attrs.pop('username')
             else:
-                print(f"DEBUG AUTH: No user found for '{username}' with role '{target_role}'", flush=True)
+                print(f"DEBUG AUTH: No user found for input '{username}' with role '{target_role}'", flush=True)
                 # Ensure the expected field is present for super().validate()
                 attrs[self.username_field] = username 
 
         try:
+            print(f"DEBUG AUTH: Calling super().validate with attrs keys: {list(attrs.keys())}", flush=True)
             data = super().validate(attrs)
-            print("DEBUG AUTH: Authentication successful.", flush=True)
+            print("DEBUG AUTH: super().validate SUCCEEDED.", flush=True)
         except Exception as e:
-            print(f"DEBUG AUTH: Authentication FAILED. Error: {e}", flush=True)
+            print(f"DEBUG AUTH: super().validate FAILED. Error: {e}", flush=True)
+            # If it failed but our manual check worked, there's a backend/simplejwt config issue
             raise e
         
         # Generate new login_id to invalidate previous sessions for all user roles
