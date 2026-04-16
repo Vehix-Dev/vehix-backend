@@ -83,7 +83,8 @@ class NearbyRodieListView(APIView):
 
         rodie_services = RodieService.objects.filter(
             service=service_type_id,
-            rodie__is_active=True
+            rodie__is_active=True,
+            rodie__is_online=True
         ).select_related('rodie')
 
         results = []
@@ -98,11 +99,20 @@ class NearbyRodieListView(APIView):
             # Fallback to DB if cache empty
             if not loc:
                 try:
-                    db_loc = RodieLocation.objects.get(rodie_id=rodie_id)
+                    # Only consider roadies who have updated their location in the last 10 minutes
+                    ten_mins_ago = timezone.now() - timezone.timedelta(minutes=10)
+                    db_loc = RodieLocation.objects.filter(
+                        rodie_id=rodie_id, 
+                        updated_at__gte=ten_mins_ago
+                    ).first()
+                    
+                    if not db_loc:
+                        continue # Stale location, skip
+
                     loc = {"lat": float(db_loc.lat), "lng": float(db_loc.lng)}
-                    cache.set(f"rodie_loc:{rodie_id}", loc, timeout=300)  # cache 5 min
-                except RodieLocation.DoesNotExist:
-                    continue  # no location info, skip this rodie
+                    cache.set(f"rodie_loc:{rodie_id}", loc, timeout=300)
+                except Exception:
+                    continue
 
             dist_km = calculate_distance_km(float(lat), float(lng), float(loc['lat']), float(loc['lng']))
             if dist_km <= 5:
@@ -132,24 +142,30 @@ class CreateServiceRequestView(generics.CreateAPIView):
         return super().dispatch(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        # Prevent multiple active requests for the same rider
-        active_request = ServiceRequest.objects.filter(
-            rider=self.request.user,
-            status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
-        ).first()
-        if active_request:
-            raise PermissionDenied(f'You already have an active request (#{active_request.id}) in progress.')
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # Lock active requests for this rider to ensure atomicity
+            active_request = ServiceRequest.objects.select_for_update().filter(
+                rider=self.request.user,
+                status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).first()
+
+            if active_request:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError("You already have an active request. Please complete or cancel it first.")
+
+            # Save the new request
+            request_obj = serializer.save(
+                rider=self.request.user,
+                status='REQUESTED'
+            )
 
         cfg = PlatformConfig.objects.first()
         max_neg = cfg.max_negative_balance if cfg else Decimal('0')
         rider_wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
         if rider_wallet.balance < Decimal(-max_neg):
             raise PermissionDenied('Rider wallet below allowed maximum negative balance')
-
-        request_obj = serializer.save(
-            rider=self.request.user,
-            status='REQUESTED'
-        )
 
         print(f"\n📍 RIDER REQUEST: {self.request.user.username} requesting {request_obj.service_type.name} at ({request_obj.rider_lat}, {request_obj.rider_lng})")
 
@@ -679,20 +695,38 @@ class CompleteRequestView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
+        from django.db import transaction
+        
         user = request.user
         if user.role != 'RODIE':
             return Response({'detail': 'Only roadies can complete service'}, status=status.HTTP_403_FORBIDDEN)
-        req = get_object_or_404(ServiceRequest, id=pk)
-        if req.rodie_id != user.id:
-            return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
-        req.status = 'COMPLETED'
-        req.completed_at = timezone.now()
-        req.save()
-        
+
         try:
-            cache.set(f"request_status:{req.id}", 'COMPLETED', timeout=3600)
-        except Exception:
-            pass
+            with transaction.atomic():
+                # Lock the request record for update
+                req = ServiceRequest.objects.select_for_update().get(id=pk)
+                
+                if req.rodie_id != user.id:
+                    return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+                
+                # Check if already completed to avoid duplicate triggers
+                if req.status == 'COMPLETED':
+                    return Response({'detail': 'Request already completed'}, status=status.HTTP_200_OK)
+
+                if req.status == 'CANCELLED':
+                    return Response({'detail': 'Cannot complete a cancelled request'}, status=status.HTTP_400_BAD_REQUEST)
+
+                req.status = 'COMPLETED'
+                req.completed_at = timezone.now()
+                req.save()
+                
+                # Cache the status for fast lookup in matching tasks
+                cache.set(f"request_status:{req.id}", 'COMPLETED', timeout=3600)
+
+        except ServiceRequest.DoesNotExist:
+            return Response({'detail': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'detail': f'Completion error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Broadcast COMPLETION immediately to reduce latency for the rider
         try:

@@ -17,6 +17,7 @@ except Exception:
     async_to_sync = None
     get_channel_layer = None
 
+from .fcm import send_push_notification, broadcast_role_push
 User = get_user_model()
 
 
@@ -186,12 +187,19 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                         print(f" Sent unapproval WebSocket to roadie {instance.id}")
                     
                     # Create persistent notification in database
-                    Notification.objects.create(
-                        user=instance,
+                    notif = Notification.objects.create(
+                        recipient=instance,
                         title=title,
-                        body=body,
-                        data=message
+                        message=body,
+                        notification_type='SERVICE'
                     )
+                    
+                    # Send real-time Push Alert
+                    send_push_notification(instance, title, body, {
+                        'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                        'type': 'account_status',
+                        'is_approved': str(new_approved)
+                    })
                     
                     async_to_sync(channel_layer.group_send)(group, message)
             except Exception as e:
@@ -468,18 +476,43 @@ class AdminNotificationListCreateView(generics.ListCreateAPIView):
             from asgiref.sync import async_to_sync
             from channels.layers import get_channel_layer
             channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'notifications',
-                {'type': 'notification', 'notification': NotificationSerializer(notif).data}
-            )
-            if notif.user_id:
-                async_to_sync(channel_layer.group_send)(f'user_{notif.user_id}', {'type': 'notification', 'notification': NotificationSerializer(notif).data})
 
-            if notif.target_role:
-                role_group = f'role_{notif.target_role}'
-                async_to_sync(channel_layer.group_send)(role_group, {'type': 'notification', 'notification': NotificationSerializer(notif).data})
-        except Exception:
-            pass
+            # Prepare payload for WebSockets
+            payload = {
+                'type': 'notification',
+                'notification': NotificationSerializer(notif).data
+            }
+
+            # Prepare data for Push Notifications
+            push_data = {
+                'notification_id': str(notif.id),
+                'type': notif.notification_type,
+            }
+
+            # 1. Global Broadcast
+            if notif.target_role == 'ALL':
+                # WebSocket
+                async_to_sync(channel_layer.group_send)('notifications', payload)
+                # Push
+                broadcast_role_push('RIDER', notif.title, notif.message, push_data)
+                broadcast_role_push('RODIE', notif.title, notif.message, push_data)
+            
+            # 2. Role Broadcast
+            elif notif.target_role in ['RIDER', 'RODIE']:
+                # WebSocket
+                async_to_sync(channel_layer.group_send)(f'role_{notif.target_role}', payload)
+                # Push
+                broadcast_role_push(notif.target_role, notif.title, notif.message, push_data)
+
+            # 3. Individual Broadcast
+            elif notif.recipient_id:
+                # WebSocket
+                async_to_sync(channel_layer.group_send)(f'user_{notif.recipient_id}', payload)
+                # Push
+                send_push_notification(notif.recipient, notif.title, notif.message, push_data)
+
+        except Exception as e:
+            print(f"DEBUG Error in Broadcast: {str(e)}")
 
 
 class AdminNotificationRUDView(generics.RetrieveUpdateDestroyAPIView):

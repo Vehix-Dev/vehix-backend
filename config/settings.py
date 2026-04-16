@@ -23,10 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True  # Changed to False for production
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = ['188.166.154.163', 'backend.vehix.ug', 'www.backend.vehix.ug', '127.0.0.1', 'localhost', 'curtis-unmobilized-clarence.ngrok-free.dev']
 CSRF_TRUSTED_ORIGINS = ['https://curtis-unmobilized-clarence.ngrok-free.dev']
@@ -128,7 +128,7 @@ CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'users.authentication.CustomJWTAuthentication',
+        'users.authentication.SingleDeviceJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',  # Changed for production
@@ -327,3 +327,8 @@ if DEBUG:
     print(f"Pesapal Consumer Key: {'SET' if PESAPAL_CONSUMER_KEY else 'NOT SET'}")
     print(f"Pesapal Consumer Secret: {'SET' if PESAPAL_CONSUMER_SECRET else 'NOT SET'}")
     print(f"Pesapal IPN ID: {'SET' if PESAPAL_IPN_ID else 'NOT SET'}")
+# Firebase Cloud Messaging Configuration
+FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
+
+if DEBUG:
+    print(f"FCM Server Key: {'SET' if FCM_SERVER_KEY else 'NOT SET'}")

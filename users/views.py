@@ -180,10 +180,10 @@ class NotificationListCreateView(generics.ListCreateAPIView):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        return Notification.objects.filter(recipient=self.request.user).order_by('-created_at')
 
     def perform_create(self, serializer):
-        notif = serializer.save(user=self.request.user)
+        notif = serializer.save(recipient=self.request.user)
         try:
             from asgiref.sync import async_to_sync
             from channels.layers import get_channel_layer
@@ -198,7 +198,7 @@ class NotificationRUDView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        return Notification.objects.filter(recipient=self.request.user)
 
 
 class RoadieStatusUpdateView(APIView):
@@ -315,65 +315,63 @@ class DepositView(APIView):
 
 class WithdrawView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-
     def post(self, request):
+        from django.db import transaction
+        
         serializer = WithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         amount = serializer.validated_data['amount']
         phone_number = serializer.validated_data.get('phone_number', request.user.phone)
 
-        # Get or create wallet
-        wallet, _ = Wallet.objects.get_or_create(user=request.user)
-        
-        # Check sufficient funds
-        if wallet.balance < amount:
-            return Response({
-                'error': 'Insufficient funds', 
-                'available_balance': str(wallet.balance),
-                'requested_amount': str(amount)
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Maximum withdrawal (5,000 UGX) is handled by WithdrawSerializer validation.
-        # We can add a smaller minimum check here if needed, or just let the serializer handle it.
-
         try:
-            # Deduct amount from wallet
-            wallet.balance -= amount
-            wallet.save()
+            with transaction.atomic():
+                # Lock the wallet row for this user
+                wallet = Wallet.objects.select_for_update().filter(user=request.user).first()
+                if not wallet:
+                    wallet = Wallet.objects.create(user=request.user)
+                
+                # Check sufficient funds (WITH LOCK)
+                if wallet.balance < amount:
+                    return Response({
+                        'error': 'Insufficient funds', 
+                        'available_balance': str(wallet.balance),
+                        'requested_amount': str(amount)
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create withdrawal request
-            import uuid
-            reference = f"WTH-{uuid.uuid4().hex[:12].upper()}"
-            
-            payment = Payment.objects.create(
-                user=request.user,
-                amount=amount,
-                transaction_type='WITHDRAWAL',
-                status='PENDING', 
-                reference=reference,
-                description=f"Withdrawal request to {phone_number}"
-            )
+                # Deduct amount from wallet
+                wallet.balance -= amount
+                wallet.save()
 
-            # Create wallet transaction
-            WalletTransaction.objects.create(
-                wallet=wallet,
-                amount=-amount,
-                reason=f"Withdrawal request {reference}"
-            )
+                # Create withdrawal request
+                import uuid
+                reference = f"WTH-{uuid.uuid4().hex[:12].upper()}"
+                
+                payment = Payment.objects.create(
+                    user=request.user,
+                    amount=amount,
+                    transaction_type='WITHDRAWAL',
+                    status='PENDING', 
+                    reference=reference,
+                    description=f"Withdrawal request to {phone_number}"
+                )
 
-            return Response({
-                'success': True,
-                'message': 'Withdrawal request submitted successfully',
-                'reference': reference,
-                'amount': str(amount),
-                'phone_number': phone_number,
-                'new_balance': str(wallet.balance)
-            })
+                # Create wallet transaction
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    amount=-amount,
+                    reason=f"Withdrawal request {reference}"
+                )
+
+                return Response({
+                    'success': True,
+                    'message': 'Withdrawal request submitted successfully',
+                    'reference': reference,
+                    'amount': str(amount),
+                    'phone_number': phone_number,
+                    'new_balance': str(wallet.balance)
+                })
 
         except Exception as e:
-            # Refund the amount if something went wrong
-            wallet.balance += amount
-            wallet.save()
             return Response({
                 'error': 'Failed to process withdrawal request',
                 'details': str(e)
@@ -570,49 +568,58 @@ class PesapalIPNView(APIView):
 
         from .pesapal import PesapalClient
         from decimal import Decimal
+        from django.db import transaction
 
         try:
-            payment = Payment.objects.get(reference=merchant_reference)
-        except Payment.DoesNotExist:
-            return Response({'status': 'not found', 'message': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+            with transaction.atomic():
+                # Lock the payment row to prevent double-processing/race conditions
+                try:
+                    payment = Payment.objects.select_for_update().get(reference=merchant_reference)
+                except Payment.DoesNotExist:
+                    return Response({'status': 'not found', 'message': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            client = PesapalClient()
-            status_data = client.get_transaction_status(tracking_id)
-            
-            if not status_data:
-                payment.status = 'FAILED'
-                payment.save()
-                return Response({'status': 'failed', 'message': 'Could not verify payment status'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            pesapal_status = status_data.get('payment_status_description') 
-            actual_amount = status_data.get('amount', payment.amount)
-            payment.amount = actual_amount
-            print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}, Amount: {actual_amount}")
-            
-            if pesapal_status == 'COMPLETED' and payment.status != 'COMPLETED':
-                payment.status = 'COMPLETED'
-                payment.save()
+                client = PesapalClient()
+                status_data = client.get_transaction_status(tracking_id)
                 
-                if payment.transaction_type == 'DEPOSIT':
-                    wallet, _ = Wallet.objects.get_or_create(user=payment.user)
-                    wallet.balance += Decimal(str(actual_amount))
-                    wallet.save()
-                    WalletTransaction.objects.create(
-                        wallet=wallet,
-                        amount=actual_amount,
-                        reason=f"Deposit {payment.reference}"
-                    )
-                    print(f"Deposit completed: {payment.amount} added to {payment.user.username}'s wallet")
+                if not status_data:
+                    if payment.status == 'PENDING':
+                        payment.status = 'FAILED'
+                        payment.save()
+                    return Response({'status': 'failed', 'message': 'Could not verify payment status'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                pesapal_status = status_data.get('payment_status_description') 
+                actual_amount = status_data.get('amount', payment.amount)
+                
+                # Check if already processed to avoid double crediting
+                if payment.status == 'COMPLETED':
+                    return Response({'status': 'already_processed', 'payment_status': 'COMPLETED'})
+
+                payment.amount = actual_amount
+                print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}, Amount: {actual_amount}")
+                
+                if pesapal_status == 'COMPLETED':
+                    payment.status = 'COMPLETED'
+                    payment.save()
                     
-            elif pesapal_status == 'FAILED':
-                if payment.status != 'FAILED':
+                    if payment.transaction_type == 'DEPOSIT':
+                        wallet, _ = Wallet.objects.get_or_create(user=payment.user)
+                        wallet.balance += Decimal(str(actual_amount))
+                        wallet.save()
+                        WalletTransaction.objects.create(
+                            wallet=wallet,
+                            amount=actual_amount,
+                            reason=f"Deposit {payment.reference}"
+                        )
+                        print(f"Deposit completed: {payment.amount} added to {payment.user.username}'s wallet")
+                        
+                elif pesapal_status == 'FAILED':
                     payment.status = 'FAILED'
                     payment.save()
                     print(f"Payment failed: {payment.reference}")
                     
         except Exception as e:
             print(f"Pesapal IPN Error: {e}")
+            import logging; logging.exception("Pesapal IPN critical error")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
@@ -703,3 +710,29 @@ class UserProfilePasswordChangeView(APIView):
             'message': 'Password updated successfully'
         })
 
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from .models import Notification
+from .serializers import NotificationSerializer
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing and managing user notifications
+    """
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(recipient=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        return Response({'status': 'marked as read'})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        Notification.objects.filter(recipient=self.request.user, is_read=False).update(is_read=True)
+        return Response({'status': 'all marked as read'})
