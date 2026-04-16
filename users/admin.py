@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Wallet, WalletTransaction
+from .models import User, Wallet, WalletTransaction, PlatformConfig
 from .models import Referral
 from .models import Notification
 from django.utils.html import format_html
@@ -182,5 +182,18 @@ class ReferralAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'title', 'read', 'created_at')
-    search_fields = ('user__username', 'title', 'body')
+    list_display = ('recipient', 'title', 'is_read', 'created_at')
+    search_fields = ('recipient__username', 'title', 'message')
+
+
+@admin.register(PlatformConfig)
+class PlatformConfigAdmin(admin.ModelAdmin):
+    list_display = ('max_negative_balance', 'service_fee', 'trial_days', 'updated_at')
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('reference', 'user', 'amount', 'transaction_type', 'status', 'created_at')
+    list_filter = ('transaction_type', 'status', 'created_at')
+    search_fields = ('reference', 'user__username', 'processor_id')
+
