@@ -55,12 +55,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 print(f"DEBUG AUTH: Found user {user_obj.external_id} with role {user_obj.role}", flush=True)
                 # Set the key that TokenObtainPairSerializer expects (self.username_field)
                 attrs[self.username_field] = user_obj.external_id
+                
+                # CRITICAL: Remove 'username' from attrs. 
+                # Django's authenticate() has a 'username' parameter. If we pass both 
+                # 'username' and 'external_id' (which is our USERNAME_FIELD), 
+                # 'username' takes precedence in the function signature, but it 
+                # refers to the human username (e.g. 'john') instead of the 
+                # USERNAME_FIELD value ('R001'). 
+                if 'username' in attrs and 'username' != self.username_field:
+                    attrs.pop('username')
             else:
                 print(f"DEBUG AUTH: No user found for '{username}' with role '{target_role}'", flush=True)
-                # We could set something to ensure super().validate(attrs) fails correctly
-                # or just let it fail because self.username_field is missing in attrs.
-                # However, the base class expects the field to be present.
-                attrs[self.username_field] = username # Let it try to authenticate and fail
+                # Ensure the expected field is present for super().validate()
+                attrs[self.username_field] = username 
 
         try:
             data = super().validate(attrs)
