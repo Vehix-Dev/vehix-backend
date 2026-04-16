@@ -6,6 +6,8 @@ from rest_framework import serializers
 import uuid
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username = serializers.CharField()
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -14,10 +16,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # The base class automatically adds a field named after USERNAME_FIELD (external_id).
-        # We want the client to send 'username' (which could be email/phone/username).
         if self.username_field in self.fields:
-            self.fields['username'] = self.fields.pop(self.username_field)
+            self.fields[self.username_field].required = False
 
     def validate(self, attrs):
         # The client sends 'username', but we must identify the user and
