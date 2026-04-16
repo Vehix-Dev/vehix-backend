@@ -358,7 +358,7 @@ class Notification(models.Model):
         default='SPECIFIC'
     )
     title = models.CharField(max_length=200)
-    message = models.TextField()
+    message = models.TextField(blank=True, default='')
     notification_type = models.CharField(
         max_length=20, 
         choices=NOTIFICATION_TYPES, 
