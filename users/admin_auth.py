@@ -8,32 +8,16 @@ from rest_framework.exceptions import AuthenticationFailed
 
 class AdminTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
     def validate(self, attrs):
-        username_field = self.username_field
-        username = attrs.get(username_field)
-        if username and '@' in username:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                u = User.objects.get(email__iexact=username)
-                attrs[username_field] = getattr(u, username_field)
-            except User.DoesNotExist:
-                pass
-
-        # Since we inherit from CustomTokenObtainPairSerializer, 
-        # but we handle credentials differently here (super.validate calls authenticate),
-        # we should ensure the user is authenticated and then update their login_id.
+        # The field name in attrs is now 'username' due to __init__ in parent
+        username = attrs.get('username')
+        password = attrs.get('password')
         
-        from django.contrib.auth import authenticate
-        # We need to manually authenticate here because we might have changed the username to email
-        user = authenticate(username=attrs.get(username_field), password=attrs.get('password'))
-        if user and user.is_active:
-            new_login_id = uuid.uuid4()
-            user.current_login_id = new_login_id
-            user.save(update_fields=['current_login_id'])
-            self.user = user
-
+        # Call parent's validate first to handle multi-field lookup (email/phone/username) 
+        # and identifier resolution (setting attrs[self.username_field] = external_id)
+        # Note: We need to put external_id into attrs for the base authenticate() to work.
         data = super().validate(attrs)
-        user = getattr(self, 'user', None)
+        
+        user = self.user
         if not user or not (getattr(user, 'role', None) == 'ADMIN' or getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)):
             raise AuthenticationFailed('User is not an admin')
         

@@ -12,8 +12,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['login_id'] = str(user.current_login_id)
         return token
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The base class automatically adds a field named after USERNAME_FIELD (external_id).
+        # We want the client to send 'username' (which could be email/phone/username).
+        if self.username_field in self.fields:
+            self.fields['username'] = self.fields.pop(self.username_field)
+
     def validate(self, attrs):
-        username = attrs.get(self.username_field)
+        # The client sends 'username', but we must identify the user and
+        # provide the 'external_id' (which is our USERNAME_FIELD) to the
+        # base class's authentication logic.
+        username = attrs.get('username')
         password = attrs.get('password')
         
         # Determine target role if we are in a subclass
@@ -28,32 +38,29 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             # Use role in filter if target_role is set
             role_filter = {'role': target_role} if target_role else {}
             
-            # Check if user exists with this username + role
-            user_query = User.objects.filter(username=username, **role_filter)
+            # 1. Try exact username match
+            user_obj = User.objects.filter(username=username, **role_filter).first()
             
-            if not user_query.exists():
-                print(f"DEBUG AUTH: No match for exact username '{username}' with role '{target_role}'. Trying lookup by email and phone.", flush=True)
-                try:
-                    # First try email lookup + role
-                    user_obj = User.objects.filter(email__iexact=username, role=target_role).first() if target_role else User.objects.filter(email__iexact=username).first()
-                    if user_obj:
-                        print(f"DEBUG AUTH: Found user {user_obj.external_id} by email {username} with role {user_obj.role}", flush=True)
-                        attrs[self.username_field] = user_obj.external_id
-                    else:
-                        print(f"DEBUG AUTH: No user found with email '{username}' and role '{target_role}'. Trying phone lookup.", flush=True)
-                        # Then try phone lookup + role
-                        user_obj = User.objects.filter(phone=username, role=target_role).first() if target_role else User.objects.filter(phone=username).first()
-                        if user_obj:
-                            print(f"DEBUG AUTH: Found user {user_obj.external_id} by phone {username} with role {user_obj.role}", flush=True)
-                            attrs[self.username_field] = user_obj.external_id
-                        else:
-                            print(f"DEBUG AUTH: No user found with phone '{username}' and role '{target_role}'", flush=True)
-                except Exception as e:
-                    print(f"DEBUG AUTH Error during lookup: {e}")
+            if not user_obj:
+                print(f"DEBUG AUTH: No match for exact username '{username}' with role '{target_role}'. Trying email.", flush=True)
+                # 2. Try email match
+                user_obj = User.objects.filter(email__iexact=username, **role_filter).first()
+            
+            if not user_obj:
+                print(f"DEBUG AUTH: No match for email '{username}' with role '{target_role}'. Trying phone.", flush=True)
+                # 3. Try phone match
+                user_obj = User.objects.filter(phone=username, **role_filter).first()
+
+            if user_obj:
+                print(f"DEBUG AUTH: Found user {user_obj.external_id} with role {user_obj.role}", flush=True)
+                # Set the key that TokenObtainPairSerializer expects (self.username_field)
+                attrs[self.username_field] = user_obj.external_id
             else:
-                 user_obj = user_query.first()
-                 print(f"DEBUG AUTH: User found by exact username '{username}' and role '{user_obj.role}'", flush=True)
-                 attrs[self.username_field] = user_obj.external_id
+                print(f"DEBUG AUTH: No user found for '{username}' with role '{target_role}'", flush=True)
+                # We could set something to ensure super().validate(attrs) fails correctly
+                # or just let it fail because self.username_field is missing in attrs.
+                # However, the base class expects the field to be present.
+                attrs[self.username_field] = username # Let it try to authenticate and fail
 
         try:
             data = super().validate(attrs)
