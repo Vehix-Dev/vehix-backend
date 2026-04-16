@@ -35,10 +35,15 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
     
     # Filter out locked rodies (those currently being offered a job)
+    # AND filter out roadies without a live WebSocket heartbeat
     filtered_services = []
     for rs in rodie_services:
         if not cache.get(f"rodie_locked:{rs.rodie_id}"):
-            filtered_services.append(rs)
+            # Check if roadie has a live heartbeat (within last 60 seconds)
+            if cache.get(f"rodie_heartbeat:{rs.rodie_id}"):
+                filtered_services.append(rs)
+            else:
+                print(f"👻 Rodie {rs.rodie.username} has Switch=ON but No WebSocket Heartbeat - skipping.")
         else:
             print(f"🔒 Rodie {rs.rodie.username} is currently locked by another offer - skipping from initial pool")
     
