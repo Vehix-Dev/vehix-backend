@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as AuthUserManager
 from django.db import models
 from django.db import transaction
 from django.core.validators import RegexValidator
@@ -7,7 +7,28 @@ import re
 import uuid
 
 
+class UserManager(AuthUserManager):
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        # We need to ensure external_id is generated even if it's not passed,
+        # because it's our USERNAME_FIELD.
+        if 'external_id' not in extra_fields or not extra_fields['external_id']:
+            # We'll let the Model.save() handle it for now, 
+            # but we must ensure we don't pass an empty string that conflicts.
+            extra_fields['external_id'] = f"PENDING-{uuid.uuid4().hex[:8]}"
+        
+        user = self.model(username=username, email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'ADMIN')
+        return self.create_user(username, email, password, **extra_fields)
+
 class User(AbstractUser):
+    objects = UserManager()
     # Username is unique per role - same username can be used as RIDER and RODIE
     username = models.CharField(
         max_length=150,
@@ -87,6 +108,12 @@ class User(AbstractUser):
         help_text="The date when the user's free trial expires."
     )
 
+    fcm_token = models.TextField(
+        null=True, 
+        blank=True, 
+        help_text="Firebase Cloud Messaging token for push notifications"
+    )
+
     class Meta:
         constraints = [
             # Email + role must be unique (same email can exist for RIDER and RODIE)
@@ -139,7 +166,7 @@ class User(AbstractUser):
                 import logging
                 logging.error(f"Error setting trial date: {e}")
 
-        if not self.external_id:
+        if not self.external_id or self.external_id.startswith('PENDING-'):
             if self.role == 'RIDER':
                 prefix = 'R'
             elif self.role == 'RODIE':
@@ -152,7 +179,9 @@ class User(AbstractUser):
             if prefix:
                 try:
                     with transaction.atomic():
-                        existing = User.objects.filter(
+                        # Use select_for_update to lock users table during sequence generation
+                        # We only need to lock enough to get a consistent max value
+                        existing = User.objects.select_for_update().filter(
                             external_id__startswith=prefix,
                             external_id__regex=r'^' + re.escape(prefix) + r'\d+$'
                         ).values_list('external_id', flat=True)
@@ -237,24 +266,6 @@ class Wallet(models.Model):
         return f"Wallet({self.user.username}): {self.balance}"
 
 
-class Notification(models.Model):
-    """In-app notification for users."""
-    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
-    title = models.CharField(max_length=200)
-    body = models.TextField(blank=True)
-    data = models.JSONField(blank=True, null=True)
-    read = models.BooleanField(default=False)
-    broadcast = models.BooleanField(default=False)
-    TARGET_ROLE_CHOICES = (
-        ('RIDER', 'Rider'),
-        ('RODIE', 'Rodie'),
-        ('MECHANIC','Mechanic')
-    )
-    target_role = models.CharField(max_length=10, choices=TARGET_ROLE_CHOICES, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Notification({self.user.username}): {self.title}"
 
 
 class WalletTransaction(models.Model):
@@ -310,9 +321,54 @@ class Payment(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     reference = models.CharField(max_length=100, unique=True, help_text="Internal unique reference")
     processor_id = models.CharField(max_length=100, blank=True, null=True, help_text="Pesapal Order Tracking ID")
-    description = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
     def __str__(self):
         return f"{self.transaction_type} - {self.reference} ({self.status})"
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = (
+        ('BULLETIN', 'Bulletin'),
+        ('UPDATE', 'Update'),
+        ('PROMOTION', 'Promotion'),
+        ('URGENT', 'Urgent Notice'),
+        ('SERVICE', 'Service Announcement'),
+    )
+    
+    TARGET_CHOICES = (
+        ('RIDER', 'All Riders'),
+        ('RODIE', 'All Roadies'),
+        ('ALL', 'Everyone'),
+        ('SPECIFIC', 'Specific User'),
+    )
+
+    recipient = models.ForeignKey(
+        'users.User', 
+        on_delete=models.CASCADE, 
+        related_name='notifications',
+        null=True, 
+        blank=True,
+        help_text="The specific user receiving this notification (null for bulk)"
+    )
+    target_role = models.CharField(
+        max_length=10, 
+        choices=TARGET_CHOICES, 
+        default='SPECIFIC'
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    notification_type = models.CharField(
+        max_length=20, 
+        choices=NOTIFICATION_TYPES, 
+        default='UPDATE'
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.recipient.username if self.recipient else 'Bulk'} - {self.title} ({self.notification_type})"

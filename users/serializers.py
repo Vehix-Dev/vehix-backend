@@ -133,26 +133,6 @@ class WalletSerializer(serializers.ModelSerializer):
         fields = ('id', 'user_id', 'user_external_id', 'user_username', 'balance', 'transactions')
 
 
-class NotificationSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
-    broadcast = serializers.BooleanField(required=False)
-    target_role = serializers.ChoiceField(choices=(('RIDER', 'Rider'), ('RODIE', 'Rodie'), ('MECHANIC', 'Mechanic')), required=False, allow_blank=True, allow_null=True)
-
-    class Meta:
-        model = Notification
-        fields = ('id', 'user', 'title', 'body', 'data', 'read', 'broadcast', 'target_role', 'created_at')
-        read_only_fields = ('created_at',)
-
-    def validate(self, attrs):
-        user = attrs.get('user') if 'user' in attrs else None
-        broadcast = attrs.get('broadcast') if 'broadcast' in attrs else False
-        target_role = attrs.get('target_role') if 'target_role' in attrs else None
-
-        if not user and not broadcast and not target_role:
-            raise serializers.ValidationError('Notification must target a user, a role, or be broadcast')
-        return attrs
-
-
 class UserSerializer(serializers.ModelSerializer):
     wallet = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
@@ -357,6 +337,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             'email',
             'phone',
             'username',
+            'fcm_token',
         )
         read_only_fields = ('id',)
 
@@ -384,6 +365,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         instance.email = validated_data.get('email', instance.email)
         instance.phone = validated_data.get('phone', instance.phone)
         instance.username = validated_data.get('username', instance.username)
+        instance.fcm_token = validated_data.get('fcm_token', instance.fcm_token)
         instance.save()
         return instance
 
@@ -398,3 +380,8 @@ class UserProfilePhotoSerializer(serializers.Serializer):
             raise serializers.ValidationError("Profile photo size must be less than 5MB.")
         return value
 
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'notification_type', 'is_read', 'created_at']
+        read_only_fields = ['id', 'created_at']

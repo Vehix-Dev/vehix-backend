@@ -37,30 +37,56 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                 logger.info(f"⌛ Total matching window expired for Request #{request_id}")
                 break
             
-            # 2. Check current status - Use Database as ultimate fallback if cache is empty
+            # 2. Check current status - Database is source of truth
             try:
-                status = cache.get(f"request_status:{request_id}")
-                if status is None:
-                    def get_db_status():
-                        try:
-                            return ServiceRequest.objects.get(id=request_id).status
-                        except ServiceRequest.DoesNotExist:
-                            return 'CANCELLED'
-                    status = async_to_sync(database_sync_to_async(get_db_status))()
-                    cache.set(f"request_status:{request_id}", status, timeout=300)
+                # Refresh status directly from DB
+                req_obj = ServiceRequest.objects.get(id=request_id)
+                status = req_obj.status
+                cache.set(f"request_status:{request_id}", status, timeout=300)
 
                 if status in ['ACCEPTED', 'CANCELLED', 'COMPLETED']:
                     logger.info(f"🛑 Request {request_id} status is {status}. Stopping offers.")
                     return f"Match completed with status: {status}"
+            except ServiceRequest.DoesNotExist:
+                logger.error(f"❌ Request {request_id} not found in DB.")
+                return "Request Deleted"
             except Exception as e:
                 logger.warning(f"⚠️ Status check failed: {e}")
 
             rodie_id = detail['id']
             distance_km = detail['distance']
             
-            # 3. Check if roadie is already locked or busy
-            if cache.get(f"rodie_locked:{rodie_id}"):
-                logger.info(f"🔒 Rodie {rodie_id} is locked by another offer. Skipping.")
+            # 3. Check if roadie is still valid (Online & Not Busy & Active Location)
+            try:
+                from users.models import User
+                from locations.models import RodieLocation
+                from django.utils import timezone
+                
+                rodie_user = User.objects.get(id=rodie_id)
+                
+                # Skip if offline
+                if not rodie_user.is_online:
+                    logger.info(f"📵 Rodie {rodie_id} is offline. Skipping.")
+                    continue
+                
+                # Skip if location is stale (No update in 10 mins)
+                ten_mins_ago = timezone.now() - timezone.timedelta(minutes=10)
+                if not RodieLocation.objects.filter(rodie=rodie_user, updated_at__gte=ten_mins_ago).exists():
+                    logger.info(f"👻 Rodie {rodie_id} has a stale location/ghost. Skipping.")
+                    continue
+
+                # Skip if already in an active session (Accepted/Started/En-route)
+                if ServiceRequest.objects.filter(rodie=rodie_user, status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']).exists():
+                    logger.info(f"🚧 Rodie {rodie_id} is now busy with another request. Skipping.")
+                    continue
+
+                if cache.get(f"rodie_locked:{rodie_id}"):
+                    logger.info(f"🔒 Rodie {rodie_id} is locked by another offer. Skipping.")
+                    continue
+            except User.DoesNotExist:
+                continue
+            except Exception as e:
+                logger.warning(f"⚠️ Availability check failed for rodie {rodie_id}: {e}")
                 continue
                 
             # 4. Get actual route info (ETA)
