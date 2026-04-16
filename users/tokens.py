@@ -20,89 +20,69 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             self.fields[self.username_field].required = False
 
     def validate(self, attrs):
-        # The client sends 'username', but we must identify the user and
-        # provide the 'external_id' (which is our USERNAME_FIELD) to the
-        # base class's authentication logic.
         username = attrs.get('username')
         password = attrs.get('password')
-        
-        # Determine target role if we are in a subclass
         target_role = getattr(self, 'target_role', None)
+
+        if not username or not password:
+            raise serializers.ValidationError('Username and password are required.')
+            
+        print(f"DEBUG AUTH: Attempting direct login for input: '{username}' (Target Role: {target_role})", flush=True)
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        role_filter = {'role': target_role} if target_role else {}
         
-        print(f"DEBUG AUTH: Attempting login for username/email/phone: '{username}' (Target Role: {target_role})", flush=True)
+        user_obj = User.objects.filter(username=username, **role_filter).first()
+        if not user_obj:
+            user_obj = User.objects.filter(email__iexact=username, **role_filter).first()
+        if not user_obj:
+            user_obj = User.objects.filter(phone=username, **role_filter).first()
 
-        if username:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            
-            # Use role in filter if target_role is set
-            role_filter = {'role': target_role} if target_role else {}
-            
-            # 1. Try exact username match
-            user_obj = User.objects.filter(username=username, **role_filter).first()
-            
-            if not user_obj:
-                # 2. Try email match
-                user_obj = User.objects.filter(email__iexact=username, **role_filter).first()
-            
-            if not user_obj:
-                # 3. Try phone match
-                user_obj = User.objects.filter(phone=username, **role_filter).first()
+        if not user_obj:
+            print("DEBUG AUTH: User not found.", flush=True)
+            from rest_framework import exceptions
+            raise exceptions.AuthenticationFailed('No active account found with the given credentials')
 
-            if user_obj:
-                print(f"DEBUG AUTH: Found user {user_obj.username} (ExtID: {user_obj.external_id}, Role: {user_obj.role}, Active: {user_obj.is_active})", flush=True)
-                
-                # Check password manually for debugging
-                pw_match = user_obj.check_password(password)
-                print(f"DEBUG AUTH: Password match test: {pw_match}", flush=True)
-                
-                # Set the key that TokenObtainPairSerializer expects (self.username_field)
-                attrs[self.username_field] = user_obj.external_id
-                
-                # CRITICAL: Remove 'username' from attrs to avoid conflict with authenticate() arguments
-                if 'username' in attrs and 'username' != self.username_field:
-                    attrs.pop('username')
-            else:
-                print(f"DEBUG AUTH: No user found for input '{username}' with role '{target_role}'", flush=True)
-                # Ensure the expected field is present for super().validate()
-                attrs[self.username_field] = username 
+        print(f"DEBUG AUTH: Found user {user_obj.username} (ExtID: {user_obj.external_id})", flush=True)
 
-        try:
-            print(f"DEBUG AUTH: Calling super().validate with attrs keys: {list(attrs.keys())}", flush=True)
-            data = super().validate(attrs)
-            print("DEBUG AUTH: super().validate SUCCEEDED.", flush=True)
-        except Exception as e:
-            print(f"DEBUG AUTH: super().validate FAILED. Error: {e}", flush=True)
-            # If it failed but our manual check worked, there's a backend/simplejwt config issue
-            raise e
-        
-        # Generate new login_id to invalidate previous sessions for all user roles
+        if not user_obj.check_password(password):
+            print("DEBUG AUTH: Incorrect password.", flush=True)
+            from rest_framework import exceptions
+            raise exceptions.AuthenticationFailed('No active account found with the given credentials')
+
+        if not user_obj.is_active:
+            print("DEBUG AUTH: User is not active.", flush=True)
+            from rest_framework import exceptions
+            raise exceptions.AuthenticationFailed('This account is not active.')
+
+        self.user = user_obj
+
         new_login_id = uuid.uuid4()
         self.user.current_login_id = new_login_id
         self.user.save(update_fields=['current_login_id'])
-        print(f"DEBUG AUTH: Generated new login_id for {self.user.username} ({self.user.role}): {new_login_id}", flush=True)
+        print(f"DEBUG AUTH: Generated new login_id for {self.user.username}: {new_login_id}", flush=True)
         
         refresh = self.get_token(self.user)
         long_life = timedelta(days=365*50)
         refresh.set_exp(lifetime=long_life)
         access = refresh.access_token
         access.set_exp(lifetime=long_life)
-        data["refresh"] = str(refresh)
-        data["access"] = str(access)
         
-        # Include user details in response
-        data['user'] = {
-            'id': self.user.id,
-            'username': self.user.username,
-            'email': self.user.email,
-            'phone': self.user.phone,
-            'role': self.user.role,
-            'external_id': self.user.external_id,
-            'services_selected': getattr(self.user, 'services_selected', False),
-            'is_approved': getattr(self.user, 'is_approved', False),
+        return {
+            "refresh": str(refresh),
+            "access": str(access),
+            "user": {
+                'id': self.user.id,
+                'username': self.user.username,
+                'email': self.user.email,
+                'phone': self.user.phone,
+                'role': self.user.role,
+                'external_id': self.user.external_id,
+                'services_selected': getattr(self.user, 'services_selected', False),
+                'is_approved': getattr(self.user, 'is_approved', False),
+            }
         }
-            
-        return data
 
 class RiderTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
     target_role = 'RIDER'
