@@ -184,6 +184,8 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                         cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
                         break
                     if status == 'CANCELLED':
+                        cache.delete(f"rodie_locked:{rodie_id}")
+                        cache.delete(f"active_offer:{rodie_id}")
                         return "Cancelled by rider"
                 except Exception:
                     pass
