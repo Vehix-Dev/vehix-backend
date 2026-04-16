@@ -378,6 +378,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                             f"rider_{rider_id}",
                             {
                                 "type": "rodie_location",
+                                "rodie_id": self.scope["user"].id,
                                 "lat": lat,
                                 "lng": lng,
                                 "username": self.scope["user"].username,

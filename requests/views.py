@@ -475,6 +475,10 @@ class CancelRequestView(APIView):
                     # Update cache so sequential notification thread stops
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
                     
+                    # Unlock the rodie if they had already accepted
+                    if req.rodie:
+                        cache.delete(f"rodie_locked:{req.rodie.id}")
+                    
                     channel_layer = get_channel_layer()
                     
                     # 1. Notify ALL rodies (stops the sound/notification popup for those who haven't accepted)
@@ -549,6 +553,9 @@ class CancelRequestView(APIView):
                 
                 try:
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
+                    
+                    # Unlock the rodie
+                    cache.delete(f"rodie_locked:{user.id}")
                     
                     # Broadcast cancellation to rider
                     channel_layer = get_channel_layer()
