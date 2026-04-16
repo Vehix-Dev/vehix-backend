@@ -173,6 +173,8 @@ class User(AbstractUser):
                 prefix = 'BS'
             elif self.role == 'MECHANIC':
                 prefix = 'IT'
+            elif self.role == 'ADMIN':
+                prefix = 'AD'
             else:
                 prefix = None
 
@@ -180,7 +182,6 @@ class User(AbstractUser):
                 try:
                     with transaction.atomic():
                         # Use select_for_update to lock users table during sequence generation
-                        # We only need to lock enough to get a consistent max value
                         existing = User.objects.select_for_update().filter(
                             external_id__startswith=prefix,
                             external_id__regex=r'^' + re.escape(prefix) + r'\d+$'
@@ -200,7 +201,11 @@ class User(AbstractUser):
                         seq = max_n + 1
                         self.external_id = f"{prefix}{seq:03d}"
                 except Exception:
-                    self.external_id = f"{prefix}001"
+                    # Generic fallback if sequence generation fails
+                    self.external_id = f"{prefix}{uuid.uuid4().hex[:6].upper()}"
+            else:
+                # Default fallback for roles with no prefix: use username
+                self.external_id = self.username
 
         if not self.referral_code:
             prefix = 'VX'
