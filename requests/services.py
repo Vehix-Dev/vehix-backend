@@ -49,7 +49,7 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
             
         # SAFETY: Check for heartbeat with 10-minute window
         if not cache.get(f"rodie_heartbeat:{rs.rodie_id}"):
-            print(f"👻 {rs.rodie.username} skipped: No heartbeat in 10 minutes. Phone might be offline.")
+            print(f"👻 {rs.rodie.username} (ID: {rs.rodie_id}) skipped: No heartbeat in 10m.")
             continue
             
         filtered_services.append(rs)
