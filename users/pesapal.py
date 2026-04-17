@@ -98,6 +98,7 @@ class PesapalClient:
             }
         }
 
+        print(f"Pesapal SubmitOrder Payload: {json.dumps(payload)}")
         response = requests_lib.post(url, json=payload, headers=headers)
         print(f"Pesapal SubmitOrder Status: {response.status_code}")
         print(f"Pesapal SubmitOrder Response: {response.text}")
