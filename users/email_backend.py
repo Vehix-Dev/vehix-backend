@@ -1,6 +1,32 @@
-import requests
+import sys
+import os
+import importlib.util
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
+
+def _import_requests_safely():
+    for path in sys.path:
+        if 'site-packages' in path.lower():
+            requests_init = os.path.join(path, 'requests', '__init__.py')
+            if os.path.exists(requests_init):
+                try:
+                    spec = importlib.util.spec_from_file_location("requests_standard_lib", requests_init)
+                    lib = importlib.util.module_from_spec(spec)
+                    sys.modules["requests_standard_lib"] = lib
+                    spec.loader.exec_module(lib)
+                    if hasattr(lib, 'post'):
+                        return lib
+                except Exception:
+                    continue
+    try:
+        import requests as lib
+        if hasattr(lib, 'post'):
+            return lib
+    except ImportError:
+        pass
+    return None
+
+requests_lib = _import_requests_safely()
 
 class ResendEmailBackend(BaseEmailBackend):
     """
@@ -32,7 +58,7 @@ class ResendEmailBackend(BaseEmailBackend):
                     "Content-Type": "application/json"
                 }
 
-                response = requests.post(self.api_url, json=payload, headers=headers)
+                response = requests_lib.post(self.api_url, json=payload, headers=headers)
                 if response.status_code in [200, 201]:
                     sent_count += 1
                 else:
