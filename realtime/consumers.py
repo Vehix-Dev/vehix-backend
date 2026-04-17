@@ -126,6 +126,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     })
             # Mark as alive immediately upon connection (10-minute safety window)
             await database_sync_to_async(cache.set)(f"rodie_heartbeat:{user.id}", True, timeout=600)
+            print(f"💓 [Heartbeat] Initial set on CONNECT for user {user.id}")
             await self.accept()
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
 
@@ -229,6 +230,16 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def receive_json(self, content):
+        # 🟢 HEARTBEAT: Any message from the phone counts as being "Alive"
+        try:
+            await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=600)
+            # Only print periodically to avoid log spam (every 10th message)
+            if getattr(self, '_msg_count', 0) % 10 == 0:
+                print(f"💓 [Heartbeat] Updated via message for user {self.scope['user'].id}")
+            self._msg_count = getattr(self, '_msg_count', 0) + 1
+        except Exception:
+            pass
+
         try:
             msg_type = content.get("type")
             if msg_type == "LOCATION":
