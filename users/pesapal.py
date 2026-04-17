@@ -99,6 +99,8 @@ class PesapalClient:
         }
 
         response = requests_lib.post(url, json=payload, headers=headers)
+        print(f"Pesapal SubmitOrder Status: {response.status_code}")
+        print(f"Pesapal SubmitOrder Response: {response.text}")
         if response.status_code == 200:
             return response.json()
         else:
