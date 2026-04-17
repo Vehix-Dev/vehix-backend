@@ -124,12 +124,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         "status": req.status,
                         "request": serializer_data
                     })
+            except Exception as e:
+                print(f"⚠️ [RodieConsumer] Error auto-rejoining active request: {e}")
+
             # Mark as alive immediately upon connection (10-minute safety window)
             await database_sync_to_async(cache.set)(f"rodie_heartbeat:{user.id}", True, timeout=600)
             print(f"💓 [Heartbeat] Initial set on CONNECT for user {user.id}")
             await self.accept()
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
-
             # Check for active offer if reconnected during dispatch
             try:
                 offer = cache.get(f"active_offer:{user.id}")
