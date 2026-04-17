@@ -187,18 +187,20 @@ class CreateServiceRequestView(generics.CreateAPIView):
             rodie = item.get('rodie')
             try:
                 rodie_wallet, _ = Wallet.objects.get_or_create(user=rodie)
-                if rodie_wallet.balance >= Decimal(-max_neg):
+                can_accept = rodie_wallet.balance >= Decimal(-max_neg)
+                if can_accept:
                     filtered.append(item)
                     matched_usernames.append(rodie.username)
-            except Exception:
+                else:
+                    print(f"💰 {rodie.username} skipped: Wallet balance ({rodie_wallet.balance}) is too low (Max Neg: {max_neg})")
+            except Exception as e:
+                print(f"❌ Wallet error for {rodie.username}: {e}")
                 filtered.append(item)
                 if rodie:
                     matched_usernames.append(getattr(rodie, 'username', 'unknown'))
 
         filtered = [r for r in filtered if r['rodie'].id != self.request.user.id]
-        matched_usernames = [r['rodie'].username for r in filtered]
-        
-        print(f"✅ MATCHED RODIES (after wallet/filters): {matched_usernames}\n")
+        print(f"✅ FINAL MATCHED RODIES: {[r['rodie'].username for r in filtered]}")
 
         if not filtered:
             # No roadies available — expire the request immediately and notify rider
