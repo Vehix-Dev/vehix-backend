@@ -658,15 +658,78 @@ def submit_feedback(request):
         print(f"Feedback received from {request.user.username}: {message}")
         print(f"Type: {feedback_type}")
         
-        return Response(
-            {'success': 'Feedback submitted successfully'}, 
-            status=status.HTTP_201_CREATED
-        )
-    except Exception as e:
-        return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({
+            'message': 'Password updated successfully'
+        }, status=status.HTTP_200_OK)
+
+
+from django.core.mail import send_mail
+import random
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        role = request.data.get('role')
+
+        if not email or not role:
+            return Response({'error': 'Email and role are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email=email, role=role).first()
+        if not user:
+            # We return 200 even if user not found for security (don't reveal registered emails)
+            return Response({'message': 'If an account exists, a code has been sent.'}, status=status.HTTP_200_OK)
+
+        # Generate 6-digit OTP
+        token_str = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        PasswordResetToken.objects.create(user=user, token=token_str)
+
+        # Send email
+        try:
+            send_mail(
+                'Vehix Password Reset Code',
+                f'Your password reset code is: {token_str}. It will expire in 15 minutes.',
+                None,  # Uses DEFAULT_FROM_EMAIL from settings
+                [email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            return Response({'error': 'Failed to send email. Please contact support.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'message': 'If an account exists, a code has been sent.'}, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        role = request.data.get('role')
+        token_str = request.data.get('code')
+        new_password = request.data.get('new_password')
+
+        if not all([email, role, token_str, new_password]):
+            return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email=email, role=role).first()
+        if not user:
+            return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reset_token = PasswordResetToken.objects.filter(user=user, token=token_str, is_used=False).last()
+
+        if not reset_token or not reset_token.is_valid():
+            return Response({'error': 'Invalid or expired code'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update password
+        user.set_password(new_password)
+        user.save()
+
+        # Invalidate token
+        reset_token.is_used = True
+        reset_token.save()
+
+        return Response({'message': 'Password has been reset successfully'}, status=status.HTTP_200_OK)
 
 
 class UserProfilePasswordChangeView(APIView):
