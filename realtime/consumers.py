@@ -124,9 +124,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         "status": req.status,
                         "request": serializer_data
                     })
-            except Exception as e:
-                print(f"⚠️ [RodieConsumer] Error auto-rejoining active request: {e}")
-
+            # Mark as alive immediately upon connection (10-minute safety window)
+            await database_sync_to_async(cache.set)(f"rodie_heartbeat:{user.id}", True, timeout=600)
             await self.accept()
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
 
@@ -240,8 +239,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     # Always cache rodie location for matching
                     try:
                         await cache_set_rodie_location(self.scope['user'].id, lat, lng)
-                        # NEW: Update Truly Online heartbeat (150s to match 2-min app timer)
-                        await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=150)
+                        # NEW: Update Truly Online heartbeat (10-minute safety window)
+                        await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=600)
                         # Broadcast to all nearby riders
                         await self.broadcast_to_nearby_riders(lat, lng)
                     except Exception:
@@ -374,9 +373,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
                 timestamp = content.get('timestamp')
-                # NEW: Update Truly Online heartbeat
+                # NEW: Update Truly Online heartbeat (10-minute safety window)
                 try:
-                    await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=150)
+                    await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=600)
                 except Exception:
                     pass
                 await self.send_json({"type": "PONG", "timestamp": timestamp})

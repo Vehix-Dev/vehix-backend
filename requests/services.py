@@ -42,14 +42,14 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
     filtered_services = []
     for rs in rodie_services:
         is_locked = cache.get(f"rodie_locked:{rs.rodie_id}")
-        has_heartbeat = cache.get(f"rodie_heartbeat:{rs.rodie_id}")
         
         if is_locked:
             print(f"🔒 {rs.rodie.username} skipped: Currently locked by another offer.")
             continue
             
-        if not has_heartbeat:
-            print(f"👻 {rs.rodie.username} skipped: No live heartbeat in cache (Switch might be ON but app is not pinging).")
+        # SAFETY: Check for heartbeat with 10-minute window
+        if not cache.get(f"rodie_heartbeat:{rs.rodie_id}"):
+            print(f"👻 {rs.rodie.username} skipped: No heartbeat in 10 minutes. Phone might be offline.")
             continue
             
         filtered_services.append(rs)
