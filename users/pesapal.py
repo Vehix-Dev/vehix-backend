@@ -78,7 +78,7 @@ class PesapalClient:
         payload = {
             "id": payment.reference,
             "currency": "UGX",  # Changed to UGX for Uganda Shillings
-            "amount": int(float(payment.amount)),
+            "amount": "{:.2f}".format(float(payment.amount)),
             "description": payment.description or "Wallet Deposit",
             "callback_url": callback_url,
             "notification_id": self.IPN_ID,
