@@ -515,14 +515,16 @@ class PaymentStatusView(APIView):
                     from .pesapal import PesapalClient
                     client = PesapalClient()
                     status_data = client.get_transaction_status(payment.processor_id)
+                    print(f"Pesapal Polling Status for {payment.reference}: {status_data}")
                     
                     if status_data:
-                        pesapal_status = status_data.get('payment_status_description')
-                        # Correctly capture the actual amount paid from Pesapal response
-                        actual_amount = status_data.get('amount', payment.amount)
-                        payment.amount = actual_amount
+                        pesapal_status = status_data.get('payment_status_description', '').upper()
+                        # Also handle status_code 1 which means Completed in V3
+                        status_code = status_data.get('status_code')
                         
-                        if pesapal_status == 'COMPLETED':
+                        if pesapal_status == 'COMPLETED' or status_code == 1:
+                            actual_amount = status_data.get('amount', payment.amount)
+                            payment.amount = actual_amount
                             payment.status = 'COMPLETED'
                             payment.save()
                             
@@ -593,7 +595,8 @@ class PesapalIPNView(APIView):
                         payment.save()
                     return Response({'status': 'failed', 'message': 'Could not verify payment status'}, status=status.HTTP_400_BAD_REQUEST)
                 
-                pesapal_status = status_data.get('payment_status_description') 
+                pesapal_status = status_data.get('payment_status_description', '').upper()
+                status_code = status_data.get('status_code')
                 actual_amount = status_data.get('amount', payment.amount)
                 
                 # Check if already processed to avoid double crediting
@@ -601,9 +604,9 @@ class PesapalIPNView(APIView):
                     return Response({'status': 'already_processed', 'payment_status': 'COMPLETED'})
 
                 payment.amount = actual_amount
-                print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}, Amount: {actual_amount}")
+                print(f"Pesapal IPN - Payment {payment.reference} status: {pesapal_status}, Code: {status_code}, Amount: {actual_amount}")
                 
-                if pesapal_status == 'COMPLETED':
+                if pesapal_status == 'COMPLETED' or status_code == 1:
                     payment.status = 'COMPLETED'
                     payment.save()
                     
