@@ -240,8 +240,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     # Always cache rodie location for matching
                     try:
                         await cache_set_rodie_location(self.scope['user'].id, lat, lng)
-                        # NEW: Update Truly Online heartbeat
-                        await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=60)
+                        # NEW: Update Truly Online heartbeat (150s to match 2-min app timer)
+                        await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=150)
                         # Broadcast to all nearby riders
                         await self.broadcast_to_nearby_riders(lat, lng)
                     except Exception:
@@ -376,7 +376,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 timestamp = content.get('timestamp')
                 # NEW: Update Truly Online heartbeat
                 try:
-                    await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=60)
+                    await database_sync_to_async(cache.set)(f"rodie_heartbeat:{self.scope['user'].id}", True, timeout=150)
                 except Exception:
                     pass
                 await self.send_json({"type": "PONG", "timestamp": timestamp})
