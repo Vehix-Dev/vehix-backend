@@ -186,49 +186,31 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "data": event
         })
 
-    async def notification(self, event):
-        await self.send_json({
-            'type': 'NOTIFICATION',
-            'notification': event.get('notification')
-        })
-
-    async def request_update(self, event):
-        await self.send_json({
-            "type": "REQUEST_UPDATE",
-            "request": event.get("request") or event.get("data"),
-            "status": event.get("status")
-        })
-
-    async def request_cancelled(self, event):
-        """Handle request cancellation confirmation"""
-        await self.send_json({
-            "type": "REQUEST_CANCELLED",
-            "request_id": event.get("request_id"),
-            "status": "CANCELLED"
-        })
-
-    # RODIE SIDE: CHAT MESSAGE HANDLER
     async def chat_message(self, event):
-        await self.send_json({
-            'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
-        })
+        # HARDEN: Support both flattened (from REST API) and nested (from WS) formats
+        message = event.get('message', event)
+        if 'type' in message and len(message) > 1:
+            message = {k: v for k, v in message.items() if k != 'type'}
+        
+        req_id = message.get('service_request') or message.get('request_id')
+        if req_id:
+            message['request_id'] = req_id
+            message['service_request'] = req_id
+        
+        await self.send_json({"type": "CHAT_MESSAGE", "message": message})
 
-    # RODIE SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
+        data = event.get('message', event)
+        sender_id = data.get('sender_id') or data.get('sender', {}).get('id')
+        if sender_id and str(sender_id) == str(self.scope['user'].id):
+            return
+        
+        req_id = data.get('service_request') or data.get('request_id')
         await self.send_json({
-            'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
+            "type": "CHAT_NOTIFICATION",
+            "request_id": req_id,
+            "message": data.get('message') or data.get('text', "New message"),
+            "sender_username": data.get('sender_username') or data.get('sender', {}).get('username', "Partner")
         })
 
     async def receive_json(self, content):
@@ -851,29 +833,35 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         except ServiceRequest.DoesNotExist:
             return None
 
-    # RIDER SIDE: CHAT MESSAGE HANDLER
     async def chat_message(self, event):
-        await self.send_json({
-            'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
-        })
+        # HARDEN: Support both flattened (from REST API) and nested (from WS) formats
+        message = event.get('message', event)
+        if 'type' in message and len(message) > 1:
+            message = {k: v for k, v in message.items() if k != 'type'}
+        
+        req_id = message.get('service_request') or message.get('request_id')
+        if req_id:
+            message['request_id'] = req_id
+            message['service_request'] = req_id
+        
+        await self.send_json({"type": "CHAT_MESSAGE", "message": message})
 
-    # RIDER SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
-        """Forward chat notification — the app ignores it if chat is already open"""
+        # HARDEN: Support both flattened and nested formats for alerts
+        data = event.get('message', event)
+        sender_id = data.get('sender_id') or data.get('sender', {}).get('id')
+
+        # Don't notify the sender themselves
+        if sender_id and str(sender_id) == str(self.scope['user'].id):
+            return
+
+        req_id = data.get('service_request') or data.get('request_id')
+        
         await self.send_json({
-            'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
+            "type": "CHAT_NOTIFICATION",
+            "request_id": req_id,
+            "message": data.get('message') or data.get('text', "New message"),
+            "sender_username": data.get('sender_username') or data.get('sender', {}).get('username', "Partner")
         })
 
     async def request_accepted(self, event):
