@@ -377,3 +377,19 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.recipient.username if self.recipient else 'Bulk'} - {self.title} ({self.notification_type})"
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        # Valid for 15 minutes
+        from django.utils import timezone
+        from datetime import timedelta
+        return not self.is_used and (timezone.now() - self.created_at) < timedelta(minutes=15)
+
+    def __str__(self):
+        return f"ResetToken for {self.user.username} - {self.token}"

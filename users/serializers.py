@@ -274,9 +274,9 @@ class WithdrawSerializer(serializers.Serializer):
 
     def validate_amount(self, value):
         from decimal import Decimal
-        if value > Decimal('5000.00'):
+        if value < Decimal('5000.00'):
             raise serializers.ValidationError(
-                'Maximum withdrawal amount is UGX 5,000 per transaction.'
+                'Minimum withdrawal amount is UGX 5,000 per transaction.'
             )
         return value
 

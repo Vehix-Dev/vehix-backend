@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback, PasswordResetRequestView, PasswordResetConfirmView
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -52,6 +52,8 @@ urlpatterns = [
     path('login/rider/', RiderLoginView.as_view(), name='rider_login'),
     path('login/roadie/', RoadieLoginView.as_view(), name='roadie_login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('me/', MeView.as_view(), name='me'),
     path('profile/', UserProfileUpdateView.as_view(), name='user_profile_update'),
     path('profile/photo/', UserProfilePhotoUploadView.as_view(), name='user_profile_photo_upload'),

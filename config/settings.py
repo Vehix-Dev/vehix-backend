@@ -332,3 +332,18 @@ FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
 
 if DEBUG:
     print(f"FCM Server Key: {'SET' if FCM_SERVER_KEY else 'NOT SET'}")
+
+
+# Email Configuration
+if DEBUG:
+    # Set this to 'django.core.mail.backends.smtp.EmailBackend' if you want to test actual sending in debug mode
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+EMAIL_HOST = 'smtp.resend.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'resend'
+EMAIL_HOST_PASSWORD = config('RESEND_API_KEY', default='your-resend-api-key-here')
+DEFAULT_FROM_EMAIL = 'Vehix <info@vehix.ug>'
