@@ -69,9 +69,10 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     logger.info(f"📵 Rodie {rodie_id} is offline. Skipping.")
                     continue
                 
-                # Skip if location is stale (No update in 10 mins)
-                ten_mins_ago = timezone.now() - timezone.timedelta(minutes=10)
-                if not RodieLocation.objects.filter(rodie=rodie_user, updated_at__gte=ten_mins_ago).exists():
+                # Skip if location is stale (No update in 60 mins)
+                # (Increased from 10m to improve reliability)
+                sixty_mins_ago = timezone.now() - timezone.timedelta(minutes=60)
+                if not RodieLocation.objects.filter(rodie=rodie_user, updated_at__gte=sixty_mins_ago).exists():
                     logger.info(f"👻 Rodie {rodie_id} has a stale location/ghost. Skipping.")
                     continue
 
