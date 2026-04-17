@@ -300,7 +300,10 @@ class DepositView(APIView):
             if not redirect_url:
                 payment.status = 'FAILED'
                 payment.save()
-                return Response({'error': 'Could not generate payment link. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+                return Response({
+                    'error': 'Could not generate payment link.',
+                    'pesapal_response': response, # Temporary for debugging
+                }, status=status.HTTP_502_BAD_GATEWAY)
 
             return Response({
                 'payment_id': payment.id,
