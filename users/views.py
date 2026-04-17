@@ -1,3 +1,4 @@
+import random
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,7 +10,7 @@ from django.db import models
 
 from .serializers import RegisterSerializer, UserSerializer
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer, DepositSerializer, WithdrawSerializer, PaymentSerializer, TransactionHistorySerializer, RoadiePaymentSummarySerializer, UserProfileUpdateSerializer, UserProfilePhotoSerializer
-from .models import Wallet, Referral, PlatformConfig, Notification, Payment, WalletTransaction
+from .models import Wallet, Referral, PlatformConfig, Notification, Payment, WalletTransaction, PasswordResetToken
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 try:
