@@ -99,11 +99,12 @@ class NearbyRodieListView(APIView):
             # Fallback to DB if cache empty
             if not loc:
                 try:
-                    # Only consider roadies who have updated their location in the last 10 minutes
-                    ten_mins_ago = timezone.now() - timezone.timedelta(minutes=10)
+                    # Only consider roadies who have updated their location in the last 60 minutes
+                    # (Increased from 10m to improve matching reliability)
+                    sixty_mins_ago = timezone.now() - timezone.timedelta(minutes=60)
                     db_loc = RodieLocation.objects.filter(
                         rodie_id=rodie_id, 
-                        updated_at__gte=ten_mins_ago
+                        updated_at__gte=sixty_mins_ago
                     ).first()
                     
                     if not db_loc:
@@ -255,14 +256,15 @@ class ChatMessageCreateAPIView(generics.CreateAPIView):
         msg = serializer.save(sender=self.request.user)
 
         try:
-            if get_channel_layer and async_to_sync:
                 channel_layer = get_channel_layer()
                 group_name = f'request_{req.id}'
+                message_data = ChatMessageSerializer(msg).data
+                # Standardize as CHAT_MESSAGE and flatten for app-side consistency
                 async_to_sync(channel_layer.group_send)(
                     group_name,
                     {
                         'type': 'chat.message',
-                        'message': ChatMessageSerializer(msg).data
+                        **message_data
                     }
                 )
         except Exception:
@@ -485,7 +487,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         'role_RODIE',
                         {
-                            "type": "request_cancelled",
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Service Request #{req.id} has been cancelled."
@@ -496,8 +498,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'request_{req.id}',
                         {
-                            "type": "request_cancelled",
-                            "request_id": req.id,
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
                             "message": "The Rider has cancelled this request.",
                             "reason": cancellation_reason.reason
@@ -509,8 +510,7 @@ class CancelRequestView(APIView):
                         async_to_sync(channel_layer.group_send)(
                             f'rodie_{req.rodie.id}',
                             {
-                                "type": "request_cancelled",
-                                "request_id": req.id,
+                                "type": "REQUEST_CANCELLED",
                                 "status": "CANCELLED",
                                 "message": "The Rider has cancelled this request.",
                                 "reason": cancellation_reason.reason
@@ -562,7 +562,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'rider_{req.rider.id}',
                         {
-                            "type": "request_cancelled",
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Roadie has cancelled request #{req.id}",

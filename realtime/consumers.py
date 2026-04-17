@@ -205,10 +205,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "status": "CANCELLED"
         })
 
+    # RODIE SIDE: CHAT MESSAGE HANDLER
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
@@ -216,10 +217,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             'created_at': event.get('created_at'),
         })
 
+    # RODIE SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
         await self.send_json({
             'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
@@ -318,7 +320,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 text = content.get('text')
                 if request_id and text:
                     user = self.scope['user']
-                    sender_name = f"{user.first_name} {user.last_name}".strip() or user.username
+                    sender_name = user.username
                     await database_sync_to_async(ChatMessage.objects.create)(
                         service_request_id=request_id,
                         sender=user,
@@ -358,6 +360,16 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 req_id = content.get('request_id')
                 if req_id:
                     await self.channel_layer.group_add(f"request_{req_id}", self.channel_name)
+                    # Immediate hydration
+                    try:
+                        from requests.serializers import ServiceRequestSerializer
+                        def get_req_sync(rid):
+                            r = ServiceRequest.objects.filter(id=rid).first()
+                            return ServiceRequestSerializer(r).data if r else None
+                        req_data = await database_sync_to_async(get_req_sync)(req_id)
+                        if req_data:
+                            await self.send_json({"type": "REQUEST_UPDATE", "status": req_data["status"], "request": req_data})
+                    except Exception: pass
                     await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
@@ -412,10 +424,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         except ServiceRequest.DoesNotExist:
             return None
 
+    # RIDER SIDE: CHAT MESSAGE HANDLER
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
@@ -423,11 +436,12 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             'created_at': event.get('created_at'),
         })
 
+    # RIDER SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
         """Forward chat notification — the app ignores it if chat is already open"""
         await self.send_json({
             'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
@@ -723,7 +737,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                                     "lat": lat,
                                     "lng": lng,
                                     "rider_id": user.id,
-                                    "rider_name": f"{user.first_name} {user.last_name}".strip() or user.username
+                                    "rider_name": user.username
                                 }
                             )
                     except Exception:
@@ -742,13 +756,23 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 req_id = content.get('request_id')
                 if req_id:
                     await self.channel_layer.group_add(f"request_{req_id}", self.channel_name)
+                    # Immediate hydration
+                    try:
+                        from requests.serializers import ServiceRequestSerializer
+                        def get_req_sync(rid):
+                            r = ServiceRequest.objects.filter(id=rid).first()
+                            return ServiceRequestSerializer(r).data if r else None
+                        req_data = await database_sync_to_async(get_req_sync)(req_id)
+                        if req_data:
+                            await self.send_json({"type": "REQUEST_UPDATE", "status": req_data["status"], "request": req_data})
+                    except Exception: pass
                     await self.send_json({"type": "JOIN_SUCCESS", "request_id": req_id})
             elif msg_type == 'CHAT':
                 request_id = content.get('request_id')
                 text = content.get('text')
                 if request_id and text:
                     user = self.scope['user']
-                    sender_name = f"{user.first_name} {user.last_name}".strip() or user.username
+                    sender_name = user.username
                     await database_sync_to_async(ChatMessage.objects.create)(
                         service_request_id=request_id,
                         sender=user,
@@ -815,10 +839,11 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         except ServiceRequest.DoesNotExist:
             return None
 
+    # RIDER SIDE: CHAT MESSAGE HANDLER
     async def chat_message(self, event):
         await self.send_json({
             'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
@@ -826,11 +851,12 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             'created_at': event.get('created_at'),
         })
 
+    # RIDER SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
         """Forward chat notification — the app ignores it if chat is already open"""
         await self.send_json({
             'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id'),
+            'request_id': event.get('request_id') or event.get('service_request'),
             'sender_id': event.get('sender_id'),
             'sender_role': event.get('sender_role'),
             'sender_name': event.get('sender_name'),
