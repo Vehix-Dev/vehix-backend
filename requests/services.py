@@ -25,27 +25,35 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
         status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
     ).exclude(rodie__isnull=True).values_list('rodie_id', flat=True)
 
+    print(f"🔍 DEBUG MATCHING: Requesting {service_type.name} at ({rider_lat}, {rider_lng})")
+    print(f"🔍 DEBUG MATCHING: Busy Roadies: {list(busy_rodie_ids)}")
+
     rodie_services = RodieService.objects.filter(
         service=service_type,
         rodie__is_active=True,
         rodie__is_online=True,
         rodie__is_approved=True,
-        rodie__services_selected=True,  # must have explicitly selected services
+        rodie__services_selected=True,
         rodie__is_deleted=False,
     ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
     
-    # Filter out locked rodies (those currently being offered a job)
-    # AND filter out roadies without a live WebSocket heartbeat
+    print(f"🔍 DEBUG MATCHING: Roadies offering this service (Filtered for Active/Online/Approved): {[r.rodie.username for r in rodie_services]}")
+
     filtered_services = []
     for rs in rodie_services:
-        if not cache.get(f"rodie_locked:{rs.rodie_id}"):
-            # Check if roadie has a live heartbeat (within last 150 seconds to match 2-min app timer)
-            if cache.get(f"rodie_heartbeat:{rs.rodie_id}"):
-                filtered_services.append(rs)
-            else:
-                print(f"👻 Rodie {rs.rodie.username} has Switch=ON but No Heartbeat in 150s - skipping.")
-        else:
-            print(f"🔒 Rodie {rs.rodie.username} is currently locked by another offer - skipping from initial pool")
+        is_locked = cache.get(f"rodie_locked:{rs.rodie_id}")
+        has_heartbeat = cache.get(f"rodie_heartbeat:{rs.rodie_id}")
+        
+        if is_locked:
+            print(f"🔒 {rs.rodie.username} skipped: Currently locked by another offer.")
+            continue
+            
+        if not has_heartbeat:
+            print(f"👻 {rs.rodie.username} skipped: No live heartbeat in cache (Switch might be ON but app is not pinging).")
+            continue
+            
+        filtered_services.append(rs)
+        print(f"✅ {rs.rodie.username} passed initial filters.")
     
     for rs in filtered_services:
         # read ephemeral rodie location from cache; skip if not available
