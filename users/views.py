@@ -277,11 +277,14 @@ class DepositView(APIView):
         import uuid
         from .pesapal import PesapalClient
 
+        amount = request.data.get('amount')
+        if not amount or float(amount) <= 0:
+            return Response({'error': 'A valid deposit amount is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
         reference = f"DEP-{uuid.uuid4().hex[:12].upper()}"
-        # Amount is 0/placeholder — Pesapal page lets the user set their own amount
         payment = Payment.objects.create(
             user=request.user,
-            amount=0,
+            amount=amount,
             transaction_type='DEPOSIT',
             status='PENDING',
             reference=reference,
