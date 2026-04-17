@@ -659,8 +659,12 @@ def submit_feedback(request):
         print(f"Type: {feedback_type}")
         
         return Response({
-            'message': 'Password updated successfully'
+            'message': 'Feedback submitted successfully'
         }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 from django.core.mail import send_mail
