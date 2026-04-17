@@ -336,14 +336,12 @@ if DEBUG:
 
 # Email Configuration
 if DEBUG:
-    # Set this to 'django.core.mail.backends.smtp.EmailBackend' if you want to test actual sending in debug mode
+    # Use console backend for local development
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 else:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    # Use custom Resend API backend for production to bypass SMTP blocks
+    EMAIL_BACKEND = 'users.email_backend.ResendEmailBackend'
 
-EMAIL_HOST = 'smtp.resend.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'resend'
+# These are used by the custom ResendEmailBackend
 EMAIL_HOST_PASSWORD = config('RESEND_API_KEY', default='your-resend-api-key-here')
 DEFAULT_FROM_EMAIL = 'Vehix <info@vehix.ug>'
