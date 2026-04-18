@@ -209,10 +209,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     req.save(update_fields=['status'])
                     cache.set(f"request_status:{request_id}", 'EXPIRED', timeout=300)
                     try:
-                        async_to_sync(channel_layer.group_send)(
-                            f'request_{request_id}',
-                            {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}
-                        )
+                        # Send to rider's personal channel (most reliable for this critical event)
                         async_to_sync(channel_layer.group_send)(
                             f'rider_{req.rider_id}',
                             {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}

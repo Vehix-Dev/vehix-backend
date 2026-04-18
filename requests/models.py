@@ -161,14 +161,9 @@ class ServiceRequest(models.Model):
             return
 
 
-# Signal to charge rodie wallet when a request becomes COMPLETED
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal
-
-@receiver(post_save, sender=ServiceRequest)
-def charge_service_fee_initial(sender, instance, created, **kwargs):
-    return
 
 
 def process_referral_reward(user_id):
@@ -227,18 +222,17 @@ def charge_fee_for_request(request_id):
         if not instance.rodie or instance.fee_charged:
             return True
         from users.models import Wallet, PlatformConfig, WalletTransaction
-        cfg = cache.get("platform_config")
-        if not cfg:
+        cfg_data = cache.get("platform_config")
+        if not cfg_data:
             cfg = PlatformConfig.objects.first()
             if cfg:
-                cache.set("platform_config", cfg, timeout=3600)
+                cfg_data = {'service_fee': cfg.service_fee, 'trial_days': cfg.trial_days}
+                cache.set("platform_config", cfg_data, timeout=3600)
         
-        fee = cfg.service_fee if cfg else Decimal('0')
-        trial_days = cfg.trial_days if cfg else 0
+        fee = cfg_data['service_fee'] if cfg_data else Decimal('0')
 
-        # Trial check
-        user_age_days = (timezone.now() - instance.rodie.created_at).days
-        if user_age_days < trial_days:
+        # Trial check — use the trial_end_date set on approval (resets on re-approval)
+        if instance.rodie.trial_end_date and timezone.now() < instance.rodie.trial_end_date:
             ServiceRequest.objects.filter(id=instance.id).update(fee_charged=True)
             return True
 

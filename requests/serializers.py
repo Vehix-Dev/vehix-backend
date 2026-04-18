@@ -152,11 +152,9 @@ class RatingCreateSerializer(serializers.ModelSerializer):
         if user.id != service_request.rider_id and user.id != (service_request.rodie_id or 0):
             raise serializers.ValidationError("You are not part of this service request.")
         
-        # Verify request is completed or cancelled
-        if service_request.status not in ('COMPLETED', 'CANCELLED'):
-            # Allow rating for cancelled requests too (sometimes riders rate roadies who don't show up)
-            if service_request.status != 'COMPLETED':
-                raise serializers.ValidationError("You can only rate a finished service.")
+        # Only completed requests can be rated
+        if service_request.status != 'COMPLETED':
+            raise serializers.ValidationError("You can only rate a completed service.")
                 
         # Check if already rated by this user
         if Rating.objects.filter(service_request=service_request, rater=user).exists():
