@@ -463,10 +463,11 @@ class CancelRequestView(APIView):
             if req.status == 'CANCELLED':
                 return Response({'detail': 'Request is already cancelled'}, status=status.HTTP_200_OK)
                 
-            # Rider can cancel if request has not started yet
             if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
+                print(f"DEBUG: Rider cancelling request {req.id}. Current status: {req.status}")
                 req.status = 'CANCELLED'
                 req.save()
+                print(f"DEBUG: Request {req.id} saved as CANCELLED.")
                 
                 # Create cancellation record
                 RequestCancellation.objects.create(
@@ -540,6 +541,7 @@ class CancelRequestView(APIView):
                 return Response({'detail': 'This request was already cancelled by the rider.'}, status=status.HTTP_400_BAD_REQUEST)
                 
             if req.status in ['ACCEPTED', 'EN_ROUTE']:
+                print(f"DEBUG: Roadie initiating cancellation for {req.id}. Current: {req.status}")
                 # Calculate distance for record keeping if location is provided
                 dist_km = None
                 if current_lat and current_lng:
@@ -550,6 +552,7 @@ class CancelRequestView(APIView):
                 
                 req.status = 'CANCELLED'
                 req.save()
+                print(f"DEBUG: Request {req.id} saved as CANCELLED by Roadie.")
                 
                 # Create cancellation record
                 RequestCancellation.objects.create(
