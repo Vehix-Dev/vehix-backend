@@ -131,7 +131,6 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                 route_distance_m, duration_s = get_route_info(loc.get('lat'), loc.get('lng'), rider_lat, rider_lng)
                 if route_distance_m is not None:
                     distance_m = route_distance_m
-                duration_s = duration_s
             except Exception:
                 duration_s = None
         else:

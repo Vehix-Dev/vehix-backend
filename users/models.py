@@ -142,29 +142,33 @@ class User(AbstractUser):
         is_new = self.pk is None
         from django.utils import timezone
 
-        # Lock in trial end date when approved for the FIRST time
-        # Detect approval by comparing to current DB state
-        if self.is_approved and not self.trial_end_date:
-            try:
-                # For existing records, check if they were already approved
-                if not is_new:
-                    old = User.objects.filter(pk=self.pk).values('is_approved', 'trial_end_date').first()
+        # Reset trial end date on every approval (including re-approvals).
+        # Detect the unapproved → approved transition by comparing with DB state.
+        if self.is_approved:
+            should_set_trial = False
+            if is_new:
+                should_set_trial = True
+            else:
+                try:
+                    old = User.objects.filter(pk=self.pk).values('is_approved').first()
                     was_approved = old['is_approved'] if old else False
-                    had_trial = old['trial_end_date'] if old else None
-                    if was_approved or had_trial:
-                        # Already had a trial or was approved, don't reset
-                        raise ValueError("Already approved or had trial")
-                
-                # New record or transitioning from unapproved
+                    if not was_approved:
+                        # Transitioning from unapproved → approved: reset trial
+                        should_set_trial = True
+                except Exception:
+                    pass
+
+            if should_set_trial:
+                try:
                     from django.apps import apps
                     ConfigModel = apps.get_model('users', 'PlatformConfig')
                     config = ConfigModel.objects.first()
                     if config and config.trial_days > 0:
                         from datetime import timedelta
                         self.trial_end_date = timezone.now() + timedelta(days=config.trial_days)
-            except Exception as e:
-                import logging
-                logging.error(f"Error setting trial date: {e}")
+                except Exception as e:
+                    import logging
+                    logging.error(f"Error setting trial date: {e}")
 
         if not self.external_id or self.external_id.startswith('PENDING-'):
             if self.role == 'RIDER':
@@ -230,7 +234,7 @@ class User(AbstractUser):
                     seq = max_n + 1
                     self.referral_code = f"{prefix}{seq:03d}"
             except Exception:
-                self.referral_code = f"VX001"
+                self.referral_code = f"VX{uuid.uuid4().hex[:6].upper()}"
 
         if self.role == 'ADMIN':
             self.is_approved = False

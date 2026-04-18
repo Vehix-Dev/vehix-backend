@@ -156,17 +156,18 @@ class CreateServiceRequestView(generics.CreateAPIView):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError("You already have an active request. Please complete or cancel it first.")
 
+            # Check wallet balance BEFORE creating the request (prevents orphaned records)
+            cfg = PlatformConfig.objects.first()
+            max_neg = cfg.max_negative_balance if cfg else Decimal('0')
+            rider_wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
+            if rider_wallet.balance < Decimal(-max_neg):
+                raise PermissionDenied('Rider wallet below allowed maximum negative balance')
+
             # Save the new request
             request_obj = serializer.save(
                 rider=self.request.user,
                 status='REQUESTED'
             )
-
-        cfg = PlatformConfig.objects.first()
-        max_neg = cfg.max_negative_balance if cfg else Decimal('0')
-        rider_wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
-        if rider_wallet.balance < Decimal(-max_neg):
-            raise PermissionDenied('Rider wallet below allowed maximum negative balance')
 
         print(f"\n📍 RIDER REQUEST: {self.request.user.username} requesting {request_obj.service_type.name} at ({request_obj.rider_lat}, {request_obj.rider_lng})")
 
@@ -347,22 +348,12 @@ class AcceptRequestView(APIView):
 
                 channel_layer = get_channel_layer()
                 
-                # Notify Rider
+                # Notify Rider via personal channel (critical transition event)
                 async_to_sync(channel_layer.group_send)(
                     f"rider_{req.rider.id}",
                     {
                         'type': 'request_accepted',
                         'status': 'ACCEPTED',
-                        'request': resp_data
-                    }
-                )
-                
-                # Notify Request Room
-                async_to_sync(channel_layer.group_send)(
-                    f'request_{req.id}',
-                    {
-                        'type': 'request_accepted',
-                        'status': 'ACCEPTED', 
                         'request': resp_data
                     }
                 )
@@ -462,18 +453,26 @@ class CancelRequestView(APIView):
         if user.role == 'RIDER' and req.rider_id == user.id:
             # Rider can cancel if request has not started yet
             if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
-                req.status = 'CANCELLED'
-                req.save()
-                
-                # Create cancellation record
-                RequestCancellation.objects.create(
-                    request=req,
-                    cancelled_by=user,
-                    reason=cancellation_reason,
-                    custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
-                    distance_at_cancellation=distance_at_cancellation,
-                    time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
-                )
+                with transaction.atomic():
+                    # Re-fetch with row lock to prevent race conditions
+                    req = ServiceRequest.objects.select_for_update().get(id=pk)
+                    if req.status not in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
+                        return Response(
+                            {'detail': f'Request status changed to {req.status}'},
+                            status=status.HTTP_409_CONFLICT
+                        )
+                    req.status = 'CANCELLED'
+                    req.save()
+                    
+                    # Create cancellation record
+                    RequestCancellation.objects.create(
+                        request=req,
+                        cancelled_by=user,
+                        reason=cancellation_reason,
+                        custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
+                        distance_at_cancellation=distance_at_cancellation,
+                        time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
+                    )
                 
                 try:
                     # Update cache so sequential notification thread stops
@@ -484,39 +483,25 @@ class CancelRequestView(APIView):
                         cache.delete(f"rodie_locked:{req.rodie.id}")
                     
                     channel_layer = get_channel_layer()
+                    cancellation_payload = {
+                        "type": "request.cancelled",
+                        "status": "CANCELLED",
+                        "request_id": req.id,
+                        "message": "The Rider has cancelled this request.",
+                        "reason": cancellation_reason.reason
+                    }
                     
-                    # 1. Notify ALL rodies (stops the sound/notification popup for those who haven't accepted)
-                    async_to_sync(channel_layer.group_send)(
-                        'role_RODIE',
-                        {
-                            "type": "request_cancelled",
-                            "status": "CANCELLED",
-                            "request_id": req.id,
-                            "message": f"Service Request #{req.id} has been cancelled."
-                        }
-                    )
-                    
-                    # 2. Notify the specific rodie if they already accepted (active ride screen)
-                    async_to_sync(channel_layer.group_send)(
-                        f'request_{req.id}',
-                        {
-                            "type": "request_cancelled",
-                            "status": "CANCELLED",
-                            "message": "The Rider has cancelled this request.",
-                            "reason": cancellation_reason.reason
-                        }
-                    )
-
-                    # 3. Guaranteed delivery to the specific rodie's personal channel
                     if req.rodie:
+                        # Post-acceptance: send to the assigned roadie's personal channel
                         async_to_sync(channel_layer.group_send)(
                             f'rodie_{req.rodie.id}',
-                            {
-                                "type": "request_cancelled",
-                                "status": "CANCELLED",
-                                "message": "The Rider has cancelled this request.",
-                                "reason": cancellation_reason.reason
-                            }
+                            cancellation_payload
+                        )
+                    else:
+                        # Pre-acceptance: broadcast to ALL roadies so the offer popup dismisses
+                        async_to_sync(channel_layer.group_send)(
+                            'role_RODIE',
+                            cancellation_payload
                         )
                     
                     print(f"🚫 Broadcasted cancellation for request {req.id} to all parties")
@@ -540,18 +525,26 @@ class CancelRequestView(APIView):
                         float(req.rider_lat), float(req.rider_lng)
                     )
                 
-                req.status = 'CANCELLED'
-                req.save()
-                
-                # Create cancellation record
-                RequestCancellation.objects.create(
-                    request=req,
-                    cancelled_by=user,
-                    reason=cancellation_reason,
-                    custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
-                    distance_at_cancellation=dist_km if current_lat and current_lng else None,
-                    time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
-                )
+                with transaction.atomic():
+                    # Re-fetch with row lock to prevent race conditions
+                    req = ServiceRequest.objects.select_for_update().get(id=pk)
+                    if req.status not in ['ACCEPTED', 'EN_ROUTE']:
+                        return Response(
+                            {'detail': f'Request status changed to {req.status}'},
+                            status=status.HTTP_409_CONFLICT
+                        )
+                    req.status = 'CANCELLED'
+                    req.save()
+                    
+                    # Create cancellation record
+                    RequestCancellation.objects.create(
+                        request=req,
+                        cancelled_by=user,
+                        reason=cancellation_reason,
+                        custom_reason_text=custom_reason_text if cancellation_reason.requires_custom_text else None,
+                        distance_at_cancellation=dist_km if current_lat and current_lng else None,
+                        time_to_arrival_at_cancellation=time_to_arrival_at_cancellation
+                    )
                 
                 try:
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
@@ -559,15 +552,15 @@ class CancelRequestView(APIView):
                     # Unlock the rodie
                     cache.delete(f"rodie_locked:{user.id}")
                     
-                    # Broadcast cancellation to rider
+                    # Broadcast cancellation to rider's personal channel
                     channel_layer = get_channel_layer()
                     async_to_sync(channel_layer.group_send)(
                         f'rider_{req.rider.id}',
                         {
-                            "type": "request_cancelled",
+                            "type": "request.cancelled",
                             "status": "CANCELLED",
                             "request_id": req.id,
-                            "message": f"Roadie has cancelled request #{req.id}",
+                            "message": "Roadie has cancelled this request.",
                             "reason": cancellation_reason.reason
                         }
                     )
@@ -596,6 +589,8 @@ class ArrivedRequestView(APIView):
         req = get_object_or_404(ServiceRequest, id=pk)
         if req.rodie_id != user.id:
             return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+        if req.status != 'EN_ROUTE':
+            return Response({'detail': f'Cannot mark arrived: request status is {req.status}, expected EN_ROUTE'}, status=status.HTTP_400_BAD_REQUEST)
         
         req.status = 'ARRIVED'
         req.arrived_at = timezone.now()
@@ -610,16 +605,11 @@ class ArrivedRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                channel_layer = get_channel_layer()
                 
-                # Send to request group
-                async_to_sync(get_channel_layer().group_send)(
+                # Send to request group (both rider and roadie are members)
+                async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
-                    {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
-                )
-                
-                # Guaranteed delivery to rider's personal channel
-                async_to_sync(get_channel_layer().group_send)(
-                    f'rider_{req.rider.id}',
                     {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
                 )
         except Exception:
@@ -638,6 +628,8 @@ class EnrouteRequestView(APIView):
         req = get_object_or_404(ServiceRequest, id=pk)
         if req.rodie_id != user.id:
             return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+        if req.status != 'ACCEPTED':
+            return Response({'detail': f'Cannot mark en-route: request status is {req.status}, expected ACCEPTED'}, status=status.HTTP_400_BAD_REQUEST)
         req.status = 'EN_ROUTE'
         req.en_route_at = timezone.now()
         req.save()
@@ -649,16 +641,11 @@ class EnrouteRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                channel_layer = get_channel_layer()
                 
-                # Send to request group
-                async_to_sync(get_channel_layer().group_send)(
+                # Send to request group (both rider and roadie are members)
+                async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
-                    {'type': 'request_enroute', 'request': data}
-                )
-                
-                # Guaranteed delivery to rider's personal channel
-                async_to_sync(get_channel_layer().group_send)(
-                    f'rider_{req.rider.id}',
                     {'type': 'request_enroute', 'request': data}
                 )
         except Exception:
@@ -676,6 +663,8 @@ class StartRequestView(APIView):
         req = get_object_or_404(ServiceRequest, id=pk)
         if req.rodie_id != user.id:
             return Response({'detail': 'Not assigned to you'}, status=status.HTTP_403_FORBIDDEN)
+        if req.status != 'ARRIVED':
+            return Response({'detail': f'Cannot start service: request status is {req.status}, expected ARRIVED'}, status=status.HTTP_400_BAD_REQUEST)
         req.status = 'STARTED'
         req.started_at = timezone.now()
         req.save()
@@ -683,16 +672,11 @@ class StartRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                channel_layer = get_channel_layer()
                 
-                # Send to request group
-                async_to_sync(get_channel_layer().group_send)(
+                # Send to request group (both rider and roadie are members)
+                async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
-                    {'type': 'request_started', 'status': 'STARTED', 'request': data}
-                )
-                
-                # Guaranteed delivery to rider's personal channel
-                async_to_sync(get_channel_layer().group_send)(
-                    f'rider_{req.rider.id}',
                     {'type': 'request_started', 'status': 'STARTED', 'request': data}
                 )
         except Exception:
@@ -725,6 +709,9 @@ class CompleteRequestView(APIView):
                 if req.status == 'CANCELLED':
                     return Response({'detail': 'Cannot complete a cancelled request'}, status=status.HTTP_400_BAD_REQUEST)
 
+                if req.status != 'STARTED':
+                    return Response({'detail': f'Cannot complete from status {req.status}. Must be STARTED.'}, status=status.HTTP_409_CONFLICT)
+
                 req.status = 'COMPLETED'
                 req.completed_at = timezone.now()
                 req.save()
@@ -742,20 +729,15 @@ class CompleteRequestView(APIView):
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
+                channel_layer = get_channel_layer()
                 
-                # Send to request group
-                async_to_sync(get_channel_layer().group_send)(
+                # Send to request group (both rider and roadie are members)
+                async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
                     {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
                 )
-                
-                # Guaranteed delivery to rider's personal channel
-                async_to_sync(get_channel_layer().group_send)(
-                    f'rider_{req.rider.id}',
-                    {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
-                )
         except Exception as e:
-            print(f"⚠️ Error broadcasting completion: {e}")
+            print(f"\u26a0\ufe0f Error broadcasting completion: {e}")
 
         # Fee charging is handled by post_save signal in models.py
         # no need for redundant blocking call here

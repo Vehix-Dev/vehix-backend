@@ -224,8 +224,9 @@ class RoadieStatusUpdateView(APIView):
                 'error': 'Select a service to provide'
             }, status=status.HTTP_403_FORBIDDEN)
 
-        request.user.is_online = bool(is_online)
-        request.user.save() 
+        from django.contrib.auth import get_user_model
+        get_user_model().objects.filter(id=request.user.id).update(is_online=bool(is_online))
+        request.user.is_online = bool(is_online)  # Update in-memory for the response
         try:
             if get_channel_layer and async_to_sync:
                 channel_layer = get_channel_layer()
@@ -262,6 +263,8 @@ class PlatformConfigView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
+        if not request.user.is_authenticated or request.user.role != 'ADMIN':
+            return Response({'detail': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         cfg = PlatformConfig.objects.first()
         if not cfg:
             cfg = PlatformConfig.objects.create()
@@ -514,6 +517,7 @@ class PaymentStatusView(APIView):
             if payment.status == 'PENDING' and payment.processor_id:
                 try:
                     from .pesapal import PesapalClient
+                    from django.db import transaction as db_transaction
                     client = PesapalClient()
                     status_data = client.get_transaction_status(payment.processor_id)
                     print(f"Pesapal Polling Status for {payment.reference}: {status_data}")
@@ -525,20 +529,27 @@ class PaymentStatusView(APIView):
                         
                         if pesapal_status == 'COMPLETED' or status_code == 1:
                             actual_amount = status_data.get('amount', payment.amount)
-                            payment.amount = actual_amount
-                            payment.status = 'COMPLETED'
-                            payment.save()
                             
-                            # Credit wallet if this is a deposit
-                            if payment.transaction_type == 'DEPOSIT':
-                                wallet, _ = Wallet.objects.get_or_create(user=payment.user)
-                                wallet.balance += Decimal(str(actual_amount))
-                                wallet.save()
-                                WalletTransaction.objects.create(
-                                    wallet=wallet,
-                                    amount=actual_amount,
-                                    reason=f"Deposit {payment.reference}"
-                                )
+                            with db_transaction.atomic():
+                                # Re-fetch with row lock to prevent double-crediting
+                                payment = Payment.objects.select_for_update().get(id=payment.id)
+                                if payment.status == 'COMPLETED':
+                                    pass  # Already processed by IPN or another poll
+                                else:
+                                    payment.amount = actual_amount
+                                    payment.status = 'COMPLETED'
+                                    payment.save()
+                                    
+                                    # Credit wallet if this is a deposit
+                                    if payment.transaction_type == 'DEPOSIT':
+                                        wallet, _ = Wallet.objects.get_or_create(user=payment.user)
+                                        wallet.balance += Decimal(str(actual_amount))
+                                        wallet.save()
+                                        WalletTransaction.objects.create(
+                                            wallet=wallet,
+                                            amount=actual_amount,
+                                            reason=f"Deposit {payment.reference}"
+                                        )
                         elif pesapal_status == 'FAILED':
                             payment.status = 'FAILED'
                             payment.save()
@@ -737,7 +748,7 @@ class PasswordResetConfirmView(APIView):
 
         # Update password
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
 
         # Invalidate token
         reset_token.is_used = True
@@ -780,7 +791,7 @@ class UserProfilePasswordChangeView(APIView):
             
         # Set and save new password
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
         
         return Response({
             'success': True,

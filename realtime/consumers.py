@@ -15,14 +15,15 @@ def cache_set_rodie_location(user_id, lat, lng):
     try:
         lat_f, lng_f = float(lat), float(lng)
         cache.set(f"rodie_loc:{user_id}", {'lat': lat_f, 'lng': lng_f}, timeout=300)
-        # Update User model for fallback
-        User.objects.filter(id=user_id).update(lat=lat_f, lng=lng_f)
-        # CRITICAL: Update RodieLocation table for find_nearby_rodies matching
-        from locations.models import RodieLocation
-        RodieLocation.objects.update_or_create(
-            rodie_id=user_id,
-            defaults={'lat': lat_f, 'lng': lng_f, 'updated_at': timezone.now()}
-        )
+        # Throttle DB writes: only write if last DB write was >30s ago
+        db_write_key = f"rodie_loc_db_ts:{user_id}"
+        if not cache.get(db_write_key):
+            User.objects.filter(id=user_id).update(lat=lat_f, lng=lng_f)
+            RodieLocation.objects.update_or_create(
+                rodie_id=user_id,
+                defaults={'lat': lat_f, 'lng': lng_f, 'updated_at': timezone.now()}
+            )
+            cache.set(db_write_key, True, timeout=30)
     except Exception:
         pass
 
@@ -55,7 +56,8 @@ class AdminConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def request_update(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "data": event["data"]})
@@ -155,10 +157,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             if hasattr(self, 'group_name'):
                 await self.channel_layer.group_discard(self.group_name, self.channel_name)
             
-            # FIXED: Don't automatically set roadie offline on disconnect
-            # Roadies should only go offline when they explicitly toggle the switch
+            # Clean up role and notification groups to prevent stale channel accumulation
             user = self.scope.get("user")
             if user and user.is_authenticated:
+                await self.channel_layer.group_discard(f'role_{user.role}', self.channel_name)
+                await self.channel_layer.group_discard('notifications', self.channel_name)
                 print(f"🔌 [RodieConsumer] {user.username} disconnected - keeping online status as-is")
         except Exception as e:
             import logging; logging.exception("RodieConsumer disconnect error")
@@ -190,34 +193,31 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def chat_message(self, event):
-        # HARDEN: Support both flattened (from REST API) and nested (from WS) formats
-        message = event.get('message', event)
-        if 'type' in message and len(message) > 1:
-            message = {k: v for k, v in message.items() if k != 'type'}
-        
-        req_id = message.get('service_request') or message.get('request_id')
-        if req_id:
-            message['request_id'] = req_id
-            message['service_request'] = req_id
-        
+        """Forward chat message to roadie — flat format matching Flutter app expectations"""
         await self.send_json({
-            "type": "CHAT_MESSAGE",
-            **message
+            'type': 'CHAT_MESSAGE',
+            'request_id': event.get('request_id') or event.get('service_request'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
         })
 
     async def chat_notification(self, event):
-        data = event.get('message', event)
-        sender_id = data.get('sender_id') or data.get('sender', {}).get('id')
+        """Forward chat notification — skip if sender is this user (prevents echo)"""
+        sender_id = event.get('sender_id')
         if sender_id and str(sender_id) == str(self.scope['user'].id):
             return
-        
-        req_id = data.get('service_request') or data.get('request_id')
+
         await self.send_json({
-            "type": "CHAT_NOTIFICATION",
-            "request_id": req_id,
-            "text": data.get('message') or data.get('text', "New message"),
-            "sender_name": data.get('sender_username') or data.get('sender', {}).get('username', "Partner"),
-            **{k: v for k, v in data.items() if k not in ['type', 'message', 'text', 'sender_username']}
+            'type': 'CHAT_NOTIFICATION',
+            'request_id': event.get('request_id') or event.get('service_request'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
         })
 
     async def receive_json(self, content):
@@ -386,10 +386,10 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             import logging; logging.exception("RodieConsumer receive_json error")
 
     async def broadcast_to_nearby_riders(self, lat, lng):
-        """Broadcast this roadie's location to all nearby riders"""
+        """Broadcast this roadie's location to all nearby riders (within 15km)"""
         try:
             from django.core.cache import cache
-            # Get all online riders
+            from locations.utils import calculate_distance_km
             from users.models import RiderAvailabilityLog
             
             def get_recent_riders():
@@ -403,9 +403,11 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 rider_id = rider_log.user.id
                 rider_loc = cache.get(f"rider_loc:{rider_id}")
                 if rider_loc:
-                    # Simple distance check (you can improve this with proper distance calculation)
-                    distance = abs(float(rider_loc['lat']) - float(lat)) + abs(float(rider_loc['lng']) - float(lng))
-                    if distance < 0.01:  # Rough proximity check (about 1km)
+                    dist = calculate_distance_km(
+                        float(rider_loc['lat']), float(rider_loc['lng']),
+                        float(lat), float(lng)
+                    )
+                    if dist <= 15:  # Within 15km
                         await self.channel_layer.group_send(
                             f"rider_{rider_id}",
                             {
@@ -417,7 +419,6 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                                 "service_type": getattr(self.scope["user"], 'service_type', 'TOWING')
                             }
                         )
-                        print(f"📍 [RodieConsumer] Sent roadie {self.scope['user'].id} location to rider {rider_id}")
         except Exception as e:
             print(f"❌ [RodieConsumer] Error broadcasting to nearby riders: {e}")
 
@@ -428,31 +429,6 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             return req.rider_id
         except ServiceRequest.DoesNotExist:
             return None
-
-    # RIDER SIDE: CHAT MESSAGE HANDLER
-    async def chat_message(self, event):
-        await self.send_json({
-            'type': 'CHAT_MESSAGE',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
-        })
-
-    # RIDER SIDE: CHAT NOTIFICATION HANDLER
-    async def chat_notification(self, event):
-        """Forward chat notification — the app ignores it if chat is already open"""
-        # Flatten for consistency
-        data = event.get('message', event)
-        if 'type' in data:
-            data = {k: v for k, v in data.items() if k != 'type'}
-            
-        await self.send_json({
-            'type': 'CHAT_NOTIFICATION',
-            **data
-        })
 
     async def request_accepted(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "ACCEPTED", "request": event.get("request")})
@@ -480,7 +456,8 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             "type": "REQUEST_CANCELLED",
             "request_id": event.get("request_id"),
-            "message": event.get("message"),
+            "message": event.get("message", "This request has been cancelled."),
+            "reason": event.get("reason"),
             "status": "CANCELLED"
         })
         # Clear any active offer for this roadie if it matches the cancelled request
@@ -549,7 +526,8 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _get_nearby_rodies(self, lat, lng):
-        """Get nearby roadies visible to riders — only approved, services-selected, online roadies."""
+        """Get nearby roadies visible to riders — only approved, services-selected, online roadies within 15km."""
+        from locations.utils import calculate_distance_km
         results = []
         try:
             qs = User.objects.filter(
@@ -572,11 +550,15 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     rodie_lng = getattr(u, 'lng', None)
 
                 if rodie_lat is not None and rodie_lng is not None:
+                    dist = calculate_distance_km(float(lat), float(lng), float(rodie_lat), float(rodie_lng)) if lat and lng else None
+                    if dist is not None and dist > 15:
+                        continue
                     results.append({
                         'id': u.id,
                         'username': u.username,
                         'lat': float(rodie_lat),
                         'lng': float(rodie_lng),
+                        'distance_km': round(dist, 1) if dist is not None else None,
                     })
         except Exception:
             return []
@@ -649,13 +631,16 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
 
     async def send_nearby_roadies(self):
-        """Send nearby roadies to this rider — always send on connect, filter when location is known."""
+        """Send nearby roadies to this rider — only when location is known."""
         try:
             from django.core.cache import cache
             rider_loc = cache.get(f"rider_loc:{self.scope['user'].id}")
-            # Use rider location if available, otherwise (0,0) to get all roadies
-            lat = rider_loc['lat'] if rider_loc else 0
-            lng = rider_loc['lng'] if rider_loc else 0
+            if not rider_loc:
+                # No cached location — send empty list, rider will get updated on first LOCATION msg
+                await self.send_json({"type": "NEARBY_LIST", "roadies": []})
+                return
+            lat = rider_loc['lat']
+            lng = rider_loc['lng']
             nearby = await self._get_nearby_rodies(lat, lng)
             await self.send_json({
                 "type": "NEARBY_LIST",
@@ -678,6 +663,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                         "is_online": False
                     }
                 )
+                # Clean up role and notification groups to prevent stale channel accumulation
+                await self.channel_layer.group_discard(f'role_{user.role}', self.channel_name)
+                await self.channel_layer.group_discard('notifications', self.channel_name)
             if hasattr(self, 'group_name'):
                 await self.channel_layer.group_discard(self.group_name, self.channel_name)
         except Exception as e:
@@ -740,7 +728,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                             await self.channel_layer.group_send(
                                 f"rodie_{rodie_id}",
                                 {
-                                    "type": "RIDER_LOCATION",
+                                    "type": "rider_location",
                                     "lat": lat,
                                     "lng": lng,
                                     "rider_id": user.id,
@@ -835,9 +823,6 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "data": event
         })
 
-    async def request_expired(self, event):
-        await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
-
     @database_sync_to_async
     def _get_rodie_id_for_request(self, request_id):
         try:
@@ -847,34 +832,31 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             return None
 
     async def chat_message(self, event):
-        # HARDEN: Support both flattened (from REST API) and nested (from WS) formats
-        message = event.get('message', event)
-        if 'type' in message and len(message) > 1:
-            message = {k: v for k, v in message.items() if k != 'type'}
-        
-        req_id = message.get('service_request') or message.get('request_id')
-        if req_id:
-            message['request_id'] = req_id
-            message['service_request'] = req_id
-        
-        await self.send_json({"type": "CHAT_MESSAGE", "message": message})
+        """Forward chat message to rider — flat format matching Flutter app expectations"""
+        await self.send_json({
+            'type': 'CHAT_MESSAGE',
+            'request_id': event.get('request_id') or event.get('service_request'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
+        })
 
     async def chat_notification(self, event):
-        # HARDEN: Support both flattened and nested formats for alerts
-        data = event.get('message', event)
-        sender_id = data.get('sender_id') or data.get('sender', {}).get('id')
-
-        # Don't notify the sender themselves
+        """Forward chat notification — skip if sender is this user (prevents echo)"""
+        sender_id = event.get('sender_id')
         if sender_id and str(sender_id) == str(self.scope['user'].id):
             return
 
-        req_id = data.get('service_request') or data.get('request_id')
-        
         await self.send_json({
-            "type": "CHAT_NOTIFICATION",
-            "request_id": req_id,
-            "message": data.get('message') or data.get('text', "New message"),
-            "sender_username": data.get('sender_username') or data.get('sender', {}).get('username', "Partner")
+            'type': 'CHAT_NOTIFICATION',
+            'request_id': event.get('request_id') or event.get('service_request'),
+            'sender_id': event.get('sender_id'),
+            'sender_role': event.get('sender_role'),
+            'sender_name': event.get('sender_name'),
+            'text': event.get('text'),
+            'created_at': event.get('created_at'),
         })
 
     async def request_accepted(self, event):
@@ -888,16 +870,6 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_arrived(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
-
-    async def rodie_location(self, event):
-        """Forward live roadie location to rider's map"""
-        await self.send_json({
-            "type": "rodie_location",
-            "lat": event.get("lat"),
-            "lng": event.get("lng"),
-            "username": event.get("username"),
-            "service_type": event.get("service_type")
-        })
 
     async def account_approved(self, event):
         await self.send_json({"type": "account.approved", "data": event.get("data")})
@@ -919,8 +891,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             "type": "REQUEST_CANCELLED",
             "request_id": event.get("request_id"),
-            "message": event.get("message"),
-            "status": "CANCELLED"
+            "status": "CANCELLED",
+            "message": event.get("message", "This request has been cancelled."),
+            "reason": event.get("reason"),
         })
 
     async def request_proximity(self, event):
@@ -954,7 +927,8 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive_json(self, content):
         typ = content.get('type')
@@ -976,13 +950,17 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def get_nearby_rodies(self, lat, lng):
+        from locations.utils import calculate_distance_km
         results = []
         try:
-            qs = User.objects.filter(role='RODIE')
-            try:
-                qs = qs.filter(is_online=True)
-            except Exception:
-                pass
+            qs = User.objects.filter(
+                role='RODIE',
+                is_online=True,
+                is_approved=True,
+                services_selected=True,
+                is_deleted=False,
+                is_active=True,
+            )
 
             for u in qs.all():
                 # Prefer RodieLocation as the canonical source of truth for rodie position
@@ -991,14 +969,17 @@ class AvailabilityConsumer(AsyncJsonWebsocketConsumer):
                     rodie_lat = rl.lat
                     rodie_lng = rl.lng
                 except RodieLocation.DoesNotExist:
-                    rodie_lat = getattr(u, 'lat', None) or getattr(u, 'last_lat', None) or getattr(u, 'current_lat', None)
-                    rodie_lng = getattr(u, 'lng', None) or getattr(u, 'last_lng', None) or getattr(u, 'current_lng', None)
+                    rodie_lat = getattr(u, 'lat', None)
+                    rodie_lng = getattr(u, 'lng', None)
 
                 if rodie_lat is not None and rodie_lng is not None:
+                    dist = calculate_distance_km(float(lat), float(lng), float(rodie_lat), float(rodie_lng)) if lat and lng else None
+                    if dist is not None and dist > 15:
+                        continue
                     results.append({
                         'rodie_id': u.id,
                         'username': getattr(u, 'username', None),
-                        'distance_meters': None,
+                        'distance_km': round(dist, 1) if dist is not None else None,
                         'eta_seconds': None,
                         'lat': float(rodie_lat),
                         'lng': float(rodie_lng),
