@@ -612,8 +612,13 @@ class ArrivedRequestView(APIView):
                     f'request_{req.id}', 
                     {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
                 )
-        except Exception:
-            pass
+                # Also send to rider's personal channel (critical — rider may not be in request group)
+                async_to_sync(channel_layer.group_send)(
+                    f'rider_{req.rider_id}',
+                    {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
+                )
+        except Exception as e:
+            print(f"⚠️ Error broadcasting arrived: {e}")
             
         return Response({'detail': 'Marked as arrived'})
 
@@ -648,8 +653,13 @@ class EnrouteRequestView(APIView):
                     f'request_{req.id}', 
                     {'type': 'request_enroute', 'request': data}
                 )
-        except Exception:
-            pass
+                # Also send to rider's personal channel
+                async_to_sync(channel_layer.group_send)(
+                    f'rider_{req.rider_id}',
+                    {'type': 'request_enroute', 'request': data}
+                )
+        except Exception as e:
+            print(f"⚠️ Error broadcasting en-route: {e}")
         return Response({'detail': 'Marked en-route'})
 
 
@@ -679,8 +689,13 @@ class StartRequestView(APIView):
                     f'request_{req.id}', 
                     {'type': 'request_started', 'status': 'STARTED', 'request': data}
                 )
-        except Exception:
-            pass
+                # Also send to rider's personal channel
+                async_to_sync(channel_layer.group_send)(
+                    f'rider_{req.rider_id}',
+                    {'type': 'request_started', 'status': 'STARTED', 'request': data}
+                )
+        except Exception as e:
+            print(f"⚠️ Error broadcasting started: {e}")
         return Response({'detail': 'Service started'})
 
 
@@ -736,8 +751,13 @@ class CompleteRequestView(APIView):
                     f'request_{req.id}', 
                     {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
                 )
+                # Also send to rider's personal channel
+                async_to_sync(channel_layer.group_send)(
+                    f'rider_{req.rider_id}',
+                    {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
+                )
         except Exception as e:
-            print(f"\u26a0\ufe0f Error broadcasting completion: {e}")
+            print(f"⚠️ Error broadcasting completion: {e}")
 
         # Fee charging is handled by post_save signal in models.py
         # no need for redundant blocking call here

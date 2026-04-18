@@ -765,14 +765,20 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             elif msg_type == 'CHAT':
                 request_id = content.get('request_id')
                 text = content.get('text')
+                print(f"💬 [RiderConsumer] CHAT received: request_id={request_id}, text={text!r}, user={user.id}")
                 if request_id and text:
-                    user = self.scope['user']
                     sender_name = user.username
-                    await database_sync_to_async(ChatMessage.objects.create)(
-                        service_request_id=request_id,
-                        sender=user,
-                        text=text
-                    )
+                    try:
+                        await database_sync_to_async(ChatMessage.objects.create)(
+                            service_request_id=request_id,
+                            sender=user,
+                            text=text
+                        )
+                        print(f"💬 [RiderConsumer] ChatMessage saved to DB for request {request_id}")
+                    except Exception as db_err:
+                        print(f"❌ [RiderConsumer] ChatMessage DB create failed: {db_err}")
+                        import logging; logging.exception("ChatMessage create error")
+                        # Still try to broadcast even if DB save fails
                     now_iso = timezone.now().isoformat()
                     # Broadcast to the request room
                     await self.channel_layer.group_send(
@@ -789,6 +795,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     )
                     # Also send notification to the roadie's personal channel
                     rodie_id = await self._get_rodie_id_for_request(request_id)
+                    print(f"💬 [RiderConsumer] Sending chat notification to rodie_{rodie_id}")
                     if rodie_id:
                         await self.channel_layer.group_send(
                             f"rodie_{rodie_id}",
@@ -802,6 +809,11 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                                 'created_at': now_iso,
                             }
                         )
+                        print(f"✅ [RiderConsumer] Chat broadcast complete for request {request_id}")
+                    else:
+                        print(f"⚠️ [RiderConsumer] No rodie_id found for request {request_id} — chat notification skipped")
+                else:
+                    print(f"⚠️ [RiderConsumer] CHAT skipped — request_id={request_id}, text={text!r}")
             elif msg_type == 'PING':
                 # Handle keep-alive ping from client
                 timestamp = content.get('timestamp')
