@@ -132,6 +132,29 @@ class NearbyRodieListView(APIView):
         return Response(results)
 
 
+class ActiveRequestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        # Find the most recent non-terminal request for this user
+        if user.role == 'RIDER':
+            req = ServiceRequest.objects.filter(
+                rider=user,
+                status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).order_by('-created_at').first()
+        else:
+            req = ServiceRequest.objects.filter(
+                rodie=user,
+                status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).order_by('-created_at').first()
+            
+        if req:
+            from .serializers import ServiceRequestSerializer
+            return Response(ServiceRequestSerializer(req).data)
+        return Response({'detail': 'No active request found'}, status=status.HTTP_404_NOT_FOUND)
+
+
 class CreateServiceRequestView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ServiceRequestCreateSerializer
