@@ -460,6 +460,9 @@ class CancelRequestView(APIView):
                 pass
 
         if user.role == 'RIDER' and req.rider_id == user.id:
+            if req.status == 'CANCELLED':
+                return Response({'detail': 'Request is already cancelled'}, status=status.HTTP_200_OK)
+                
             # Rider can cancel if request has not started yet
             if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
                 req.status = 'CANCELLED'
@@ -489,7 +492,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         'role_RODIE',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Service Request #{req.id} has been cancelled."
@@ -500,8 +503,9 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'request_{req.id}',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
+                            "request_id": req.id,
                             "message": "The Rider has cancelled this request.",
                             "reason": cancellation_reason.reason
                         }
@@ -512,8 +516,9 @@ class CancelRequestView(APIView):
                         async_to_sync(channel_layer.group_send)(
                             f'rodie_{req.rodie.id}',
                             {
-                                "type": "REQUEST_CANCELLED",
+                                "type": "request_cancelled",
                                 "status": "CANCELLED",
+                                "request_id": req.id,
                                 "message": "The Rider has cancelled this request.",
                                 "reason": cancellation_reason.reason
                             }
@@ -531,6 +536,9 @@ class CancelRequestView(APIView):
 
         # Rodie can cancel if request is accepted or en_route
         if user.role == 'RODIE' and req.rodie_id == user.id:
+            if req.status == 'CANCELLED':
+                return Response({'detail': 'This request was already cancelled by the rider.'}, status=status.HTTP_400_BAD_REQUEST)
+                
             if req.status in ['ACCEPTED', 'EN_ROUTE']:
                 # Calculate distance for record keeping if location is provided
                 dist_km = None
@@ -564,7 +572,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'rider_{req.rider.id}',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Roadie has cancelled request #{req.id}",
