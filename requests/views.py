@@ -132,29 +132,6 @@ class NearbyRodieListView(APIView):
         return Response(results)
 
 
-class ActiveRequestView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        user = request.user
-        # Find the most recent non-terminal request for this user
-        if user.role == 'RIDER':
-            req = ServiceRequest.objects.filter(
-                rider=user,
-                status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
-            ).order_by('-created_at').first()
-        else:
-            req = ServiceRequest.objects.filter(
-                rodie=user,
-                status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
-            ).order_by('-created_at').first()
-            
-        if req:
-            from .serializers import ServiceRequestSerializer
-            return Response(ServiceRequestSerializer(req).data)
-        return Response({'detail': 'No active request found'}, status=status.HTTP_404_NOT_FOUND)
-
-
 class CreateServiceRequestView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ServiceRequestCreateSerializer
@@ -483,14 +460,10 @@ class CancelRequestView(APIView):
                 pass
 
         if user.role == 'RIDER' and req.rider_id == user.id:
-            if req.status == 'CANCELLED':
-                return Response({'detail': 'Request is already cancelled'}, status=status.HTTP_200_OK)
-                
+            # Rider can cancel if request has not started yet
             if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
-                print(f"DEBUG: Rider cancelling request {req.id}. Current status: {req.status}")
                 req.status = 'CANCELLED'
                 req.save()
-                print(f"DEBUG: Request {req.id} saved as CANCELLED.")
                 
                 # Create cancellation record
                 RequestCancellation.objects.create(
@@ -516,7 +489,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         'role_RODIE',
                         {
-                            "type": "request_cancelled",
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Service Request #{req.id} has been cancelled."
@@ -527,9 +500,8 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'request_{req.id}',
                         {
-                            "type": "request_cancelled",
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
-                            "request_id": req.id,
                             "message": "The Rider has cancelled this request.",
                             "reason": cancellation_reason.reason
                         }
@@ -540,9 +512,8 @@ class CancelRequestView(APIView):
                         async_to_sync(channel_layer.group_send)(
                             f'rodie_{req.rodie.id}',
                             {
-                                "type": "request_cancelled",
+                                "type": "REQUEST_CANCELLED",
                                 "status": "CANCELLED",
-                                "request_id": req.id,
                                 "message": "The Rider has cancelled this request.",
                                 "reason": cancellation_reason.reason
                             }
@@ -560,11 +531,7 @@ class CancelRequestView(APIView):
 
         # Rodie can cancel if request is accepted or en_route
         if user.role == 'RODIE' and req.rodie_id == user.id:
-            if req.status == 'CANCELLED':
-                return Response({'detail': 'This request was already cancelled by the rider.'}, status=status.HTTP_400_BAD_REQUEST)
-                
             if req.status in ['ACCEPTED', 'EN_ROUTE']:
-                print(f"DEBUG: Roadie initiating cancellation for {req.id}. Current: {req.status}")
                 # Calculate distance for record keeping if location is provided
                 dist_km = None
                 if current_lat and current_lng:
@@ -575,7 +542,6 @@ class CancelRequestView(APIView):
                 
                 req.status = 'CANCELLED'
                 req.save()
-                print(f"DEBUG: Request {req.id} saved as CANCELLED by Roadie.")
                 
                 # Create cancellation record
                 RequestCancellation.objects.create(
@@ -598,7 +564,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'rider_{req.rider.id}',
                         {
-                            "type": "request_cancelled",
+                            "type": "REQUEST_CANCELLED",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Roadie has cancelled request #{req.id}",
