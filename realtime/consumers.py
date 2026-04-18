@@ -901,23 +901,6 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def account_unapproved(self, event):
         await self.send_json({"type": "account.unapproved", "data": event.get("data")})
 
-    async def request_accepted(self, event):
-        """Handle request acceptance by roadie"""
-        await self.send_json({
-            "type": "REQUEST_UPDATE",
-            "status": "ACCEPTED",
-            "request": event.get("request")
-        })
-
-    async def request_enroute(self, event):
-        await self.send_json({"type": "REQUEST_UPDATE", "status": "EN_ROUTE", "request": event.get("request")})
-
-    async def request_arrived(self, event):
-        await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
-
-    async def request_started(self, event):
-        await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
-
     async def request_completed(self, event):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
 
