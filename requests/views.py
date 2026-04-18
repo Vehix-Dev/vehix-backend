@@ -489,7 +489,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         'role_RODIE',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Service Request #{req.id} has been cancelled."
@@ -500,7 +500,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'request_{req.id}',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
                             "message": "The Rider has cancelled this request.",
                             "reason": cancellation_reason.reason
@@ -512,7 +512,7 @@ class CancelRequestView(APIView):
                         async_to_sync(channel_layer.group_send)(
                             f'rodie_{req.rodie.id}',
                             {
-                                "type": "REQUEST_CANCELLED",
+                                "type": "request_cancelled",
                                 "status": "CANCELLED",
                                 "message": "The Rider has cancelled this request.",
                                 "reason": cancellation_reason.reason
@@ -564,7 +564,7 @@ class CancelRequestView(APIView):
                     async_to_sync(channel_layer.group_send)(
                         f'rider_{req.rider.id}',
                         {
-                            "type": "REQUEST_CANCELLED",
+                            "type": "request_cancelled",
                             "status": "CANCELLED",
                             "request_id": req.id,
                             "message": f"Roadie has cancelled request #{req.id}",

@@ -200,7 +200,10 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             message['request_id'] = req_id
             message['service_request'] = req_id
         
-        await self.send_json({"type": "CHAT_MESSAGE", "message": message})
+        await self.send_json({
+            "type": "CHAT_MESSAGE",
+            **message
+        })
 
     async def chat_notification(self, event):
         data = event.get('message', event)
@@ -212,8 +215,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             "type": "CHAT_NOTIFICATION",
             "request_id": req_id,
-            "message": data.get('message') or data.get('text', "New message"),
-            "sender_username": data.get('sender_username') or data.get('sender', {}).get('username', "Partner")
+            "text": data.get('message') or data.get('text', "New message"),
+            "sender_name": data.get('sender_username') or data.get('sender', {}).get('username', "Partner"),
+            **{k: v for k, v in data.items() if k not in ['type', 'message', 'text', 'sender_username']}
         })
 
     async def receive_json(self, content):
@@ -440,14 +444,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     # RIDER SIDE: CHAT NOTIFICATION HANDLER
     async def chat_notification(self, event):
         """Forward chat notification — the app ignores it if chat is already open"""
+        # Flatten for consistency
+        data = event.get('message', event)
+        if 'type' in data:
+            data = {k: v for k, v in data.items() if k != 'type'}
+            
         await self.send_json({
             'type': 'CHAT_NOTIFICATION',
-            'request_id': event.get('request_id') or event.get('service_request'),
-            'sender_id': event.get('sender_id'),
-            'sender_role': event.get('sender_role'),
-            'sender_name': event.get('sender_name'),
-            'text': event.get('text'),
-            'created_at': event.get('created_at'),
+            **data
         })
 
     async def request_accepted(self, event):
@@ -915,6 +919,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({
             "type": "REQUEST_CANCELLED",
             "request_id": event.get("request_id"),
+            "message": event.get("message"),
             "status": "CANCELLED"
         })
 
