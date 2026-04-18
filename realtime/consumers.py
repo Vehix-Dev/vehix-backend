@@ -95,6 +95,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                 await self.close()
                 return
 
+            # ACCEPT immediately to allow group operations
+            await self.accept()
+
             self.group_name = f"rodie_{user.id}"
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.channel_layer.group_add(f'role_{user.role}', self.channel_name)
@@ -130,7 +133,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             # Mark as alive immediately upon connection (10-minute safety window)
             await database_sync_to_async(cache.set)(f"rodie_heartbeat:{user.id}", True, timeout=600)
             print(f"💓 [Heartbeat] Initial set on CONNECT for user {user.id}")
-            await self.accept()
+            
             print(f"✅ [RodieConsumer] Connected successfully for user {user.id}")
             # Check for active offer if reconnected during dispatch
             try:
@@ -384,9 +387,13 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             from django.core.cache import cache
             # Get all online riders
             from users.models import RiderAvailabilityLog
-            recent_riders = RiderAvailabilityLog.objects.filter(
-                went_offline_at__isnull=True
-            ).select_related('user').filter(user__role='RIDER')
+            
+            def get_recent_riders():
+                return list(RiderAvailabilityLog.objects.filter(
+                    went_offline_at__isnull=True
+                ).select_related('user').filter(user__role='RIDER'))
+            
+            recent_riders = await database_sync_to_async(get_recent_riders)()
             
             for rider_log in recent_riders:
                 rider_id = rider_log.user.id
@@ -584,6 +591,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                 await self.close()
                 return
 
+            # ACCEPT immediately
+            await self.accept()
+
             await self._log_online(user)
             await self.channel_layer.group_send(
                 "admin_monitoring",
@@ -624,7 +634,6 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             except Exception as e:
                 print(f"⚠️ [RiderConsumer] Error auto-rejoining active request: {e}")
 
-            await self.accept()
             print(f"✅ [RiderConsumer] Connected successfully for user {user.id}")
             print(f"✅ [RiderConsumer] Joined groups: {self.group_name}, role_{user.role}, notifications")
             
