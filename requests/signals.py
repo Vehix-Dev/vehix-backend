@@ -9,41 +9,28 @@ from .models import ServiceRequest
 def broadcast_request_update(sender, instance, created, **kwargs):
     """
     Triggers whenever a ServiceRequest is saved (created or updated).
-    Broadcasts the update to:
-    1. New request: all rodies that offer the requested service + are online + are nearby
-    2. Assigned rodie: request updates
-    3. Rider: request updates
-    4. Admin: monitoring updates
+    Only broadcasts for non-terminal statuses — the views handle
+    CANCELLED / COMPLETED / EXPIRED notifications explicitly to avoid
+    duplicate or ghost messages.
     """
+    # Skip terminal statuses — views send targeted notifications for these
+    if instance.status in ('CANCELLED', 'COMPLETED', 'EXPIRED'):
+        print(f" SIGNAL SKIPPED: Request {instance.id} status={instance.status} (terminal — views handle this)")
+        return
+
     channel_layer = get_channel_layer()
     if not channel_layer:
         return
 
     from requests.serializers import ServiceRequestSerializer
-    from requests.services import find_nearby_rodies
 
     data = ServiceRequestSerializer(instance).data
 
-    print(f"\n🔔 SIGNAL FIRED: Request {instance.id} created={created}, status={instance.status}, rodie_id={instance.rodie_id}")
+    print(f"\n SIGNAL FIRED: Request {instance.id} created={created}, status={instance.status}, rodie_id={instance.rodie_id}")
 
-    # If request is newly created and REQUESTED, find matching rodies and send offers
-    if created and instance.status == 'REQUESTED':
-        # DISABLED: Let notify_rodies handle request sending with proper filtering
-        # The signal was sending requests without wallet checks and causing duplicates
-        print(f"🔍 Finding nearby rodies for service: {instance.service_type.name}")
-        nearby_rodies = find_nearby_rodies(
-            instance.service_type,
-            float(instance.rider_lat),
-            float(instance.rider_lng)
-        )
-        print(f"📡 Found {len(nearby_rodies)} matching rodies (notify_rodies will handle filtering)")
-        
-        # DON'T send here - notify_rodies in services.py handles wallet filtering and proper matching
-        print(f"✅ Request broadcasting delegated to notify_rodies with wallet filtering")
-    
     # If request is assigned to a specific rodie, send update
     if instance.rodie_id:
-        print(f"✅ Sending update to assigned rodie {instance.rodie_id}")
+        print(f" Sending update to assigned rodie {instance.rodie_id}")
         async_to_sync(channel_layer.group_send)(
             f"rodie_{instance.rodie_id}", 
             {
@@ -70,4 +57,4 @@ def broadcast_request_update(sender, instance, created, **kwargs):
             "data": data
         }
     )
-    print(f"✨ Signal complete for request {instance.id}\n")
+    print(f" Signal complete for request {instance.id}\n")
