@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback, PasswordResetRequestView, PasswordResetConfirmView
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback, PasswordResetRequestView, PasswordResetConfirmView, AccountDeletionEligibilityView, RequestAccountDeletionView
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -58,6 +58,8 @@ urlpatterns = [
     path('profile/', UserProfileUpdateView.as_view(), name='user_profile_update'),
     path('profile/photo/', UserProfilePhotoUploadView.as_view(), name='user_profile_photo_upload'),
     path('profile/change-password/', UserProfilePasswordChangeView.as_view(), name='user_profile_password_change'),
+    path('profile/deletion-eligibility/', AccountDeletionEligibilityView.as_view(), name='deletion_eligibility'),
+    path('profile/request-deletion/', RequestAccountDeletionView.as_view(), name='request_deletion'),
     path('wallet/', MyWalletView.as_view(), name='my_wallet'),
     path('wallet/deposit/', DepositView.as_view(), name='wallet_deposit'),
     path('wallet/withdraw/', WithdrawView.as_view(), name='wallet_withdraw'),
@@ -80,6 +82,7 @@ urlpatterns = [
     path('auth/admin/users/', AdminListCreateView.as_view(), name='admin_users_list_create'),
     path('auth/admin/users/<int:pk>/', AdminRetrieveUpdateDestroyView.as_view(), name='admin_users_rud'),
     path('auth/admin/users/deleted/', AdminDeletedUsersView.as_view(), name='admin_users_deleted'),
+    path('auth/admin/users/pending-deletions/', AdminPendingDeletionListView.as_view(), name='admin_users_pending_deletion'),
     path('auth/admin/users/<int:pk>/restore/', AdminRestoreUserView.as_view(), name='admin_user_restore'),
     path('auth/admin/services/', ServiceTypeListCreateView.as_view(), name='admin_services_list_create'),
     path('auth/admin/services/<int:pk>/', ServiceTypeRetrieveUpdateDestroyView.as_view(), name='admin_services_rud'),
