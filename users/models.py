@@ -114,6 +114,20 @@ class User(AbstractUser):
         help_text="Firebase Cloud Messaging token for push notifications"
     )
 
+    DELETION_STATUS_CHOICES = (
+        ('PENDING', 'Pending Deletion'),
+    )
+
+    deletion_status = models.CharField(
+        max_length=20, 
+        choices=DELETION_STATUS_CHOICES, 
+        null=True, 
+        blank=True,
+        help_text="Tracks account deletion requests"
+    )
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    deletion_reason = models.TextField(null=True, blank=True)
+
     class Meta:
         constraints = [
             # Email + role must be unique (same email can exist for RIDER and RODIE)

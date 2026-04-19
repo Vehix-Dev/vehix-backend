@@ -160,6 +160,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id_card_front', 'id_card_back', 'license_photo', 'vehicle_photo',
             'rating', 'total_assists', 'total_rides', 'total_jobs',
             'trial_days_left', 'trial_end_date', 'max_negative_balance',
+            'deletion_status', 'deletion_requested_at', 'deletion_reason',
         ]
         read_only_fields = (
             'id', 'external_id', 'username', 'first_name', 'last_name', 

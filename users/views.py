@@ -798,6 +798,110 @@ class UserProfilePasswordChangeView(APIView):
             'message': 'Password updated successfully'
         })
 
+class AccountDeletionEligibilityView(APIView):
+    """
+    Check if the authenticated user is eligible for account deletion.
+    Returns a list of reasons if ineligible.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        reasons = []
+        
+        from requests.models import ServiceRequest, Dispute
+        from decimal import Decimal
+        from django.utils import timezone
+        
+        # 1. Check for active request/job
+        if user.role == 'RIDER':
+            active_requests = ServiceRequest.objects.filter(
+                rider=user,
+                status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).exists()
+        else:
+            active_requests = ServiceRequest.objects.filter(
+                rodie=user,
+                status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
+            ).exists()
+            
+        if active_requests:
+            reasons.append("You have an active request or job in progress.")
+            
+        # 2. Check for pending transaction
+        pending_tx = Payment.objects.filter(user=user, status='PENDING').exists()
+        if pending_tx:
+            reasons.append("You have a pending payment or withdrawal transaction.")
+            
+        # 3. Check wallet balance
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+        if wallet.balance > 0:
+            reasons.append(f"Your wallet balance is UGX {wallet.balance}. It must be zero to delete your account.")
+        elif wallet.balance < 0:
+            reasons.append(f"You have a negative balance of UGX {wallet.balance}. Please clear your debt before deletion.")
+            
+        # 4. Check for unpaid service fees (for Roadies)
+        if user.role in ['RODIE', 'MECHANIC']:
+            unpaid_fees = ServiceRequest.objects.filter(
+                rodie=user,
+                status='COMPLETED',
+                fee_charged=False
+            ).exists()
+            if unpaid_fees:
+                reasons.append("You have unpaid service fees for completed jobs.")
+                
+        # 5. Check for unresolved disputes
+        unresolved_disputes = Dispute.objects.filter(
+            models.Q(raised_by=user) | models.Q(request__rider=user) | models.Q(request__rodie=user),
+            status='PENDING'
+        ).distinct().exists()
+        if unresolved_disputes:
+            reasons.append("You have one or more unresolved disputes.")
+            
+        return Response({
+            'eligible': len(reasons) == 0,
+            'reasons': reasons
+        })
+
+class RequestAccountDeletionView(APIView):
+    """
+    Submit a request for account deletion.
+    User must be eligible.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        reason_text = request.data.get('reason', '')
+        
+        # Re-check eligibility server-side for safety
+        eligibility_view = AccountDeletionEligibilityView()
+        eligibility_response = eligibility_view.get(request)
+        if not eligibility_response.data.get('eligible'):
+            return Response({
+                'success': False,
+                'message': 'Account is not eligible for deletion.',
+                'reasons': eligibility_response.data.get('reasons')
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Set deletion status
+        user.deletion_status = 'PENDING'
+        user.deletion_requested_at = timezone.now()
+        user.deletion_reason = reason_text
+        user.is_active = False  # Deactivate immediately
+        user.save(update_fields=['deletion_status', 'deletion_requested_at', 'deletion_reason', 'is_active'])
+        
+        # Log out effectively by clearing any session or token related data if needed
+        # In JWT world, we can't easily invalidate tokens without a blacklist, 
+        # but we can clear the current_login_id to force logout if our auth uses it.
+        user.current_login_id = None
+        user.save(update_fields=['current_login_id'])
+        
+        return Response({
+            'success': True,
+            'message': 'Account deletion request submitted. You have been logged out.'
+        })
+
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from .models import Notification

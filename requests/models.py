@@ -277,3 +277,34 @@ def charge_service_fee(sender, instance, created, **kwargs):
             # Fallback to thread if celery is not available
             import threading
             threading.Thread(target=charge_fee_for_request, args=(instance.id,), daemon=True).start()
+
+
+class Dispute(models.Model):
+    """Track disputes raised for service requests"""
+    
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('RESOLVED', 'Resolved'),
+    )
+    
+    request = models.ForeignKey(
+        ServiceRequest, 
+        on_delete=models.CASCADE, 
+        related_name='disputes'
+    )
+    raised_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='disputes_raised'
+    )
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='PENDING'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Dispute on Request #{self.request.id} by {self.raised_by.username}"

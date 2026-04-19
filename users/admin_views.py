@@ -388,11 +388,22 @@ class RoadieSummaryView(APIView):
 
 
 class AdminDeletedUsersView(generics.ListAPIView):
-    permission_classes = [permissions.AllowAny ]
+    permission_classes = [permissions.AllowAny]
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
+
+
+class AdminPendingDeletionListView(generics.ListAPIView):
+    """View to list users who have requested account deletion (deletion_status='PENDING')."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = AdminUserSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['first_name', 'last_name', 'email', 'phone', 'username']
+
+    def get_queryset(self):
+        return User.objects.filter(deletion_status='PENDING').order_by('-deletion_requested_at')
 
 
 class AdminRestoreUserView(APIView):
