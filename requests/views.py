@@ -481,6 +481,7 @@ class CancelRequestView(APIView):
                     # Unlock the rodie if they had already accepted
                     if req.rodie:
                         cache.delete(f"rodie_locked:{req.rodie.id}")
+                        cache.delete(f"active_offer:{req.rodie.id}")
                     
                     channel_layer = get_channel_layer()
                     cancellation_payload = {
@@ -549,8 +550,9 @@ class CancelRequestView(APIView):
                 try:
                     cache.set(f"request_status:{req.id}", 'CANCELLED', timeout=300)
                     
-                    # Unlock the rodie
+                    # Unlock the rodie and clear stale offer
                     cache.delete(f"rodie_locked:{user.id}")
+                    cache.delete(f"active_offer:{user.id}")
                     
                     # Broadcast cancellation to rider's personal channel
                     channel_layer = get_channel_layer()

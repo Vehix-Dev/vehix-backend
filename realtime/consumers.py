@@ -141,10 +141,18 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             try:
                 offer = cache.get(f"active_offer:{user.id}")
                 if offer:
-                    await self.send_json({
-                        "type": "OFFER_REQUEST",
-                        "request": offer
-                    })
+                    # Validate the request is still REQUESTED before re-sending stale offers
+                    offer_status = cache.get(f"request_status:{offer.get('id')}")
+                    if offer_status == 'REQUESTED':
+                        await self.send_json({
+                            "type": "OFFER_REQUEST",
+                            "request": offer
+                        })
+                        print(f"📡 [RodieConsumer] Re-sent active offer for request {offer.get('id')}")
+                    else:
+                        # Stale offer — clean up
+                        cache.delete(f"active_offer:{user.id}")
+                        print(f"🧹 [RodieConsumer] Cleared stale offer for request {offer.get('id')} (status={offer_status})")
             except Exception:
                 pass
         except Exception as e:

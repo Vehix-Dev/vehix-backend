@@ -185,6 +185,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     status = cache.get(f"request_status:{request_id}")
                     if status == 'ACCEPTED':
                         cache.delete(f"rodie_locked:{rodie_id}")
+                        cache.delete(f"active_offer:{rodie_id}")
                         return f"Accepted by {rodie_id}"
                     if status == 'DECLINED':
                         cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
