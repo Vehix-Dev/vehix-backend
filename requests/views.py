@@ -360,7 +360,7 @@ class AcceptRequestView(APIView):
             except Exception as e:
                 print(f"DEBUG: Acceptance notification error: {e}")
 
-            return Response({'detail': 'Request accepted', 'request_id': req.id})
+            return Response({'detail': 'Request accepted', 'request_id': req.id, 'request': resp_data})
 
 
 class DeclineRequestView(APIView):
