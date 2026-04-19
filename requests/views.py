@@ -595,6 +595,7 @@ class ArrivedRequestView(APIView):
         req.status = 'ARRIVED'
         req.arrived_at = timezone.now()
         req.save()
+        print(f"📍 [ArrivedView] Request {req.id}: status set to ARRIVED, rider_id={req.rider_id}")
         
         try:
             cache.set(f"request_status:{req.id}", 'ARRIVED', timeout=3600)
@@ -607,6 +608,7 @@ class ArrivedRequestView(APIView):
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
+                print(f"📡 [ArrivedView] Broadcasting ARRIVED to request_{req.id} and rider_{req.rider_id}")
                 # Send to request group (both rider and roadie are members)
                 async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
@@ -617,8 +619,10 @@ class ArrivedRequestView(APIView):
                     f'rider_{req.rider_id}',
                     {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
                 )
+                print(f"✅ [ArrivedView] ARRIVED broadcast complete for request {req.id}")
         except Exception as e:
-            print(f"⚠️ Error broadcasting arrived: {e}")
+            print(f"❌ [ArrivedView] Error broadcasting arrived: {e}")
+            import traceback; traceback.print_exc()
             
         return Response({'detail': 'Marked as arrived'})
 
@@ -638,6 +642,7 @@ class EnrouteRequestView(APIView):
         req.status = 'EN_ROUTE'
         req.en_route_at = timezone.now()
         req.save()
+        print(f"📍 [EnrouteView] Request {req.id}: status set to EN_ROUTE, rider_id={req.rider_id}")
         try:
             cache.set(f"request_status:{req.id}", 'EN_ROUTE', timeout=3600)
         except Exception:
@@ -648,6 +653,7 @@ class EnrouteRequestView(APIView):
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
+                print(f"📡 [EnrouteView] Broadcasting EN_ROUTE to request_{req.id} and rider_{req.rider_id}")
                 # Send to request group (both rider and roadie are members)
                 async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
@@ -658,8 +664,10 @@ class EnrouteRequestView(APIView):
                     f'rider_{req.rider_id}',
                     {'type': 'request_enroute', 'request': data}
                 )
+                print(f"✅ [EnrouteView] EN_ROUTE broadcast complete for request {req.id}")
         except Exception as e:
-            print(f"⚠️ Error broadcasting en-route: {e}")
+            print(f"❌ [EnrouteView] Error broadcasting en-route: {e}")
+            import traceback; traceback.print_exc()
         return Response({'detail': 'Marked en-route'})
 
 
@@ -678,12 +686,14 @@ class StartRequestView(APIView):
         req.status = 'STARTED'
         req.started_at = timezone.now()
         req.save()
+        print(f"📍 [StartView] Request {req.id}: status set to STARTED, rider_id={req.rider_id}")
         try:
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
+                print(f"📡 [StartView] Broadcasting STARTED to request_{req.id} and rider_{req.rider_id}")
                 # Send to request group (both rider and roadie are members)
                 async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
@@ -694,8 +704,10 @@ class StartRequestView(APIView):
                     f'rider_{req.rider_id}',
                     {'type': 'request_started', 'status': 'STARTED', 'request': data}
                 )
+                print(f"✅ [StartView] STARTED broadcast complete for request {req.id}")
         except Exception as e:
-            print(f"⚠️ Error broadcasting started: {e}")
+            print(f"❌ [StartView] Error broadcasting started: {e}")
+            import traceback; traceback.print_exc()
         return Response({'detail': 'Service started'})
 
 
@@ -746,6 +758,7 @@ class CompleteRequestView(APIView):
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
+                print(f"📡 [CompleteView] Broadcasting COMPLETED to request_{req.id} and rider_{req.rider_id}")
                 # Send to request group (both rider and roadie are members)
                 async_to_sync(channel_layer.group_send)(
                     f'request_{req.id}', 
@@ -756,8 +769,10 @@ class CompleteRequestView(APIView):
                     f'rider_{req.rider_id}',
                     {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
                 )
+                print(f"✅ [CompleteView] COMPLETED broadcast complete for request {req.id}")
         except Exception as e:
-            print(f"⚠️ Error broadcasting completion: {e}")
+            print(f"❌ [CompleteView] Error broadcasting completion: {e}")
+            import traceback; traceback.print_exc()
 
         # Fee charging is handled by post_save signal in models.py
         # no need for redundant blocking call here
