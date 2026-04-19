@@ -202,6 +202,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
 
     async def chat_message(self, event):
         """Forward chat message to roadie — flat format matching Flutter app expectations"""
+        print(f"\U0001f4e8 [RodieConsumer] chat_message handler fired for user {self.scope['user'].id}, sender_role={event.get('sender_role')}, text={event.get('text')!r}")
         await self.send_json({
             'type': 'CHAT_MESSAGE',
             'request_id': event.get('request_id') or event.get('service_request'),
@@ -215,7 +216,9 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
     async def chat_notification(self, event):
         """Forward chat notification — skip if sender is this user (prevents echo)"""
         sender_id = event.get('sender_id')
+        print(f"\U0001f4e8 [RodieConsumer] chat_notification handler fired for user {self.scope['user'].id}, sender_id={sender_id}, sender_role={event.get('sender_role')}")
         if sender_id and str(sender_id) == str(self.scope['user'].id):
+            print(f"\u26a0\ufe0f [RodieConsumer] chat_notification SKIPPED — sender is self")
             return
 
         await self.send_json({
@@ -853,6 +856,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
 
     async def chat_message(self, event):
         """Forward chat message to rider — flat format matching Flutter app expectations"""
+        print(f"\U0001f4e8 [RiderConsumer] chat_message handler fired for user {self.scope['user'].id}, sender_role={event.get('sender_role')}, text={event.get('text')!r}")
         await self.send_json({
             'type': 'CHAT_MESSAGE',
             'request_id': event.get('request_id') or event.get('service_request'),
@@ -866,7 +870,9 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
     async def chat_notification(self, event):
         """Forward chat notification — skip if sender is this user (prevents echo)"""
         sender_id = event.get('sender_id')
+        print(f"\U0001f4e8 [RiderConsumer] chat_notification handler fired for user {self.scope['user'].id}, sender_id={sender_id}, sender_role={event.get('sender_role')}")
         if sender_id and str(sender_id) == str(self.scope['user'].id):
+            print(f"\u26a0\ufe0f [RiderConsumer] chat_notification SKIPPED — sender is self (echo prevention)")
             return
 
         await self.send_json({
@@ -880,15 +886,19 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def request_accepted(self, event):
+        print(f"\U0001f4e8 [RiderConsumer] request_accepted handler fired for user {self.scope['user'].id}")
         await self.send_json({"type": "REQUEST_UPDATE", "status": "ACCEPTED", "request": event.get("request")})
 
     async def request_enroute(self, event):
+        print(f"\U0001f4e8 [RiderConsumer] request_enroute handler fired for user {self.scope['user'].id}")
         await self.send_json({"type": "REQUEST_UPDATE", "status": "EN_ROUTE", "request": event.get("request")})
 
     async def request_started(self, event):
+        print(f"\U0001f4e8 [RiderConsumer] request_started handler fired for user {self.scope['user'].id}")
         await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
 
     async def request_arrived(self, event):
+        print(f"\U0001f4e8 [RiderConsumer] request_arrived handler fired for user {self.scope['user'].id}")
         await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
 
     async def account_approved(self, event):
@@ -898,6 +908,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "account.unapproved", "data": event.get("data")})
 
     async def request_completed(self, event):
+        print(f"\U0001f4e8 [RiderConsumer] request_completed handler fired for user {self.scope['user'].id}")
         await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
 
     async def request_expired(self, event):
