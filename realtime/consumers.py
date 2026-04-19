@@ -186,6 +186,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             "request": event.get("request") or event.get("data")
         })
 
+    async def request_update(self, event):
+        """Handle request_update from post_save signal — forward to roadie app"""
+        await self.send_json({
+            "type": "REQUEST_UPDATE",
+            "request": event.get("request") or event.get("data"),
+            "status": event.get("status"),
+        })
+
     async def user_status(self, event):
         await self.send_json({
             "type": "USER_STATUS",
