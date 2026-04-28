@@ -63,6 +63,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         self.user.save(update_fields=['current_login_id'])
         print(f"DEBUG AUTH: Generated new login_id for {self.user.username}: {new_login_id}", flush=True)
         
+        # Broadcast session invalidation to any old active websockets
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                group_name = f"rider_{self.user.id}" if self.user.role == 'RIDER' else f"rodie_{self.user.id}"
+                async_to_sync(channel_layer.group_send)(
+                    group_name,
+                    {
+                        "type": "session_invalidated",
+                        "message": "You have been logged out because you logged in on another device."
+                    }
+                )
+        except Exception as e:
+            print(f"DEBUG AUTH: Could not send session_invalidated to old websocket: {e}", flush=True)
+        
         refresh = self.get_token(self.user)
         long_life = timedelta(days=365*50)
         refresh.set_exp(lifetime=long_life)

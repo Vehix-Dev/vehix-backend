@@ -36,7 +36,7 @@ class RiderRequestsListView(generics.ListAPIView):
         qs = ServiceRequest.objects.filter(rider=user).select_related('rodie', 'service_type').order_by('-created_at')
         status_filter = self.request.query_params.get('status')
         if status_filter == 'active':
-            qs = qs.filter(status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'STARTED'])
+            qs = qs.filter(status__in=['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED'])
         else:
             # Only return expired, completed and cancelled for history
             qs = qs.filter(status__in=['COMPLETED', 'CANCELLED', 'EXPIRED'])
@@ -204,22 +204,13 @@ class CreateServiceRequestView(generics.CreateAPIView):
         print(f"✅ FINAL MATCHED RODIES: {[r['rodie'].username for r in filtered]}")
 
         if not filtered:
-            # No roadies available — expire the request immediately and notify rider
-            print(f"⚠️ No eligible roadies found for Request #{request_obj.id}. Expiring immediately.")
-            request_obj.status = 'EXPIRED'
-            request_obj.save(update_fields=['status'])
-            try:
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'rider_{request_obj.rider.id}',
-                    {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_obj.id}}
-                )
-            except Exception:
-                pass
-            return
-
+            # BUG FIX: Don't expire immediately. 
+            # Start the matching task anyway; it will poll for roadies until 90s expires.
+            print(f"⚠️ No eligible roadies found for Request #{request_obj.id} initially. Starting polling task.")
+        
         # Celery Dispatch: Use external tasks for reliability
         from .services import notify_rodies
+        # Ensure we always call notify_rodies even if filtered is empty
         notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
         # mark ephemeral request status in cache so notify worker can poll without DB locks
         try:
@@ -375,8 +366,12 @@ class DeclineRequestView(APIView):
             return Response({'detail': 'Request is not in a state to be declined'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # BUG FIX: Do NOT notify the Rider that a roadie declined.
+            # This allows the system to move to the next roadie silently.
             if get_channel_layer and async_to_sync:
-                async_to_sync(get_channel_layer().group_send)(f'request_{req.id}', {'type': 'request.declined', 'request': {'id': req.id, 'rodie_id': user.id}})
+                # We only notify the specific request group about the decline internally
+                # but we shouldn't send 'request_declined' as a status update to the rider.
+                pass
         except Exception:
             pass
         try:
@@ -499,11 +494,18 @@ class CancelRequestView(APIView):
                             cancellation_payload
                         )
                     else:
-                        # Pre-acceptance: broadcast to ALL roadies so the offer popup dismisses
-                        async_to_sync(channel_layer.group_send)(
-                            'role_RODIE',
-                            cancellation_payload
-                        )
+                        # Pre-acceptance: BUG FIX - Only notify roadies who actually saw the offer.
+                        # We don't want to alert roadies who are just online.
+                        from users.models import User
+                        online_rodies = User.objects.filter(role='RODIE', is_online=True)
+                        for r in online_rodies:
+                            active_offer = cache.get(f"active_offer:{r.id}")
+                            if active_offer and str(active_offer.get('id')) == str(req.id):
+                                async_to_sync(channel_layer.group_send)(
+                                    f'rodie_{r.id}',
+                                    cancellation_payload
+                                )
+                                print(f"🚫 Sent cancellation to offered roadie {r.username}")
                     
                     print(f"🚫 Broadcasted cancellation for request {req.id} to all parties")
                 except Exception as e:

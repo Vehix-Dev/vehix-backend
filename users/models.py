@@ -188,7 +188,7 @@ class User(AbstractUser):
             if self.role == 'RIDER':
                 prefix = 'R'
             elif self.role == 'RODIE':
-                prefix = 'BS'
+                prefix = 'SP'
             elif self.role == 'MECHANIC':
                 prefix = 'IT'
             elif self.role == 'ADMIN':
@@ -314,16 +314,15 @@ class Referral(models.Model):
 
 class PlatformConfig(models.Model):
     """Singleton-like config to allow admin configuration via API.
-    Admins can set `max_negative_balance` and `service_fee`.
+    Admins can set `max_negative_balance`.
     """
     max_negative_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    service_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     trial_days = models.IntegerField(default=0, help_text="Free trial period in days from user registration")
     mechanic_transition_documents = models.JSONField(default=list, help_text="List of required documents for mechanic transition, e.g. ['ID', 'License', 'Certificate']")
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"PlatformConfig(max_neg={self.max_negative_balance}, fee={self.service_fee})"
+        return f"PlatformConfig(max_neg={self.max_negative_balance})"
 
 
 class Payment(models.Model):
