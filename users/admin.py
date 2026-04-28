@@ -188,7 +188,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(PlatformConfig)
 class PlatformConfigAdmin(admin.ModelAdmin):
-    list_display = ('max_negative_balance', 'service_fee', 'trial_days', 'updated_at')
+    list_display = ('max_negative_balance', 'trial_days', 'updated_at')
 
 
 @admin.register(Payment)

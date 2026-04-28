@@ -20,6 +20,9 @@ except Exception:
     async_to_sync = None
     get_channel_layer = None
 
+from django.utils import timezone
+from decimal import Decimal
+
 User = get_user_model()
 
 
@@ -152,9 +155,16 @@ class MyWalletView(APIView):
     def get(self, request):
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
         
-        # Get all payments and wallet transactions
+        # Get all payments
         payments = Payment.objects.filter(user=request.user).order_by('-created_at')
-        transactions = WalletTransaction.objects.filter(wallet=wallet).order_by('-created_at')
+        
+        # Get wallet transactions that are NOT redundant with payments
+        # (Deposits and Withdrawals are already represented by Payment objects)
+        from django.db.models import Q
+        transactions = WalletTransaction.objects.filter(wallet=wallet).exclude(
+            Q(reason__startswith='Deposit ') | 
+            Q(reason__startswith='Withdrawal request ')
+        ).order_by('-created_at')
         
         # Combine and serialize using the history serializer
         combined = list(payments) + list(transactions)
@@ -406,46 +416,66 @@ class RoadiePaymentsView(APIView):
         # Get wallet
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
 
-        # Get all payments
-        payments = Payment.objects.filter(user=request.user).order_by('-created_at')
+        # Get all payments - exclude completed deposits as they are redundant with WalletTransactions
+        # Keep all withdrawals so we can see their PENDING/COMPLETED status
+        payments_history = Payment.objects.filter(user=request.user).exclude(
+            transaction_type='DEPOSIT', status='COMPLETED'
+        ).order_by('-created_at')
 
-        # Get all wallet transactions
-        transactions = WalletTransaction.objects.filter(wallet=wallet).order_by('-created_at')
+        # Get wallet transactions - exclude those that already have a Payment record (withdrawals)
+        # to avoid double-counting in the history list.
+        transactions = WalletTransaction.objects.filter(wallet=wallet).exclude(
+            reason__icontains='Withdrawal request'
+        ).order_by('-created_at')
 
         # Combine and serialize
-        combined = list(payments) + list(transactions)
+        combined = list(payments_history) + list(transactions)
         combined.sort(key=lambda x: x.created_at, reverse=True)
 
         # Serialize transaction history
         history_serializer = TransactionHistorySerializer(combined, many=True)
 
         # Calculate summary stats
-        total_deposits = payments.filter(
-            transaction_type='DEPOSIT',
-            status='COMPLETED'
+        # Total earned includes all successful deposits
+        total_deposits = WalletTransaction.objects.filter(
+            wallet=wallet,
+            amount__gt=0
         ).aggregate(
             total=models.Sum('amount')
         )['total'] or 0
 
-        total_withdrawals = payments.filter(
-            transaction_type='WITHDRAWAL',
-            status='COMPLETED'
-        ).aggregate(
+        # Total withdrawn includes all withdrawals that have been deducted from balance (PENDING or COMPLETED)
+        total_withdrawals = Payment.objects.filter(
+            user=request.user,
+            transaction_type='WITHDRAWAL'
+        ).exclude(status='FAILED').exclude(status='CANCELLED').aggregate(
             total=models.Sum('amount')
         )['total'] or 0
 
-        pending_deposits = payments.filter(
+        pending_deposits = Payment.objects.filter(
+            user=request.user,
             transaction_type='DEPOSIT',
             status='PENDING'
-        ).aggregate(
-            total=models.Sum('amount')
-        )['total'] or 0
+        ).aggregate(total=models.Sum('amount'))['total'] or 0
 
+        pending_withdrawals = Payment.objects.filter(
+            user=request.user,
+            transaction_type='WITHDRAWAL',
+            status='PENDING'
+        ).aggregate(total=models.Sum('amount'))['total'] or 0
+        
+        combined = list(payments) + list(transactions)
+        combined.sort(key=lambda x: x.created_at, reverse=True)
+        
+        from .serializers import TransactionHistorySerializer
+        history_serializer = TransactionHistorySerializer(combined, many=True)
+        
         summary = {
             'current_balance': wallet.balance,
-            'total_earned': total_deposits,
+            'total_earned': total_deposits, # In context of Roadie, deposits are often income or balance topups
             'total_withdrawn': total_withdrawals,
             'pending_deposits': pending_deposits,
+            'pending_withdrawals': pending_withdrawals,
             'transaction_count': len(combined)
         }
 
@@ -587,7 +617,6 @@ class PesapalIPNView(APIView):
             return Response({'status': 'ignored', 'message': 'Missing parameters'}, status=status.HTTP_200_OK)
 
         from .pesapal import PesapalClient
-        from decimal import Decimal
         from django.db import transaction
 
         try:
@@ -810,8 +839,6 @@ class AccountDeletionEligibilityView(APIView):
         reasons = []
         
         from requests.models import ServiceRequest, Dispute
-        from decimal import Decimal
-        from django.utils import timezone
         
         # 1. Check for active request/job
         if user.role == 'RIDER':

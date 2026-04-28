@@ -90,41 +90,51 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
                 'distance': distance
             })
 
-    return sorted(eligible_rodies, key=lambda x: x['distance'])
-
-
-def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=10, expiry_seconds=90):
+    return sorted(eligible_rodies, key=lambdef _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=15, expiry_seconds=90):
     """Background thread: send offer to each rodie in order, wait `offer_seconds` for acceptance, expire after `expiry_seconds`."""
     channel_layer = get_channel_layer()
-    start = time.time()
+    start_time = time.time()
+    offered_rodie_ids = set()
 
-    for r in rodies:
-        # Check if request was cancelled before offering to next roadie
+    # Get service type for name
+    try:
+        service_type = ServiceType.objects.get(id=service_type_id)
+    except ServiceType.DoesNotExist:
+        return
+
+    while (time.time() - start_time) < expiry_seconds:
+        # 1. Check if request is still valid (not accepted or cancelled)
         try:
             status = cache.get(f"request_status:{request_id}")
-            if status == 'CANCELLED':
-                print(f"🚫 Request {request_id} was cancelled - stopping sequential offers before next roadie")
+            if status in ['ACCEPTED', 'CANCELLED', 'COMPLETED']:
+                print(f"🛑 Request {request_id} has status {status} - stopping search loop.")
                 return
         except Exception:
             pass
-            
-        if time.time() - start >= expiry_seconds:
-            try:
-                # Final DB check before expiring
-                req = ServiceRequest.objects.get(id=request_id)
-                if req.status == 'REQUESTED':
-                    req.status = 'EXPIRED'
-                    req.save()
-            except Exception:
-                pass
-            break
 
+        # 2. If we have no roadies to offer to, find more
+        if not rodies:
+            print(f"🔍 [Search Loop] No current roadies. Scanning for nearby roadies for Request #{request_id}...")
+            rodies = find_nearby_rodies(service_type, rider_lat, rider_lng)
+            # Filter out roadies we already offered to in this search session
+            rodies = [r for r in rodies if r['rodie'].id not in offered_rodie_ids]
+            
+            if not rodies:
+                # Still no roadies? Wait a bit and try again
+                print(f"⏳ [Search Loop] Still no roadies found. Sleeping 5s...")
+                time.sleep(5)
+                continue
+
+        # 3. Take the first roadie and offer the job
+        r = rodies.pop(0)
         rodie = r.get('rodie')
-        # Get the distance from find_nearby_rodies result
+        offered_rodie_ids.add(rodie.id)
+        
         distance_km = r.get('distance', 0)
         distance_m = distance_km * 1000
         
         # Try to get route info for ETA
+        duration_s = None
         loc = cache.get(f"rodie_loc:{rodie.id}")
         if loc:
             try:
@@ -132,42 +142,42 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                 if route_distance_m is not None:
                     distance_m = route_distance_m
             except Exception:
-                duration_s = None
-        else:
-            duration_s = None
-
-        req_obj = ServiceRequest.objects.get(id=request_id)
-        payload = {
-            "id": request_id, 
-            "service_id": service_type_id,
-            "service_type_name": ServiceType.objects.get(id=service_type_id).name,
-            "rider_lat": float(rider_lat),
-            "rider_lng": float(rider_lng),
-            "eta_seconds": duration_s,
-            "distance_meters": distance_m,
-            "distance_km": round((distance_m or 0) / 1000.0, 1),
-            "fee": 15000,  # Placeholder for now
-            "rider_username": req_obj.rider.username,
-            "rider_phone": req_obj.rider.phone,
-            "rider": {
-                "id": req_obj.rider.id,
-                "first_name": req_obj.rider.first_name,
-                "last_name": req_obj.rider.last_name,
-                "username": req_obj.rider.username,
-                "phone": req_obj.rider.phone,
-            }
-        }
+                pass
 
         try:
-            # Persistent offer for reconnection
+            req_obj = ServiceRequest.objects.get(id=request_id)
+            payload = {
+                "id": request_id, 
+                "service_id": service_type_id,
+                "service_type_name": service_type.name,
+                "rider_lat": float(rider_lat),
+                "rider_lng": float(rider_lng),
+                "eta_seconds": duration_s,
+                "distance_meters": distance_m,
+                "distance_km": round((distance_m or 0) / 1000.0, 1),
+                "fee": float(service_type.fixed_price),
+                "rider_username": req_obj.rider.username,
+                "rider_phone": req_obj.rider.phone,
+                "rider": {
+                    "id": req_obj.rider.id,
+                    "first_name": req_obj.rider.first_name,
+                    "last_name": req_obj.rider.last_name,
+                    "username": req_obj.rider.username,
+                    "phone": req_obj.rider.phone,
+                }
+            }
+
+            # Mark roadie as locked so they don't get other offers
+            cache.set(f"rodie_locked:{rodie.id}", True, timeout=offer_seconds + 2)
             cache.set(f"active_offer:{rodie.id}", payload, timeout=offer_seconds + 2)
             
+            print(f"📡 [Search Loop] Sending offer to {rodie.username} ({payload['distance_km']}km away)")
             async_to_sync(channel_layer.group_send)(
                 f"rodie_{rodie.id}",
                 {"type": "offer.request", "request": payload}
             )
 
-            # Notify Rider about the proximity of this specific roadie being offered
+            # Update Rider about proximity
             async_to_sync(channel_layer.group_send)(
                 f"request_{request_id}",
                 {
@@ -176,35 +186,29 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                     "eta_seconds": payload["eta_seconds"]
                 }
             )
-        except Exception:
-            pass
-        # Poll for acceptance or decline
-        accepted = False # Initialize accepted flag
-        start_time = time.time()
-        while time.time() - start_time < offer_seconds:
-            try:
+
+            # 4. Wait for acceptance/decline/timeout
+            wait_start = time.time()
+            while time.time() - wait_start < offer_seconds:
                 status = cache.get(f"request_status:{request_id}")
                 if status == 'ACCEPTED':
-                    accepted = True
-                    break
+                    print(f"✅ Request {request_id} accepted by {rodie.username}")
+                    return # Exit loop
                 if status in ['DECLINED', 'CANCELLED']:
-                    # Move to next roadie immediately if declined, or stop entirely if cancelled
                     if status == 'CANCELLED':
-                        print(f"🚫 Request {request_id} was cancelled by rider - stopping sequential offers")
-                        return  # Exit the entire function
-                    break
-            except Exception:
-                pass
-            time.sleep(1)
-        
-        # Clear active offer after turn ends
-        try:
+                        print(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
+                        return # Exit loop
+                    print(f"👎 {rodie.username} declined. Moving to next...")
+                    break # Break wait, move to next roadie
+                time.sleep(1)
+            
+            # Clear lock after turn
+            cache.delete(f"rodie_locked:{rodie.id}")
             cache.delete(f"active_offer:{rodie.id}")
-        except Exception:
-            pass
 
-        if accepted:
-            break
+        except Exception as e:
+            print(f"❌ [Search Loop] Error offering to {rodie.id}: {e}")
+            cache.delete(f"rodie_locked:{rodie.id}")
 
     # Check if request was accepted, cancelled, or needs expiry
     try:

@@ -323,6 +323,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                                 "distance_km": distance_km,
                                 "eta_seconds": eta_seconds,
                                 "rodie_id": self.scope["user"].id,
+                                "username": self.scope["user"].username,
                                 "rodie_name": self.scope["user"].username,
                             }
                         )
@@ -442,6 +443,13 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             print(f"❌ [RodieConsumer] Error broadcasting to nearby riders: {e}")
 
     @database_sync_to_async
+    def _is_assigned_to_request(self, user_id, request_id):
+        try:
+            return ServiceRequest.objects.filter(id=request_id, rodie_id=user_id).exists()
+        except Exception:
+            return False
+
+    @database_sync_to_async
     def _get_rider_id_for_request(self, request_id):
         try:
             req = ServiceRequest.objects.get(id=request_id)
@@ -472,29 +480,48 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_cancelled(self, event):
         """Handle request cancellation by rider"""
+        user_id = self.scope['user'].id
+        request_id = event.get("request_id")
+        
+        # 🟢 BUG FIX: Prevent cancellation notifications for roadies who weren't involved.
+        # Check if this roadie has an active offer for this request (Matching Phase)
+        active_offer = cache.get(f"active_offer:{user_id}")
+        is_relevant = active_offer and str(active_offer.get("id")) == str(request_id)
+        
+        if is_relevant:
+            # Clear the offer since it's now cancelled
+            cache.delete(f"active_offer:{user_id}")
+            print(f"🚫 [RodieConsumer] Filtered cancellation for {user_id}: Active offer matched.")
+        else:
+            # Check if this roadie is actually assigned to the request (Accepted/In-progress Phase)
+            # This covers roadies who have already accepted the job.
+            is_assigned = await self._is_assigned_to_request(user_id, request_id)
+            if not is_assigned:
+                # If neither offered nor assigned, ignore this broadcast.
+                # This prevents roadies who are merely 'online' from getting sounds for requests they never saw.
+                return
+            print(f"🚫 [RodieConsumer] Filtered cancellation for {user_id}: Assigned roadie matched.")
+
         await self.send_json({
             "type": "REQUEST_CANCELLED",
-            "request_id": event.get("request_id"),
+            "request_id": request_id,
             "message": event.get("message", "This request has been cancelled."),
             "reason": event.get("reason"),
             "status": "CANCELLED"
         })
-        # Clear any active offer for this roadie if it matches the cancelled request
-        try:
-            from django.core.cache import cache
-            user_id = self.scope['user'].id
-            active_offer = cache.get(f"active_offer:{user_id}")
-            if active_offer and active_offer.get("id") == event.get("request_id"):
-                cache.delete(f"active_offer:{user_id}")
-                print(f"🚫 Cleared active offer {event.get('request_id')} for roadie {user_id} due to cancellation")
-        except Exception as e:
-            print(f"❌ Error clearing active offer for cancelled request: {e}")
 
     async def rodie_status(self, event):
         await self.send_json({
             "type": "RODIE_STATUS",
             "data": event
         })
+
+    async def session_invalidated(self, event):
+        await self.send_json({
+            "type": "SESSION_INVALIDATED",
+            "message": event.get("message", "You have been logged out because you logged in on another device.")
+        })
+        await self.close(code=4001)
 
     async def account_approved(self, event):
         """Handle account approval notification"""
@@ -696,7 +723,7 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "lat": event["lat"],
             "lng": event["lng"],
             "rodie_id": event.get("rodie_id"),
-            "username": event.get("username", "Roadie"),
+            "username": event.get("username") or event.get("rodie_username") or event.get("rodie_name") or "Roadie",
             "service_type": event.get("service_type", "TOWING")
         }
         # Only include distance and ETA if they have valid values
@@ -720,6 +747,13 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "request": event.get("request") or event.get("data"),
             "status": event.get("status")
         })
+
+    async def session_invalidated(self, event):
+        await self.send_json({
+            "type": "SESSION_INVALIDATED",
+            "message": event.get("message", "You have been logged out because you logged in on another device.")
+        })
+        await self.close(code=4001)
 
     async def receive_json(self, content):
         user = self.scope["user"]

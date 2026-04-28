@@ -254,7 +254,7 @@ class ReferralSerializer(serializers.ModelSerializer):
 class PlatformConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformConfig
-        fields = ('id', 'max_negative_balance', 'service_fee', 'trial_days', 'mechanic_transition_documents', 'updated_at')
+        fields = ('id', 'max_negative_balance', 'trial_days', 'mechanic_transition_documents', 'updated_at')
 
 
 class PaymentSerializer(serializers.ModelSerializer):

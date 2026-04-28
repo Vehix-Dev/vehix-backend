@@ -221,15 +221,10 @@ def charge_fee_for_request(request_id):
         # 2. Charge Fee to Roadie
         if not instance.rodie or instance.fee_charged:
             return True
-        from users.models import Wallet, PlatformConfig, WalletTransaction
-        cfg_data = cache.get("platform_config")
-        if not cfg_data:
-            cfg = PlatformConfig.objects.first()
-            if cfg:
-                cfg_data = {'service_fee': cfg.service_fee, 'trial_days': cfg.trial_days}
-                cache.set("platform_config", cfg_data, timeout=3600)
+        from users.models import Wallet, WalletTransaction
         
-        fee = cfg_data['service_fee'] if cfg_data else Decimal('0')
+        # The service fee is exactly the fixed_price of the service
+        fee = instance.service_type.fixed_price if instance.service_type else Decimal('0')
 
         # Trial check — use the trial_end_date set on approval (resets on re-approval)
         if instance.rodie.trial_end_date and timezone.now() < instance.rodie.trial_end_date:
