@@ -90,7 +90,9 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
                 'distance': distance
             })
 
-    return sorted(eligible_rodies, key=lambdef _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=15, expiry_seconds=90):
+    return sorted(eligible_rodies, key=lambda x: x['distance'])
+
+def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=15, expiry_seconds=90):
     """Background thread: send offer to each rodie in order, wait `offer_seconds` for acceptance, expire after `expiry_seconds`."""
     channel_layer = get_channel_layer()
     start_time = time.time()
