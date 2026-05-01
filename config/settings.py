@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-8j*(28(_98)x$2d+io267_@ki*-$wh1oea4th=b23th0!)=im7')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = ['188.166.154.163', 'backend.vehix.ug', 'www.backend.vehix.ug', '127.0.0.1', 'localhost', 'curtis-unmobilized-clarence.ngrok-free.dev']
 CSRF_TRUSTED_ORIGINS = ['https://curtis-unmobilized-clarence.ngrok-free.dev']
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'channels',
+    'sslserver',
     
     # Local apps
     'users',
@@ -99,10 +100,12 @@ MIDDLEWARE = [
 ]
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = False  # Changed to False for production
+CORS_ALLOW_ALL_ORIGINS = True  # Changed to False for production
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://localhost:3000",
+    "https://127.0.0.1:3000",
     "https://vehix.ug",
     "https://www.vehix.ug",
     "https://backend.vehix.ug",
@@ -191,13 +194,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'parkingdb',
-        'USER': 'parkinguser',
-        'PASSWORD': 'strongpassword',  # Consider using environment variable
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'CONN_MAX_AGE': 60,  # Persistent connections for performance
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

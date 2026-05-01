@@ -1,4 +1,5 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 from .views import (
     CreateServiceRequestView,
     ChatMessageListView,
@@ -16,6 +17,17 @@ from .views import (
     ArrivedRequestView,
 )
 from .api_cancellation import CancellationReasonsView
+from .cancellation_views import (
+    CancellationReasonViewSet,
+    RequestCancellationViewSet,
+    RatingViewSet,
+)
+
+# Create router for viewsets
+router = DefaultRouter()
+router.register(r'cancellation-reasons', CancellationReasonViewSet, basename='cancellation-reason')
+router.register(r'cancellations', RequestCancellationViewSet, basename='cancellation')
+router.register(r'ratings', RatingViewSet, basename='rating')
 
 urlpatterns = [
     path('create/', CreateServiceRequestView.as_view()),
@@ -34,3 +46,6 @@ urlpatterns = [
     path('<int:pk>/rate/', RateServiceRequestView.as_view(), name='request_rate'),
     path('nearby/', NearbyRodieListView.as_view(), name='nearby_rodies'),
 ]
+
+# Add router URLs
+urlpatterns += router.urls
