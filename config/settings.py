@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'channels',
-    'sslserver',
     
     # Local apps
     'users',
