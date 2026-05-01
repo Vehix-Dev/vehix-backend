@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('requests', '0008_add_cancellation_models'),
+        ('requests', '0008_add_rating_fields'),
         ('requests', '0026_rating'),
     ]
 
