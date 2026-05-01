@@ -464,12 +464,6 @@ class RoadiePaymentsView(APIView):
             status='PENDING'
         ).aggregate(total=models.Sum('amount'))['total'] or 0
         
-        combined = list(payments) + list(transactions)
-        combined.sort(key=lambda x: x.created_at, reverse=True)
-        
-        from .serializers import TransactionHistorySerializer
-        history_serializer = TransactionHistorySerializer(combined, many=True)
-        
         summary = {
             'current_balance': wallet.balance,
             'total_earned': total_deposits, # In context of Roadie, deposits are often income or balance topups
@@ -916,7 +910,8 @@ class RequestAccountDeletionView(APIView):
         user.deletion_requested_at = timezone.now()
         user.deletion_reason = reason_text
         user.is_active = False  # Deactivate immediately
-        user.save(update_fields=['deletion_status', 'deletion_requested_at', 'deletion_reason', 'is_active'])
+        user.is_deleted = True  # Soft delete to hide from active lists
+        user.save(update_fields=['deletion_status', 'deletion_requested_at', 'deletion_reason', 'is_active', 'is_deleted'])
         
         # Log out effectively by clearing any session or token related data if needed
         # In JWT world, we can't easily invalidate tokens without a blacklist, 
