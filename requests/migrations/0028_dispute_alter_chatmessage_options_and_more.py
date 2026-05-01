@@ -8,6 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('requests', '0008_add_rating_fields'),
         ('requests', '0027_merge_0008_add_cancellation_models_0026_rating'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
