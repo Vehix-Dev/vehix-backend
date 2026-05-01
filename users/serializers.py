@@ -287,7 +287,7 @@ class TransactionHistorySerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
-    reason = serializers.CharField(source='get_reason', required=False)
+    reason = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     reference = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
