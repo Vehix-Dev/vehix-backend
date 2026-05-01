@@ -410,3 +410,219 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"ResetToken for {self.user.username} - {self.token}"
+
+
+class SupportTicket(models.Model):
+    """Support/Inquiry tickets submitted by users via feedback form"""
+    
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('ONGOING', 'Ongoing'),
+        ('RESOLVED', 'Resolved'),
+    )
+    
+    USER_TYPE_CHOICES = (
+        ('RIDER', 'Rider'),
+        ('RODIE', 'Roadie'),
+    )
+    
+    # Unique support ID
+    support_id = models.CharField(max_length=20, unique=True)
+    
+    # User who submitted the ticket
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='support_tickets'
+    )
+    user_type = models.CharField(
+        max_length=10,
+        choices=USER_TYPE_CHOICES,
+        help_text="Whether the ticket is from a Rider or Roadie"
+    )
+    
+    # Ticket content
+    subject = models.CharField(max_length=200, blank=True)
+    message = models.TextField()
+    
+    # Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING'
+    )
+    
+    # Internal notes for support team
+    internal_comments = models.TextField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['user_type', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Ticket {self.support_id} - {self.user.username} ({self.status})"
+    
+    def save(self, *args, **kwargs):
+        # Generate unique support ID if not set
+        if not self.support_id:
+            import uuid
+            from django.utils import timezone
+            timestamp = timezone.now().strftime('%Y%m%d')
+            random_id = uuid.uuid4().hex[:6].upper()
+            self.support_id = f"SUP-{timestamp}-{random_id}"
+        super().save(*args, **kwargs)
+
+
+class AdminAuditLog(models.Model):
+    """Immutable audit log of all admin actions for accountability and traceability"""
+    
+    ACTION_TYPES = (
+        ('USER_CREATE', 'User Created'),
+        ('USER_UPDATE', 'User Updated'),
+        ('USER_DELETE', 'User Deleted'),
+        ('USER_APPROVE', 'User Approved'),
+        ('USER_DEACTIVATE', 'User Deactivated'),
+        ('ADMIN_CREATE', 'Admin Created'),
+        ('ADMIN_DELETE', 'Admin Deleted'),
+        ('SERVICE_CREATE', 'Service Created'),
+        ('SERVICE_UPDATE', 'Service Updated'),
+        ('SERVICE_DELETE', 'Service Deleted'),
+        ('REQUEST_CANCEL', 'Request Cancelled'),
+        ('WALLET_ADJUST', 'Wallet Adjusted'),
+        ('PAYMENT_PROCESS', 'Payment Processed'),
+        ('SUPPORT_UPDATE', 'Support Ticket Updated'),
+        ('DISPUTE_RESOLVE', 'Dispute Resolved'),
+        ('CONFIG_UPDATE', 'Config Updated'),
+        ('NOTIFICATION_SEND', 'Notification Sent'),
+        ('OTHER', 'Other'),
+    )
+    
+    # Admin performing the action
+    admin_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='audit_logs_created'
+    )
+    
+    # What action was performed
+    action_type = models.CharField(max_length=50, choices=ACTION_TYPES)
+    action_description = models.TextField()
+    
+    # Target entity
+    target_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs_targeting'
+    )
+    target_entity_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Type of entity affected (User, Service, Request, etc.)"
+    )
+    target_entity_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="ID of the entity affected"
+    )
+    
+    # Change details (JSON for flexibility)
+    changes = models.JSONField(default=dict, blank=True)
+    
+    # Timestamp
+    created_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['admin_user', '-created_at']),
+            models.Index(fields=['action_type', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.admin_user.username} - {self.action_type} - {self.created_at}"
+
+
+class NotificationHistory(models.Model):
+    """History tracking of all notifications sent to users"""
+    
+    DELIVERY_STATUS = (
+        ('PENDING', 'Pending'),
+        ('SENT', 'Sent'),
+        ('FAILED', 'Failed'),
+        ('DELIVERED', 'Delivered'),
+    )
+    
+    # Original notification
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name='history'
+    )
+    
+    # Recipient details at time of send
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_history'
+    )
+    
+    # Delivery tracking
+    delivery_status = models.CharField(
+        max_length=20,
+        choices=DELIVERY_STATUS,
+        default='PENDING'
+    )
+    delivery_error = models.TextField(blank=True, null=True)
+    
+    # Interaction tracking
+    was_opened = models.BooleanField(default=False)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    
+    # Timestamps
+    sent_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['recipient', '-sent_at']),
+            models.Index(fields=['delivery_status', '-sent_at']),
+        ]
+    
+    def __str__(self):
+        return f"Notification to {self.recipient.username if self.recipient else 'Unknown'} - {self.delivery_status}"
+
+
+class ReferralSummary(models.Model):
+    """Summary stats for referrals (for report generation)"""
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='referral_summary'
+    )
+    
+    total_referrals = models.IntegerField(default=0)
+    successful_referrals = models.IntegerField(default=0)
+    pending_referrals = models.IntegerField(default=0)
+    total_rewards_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    pending_rewards = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Referral Summary for {self.user.username}"

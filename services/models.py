@@ -13,8 +13,18 @@ class ServiceType(models.Model):
     code = models.CharField(max_length=50, unique=True)
     category = models.CharField(max_length=10, choices=CATEGORY_CHOICES, default='BASIC')
     fixed_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    service_fee = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0,
+        help_text="Service fee charged to Roadies for this service type"
+    )
     image = models.ImageField(upload_to='services/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    has_subcategories = models.BooleanField(
+        default=False,
+        help_text="Whether this service has sub-category services"
+    )
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 

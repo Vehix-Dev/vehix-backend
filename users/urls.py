@@ -26,6 +26,13 @@ from .admin_views import (
     AdminPlatformConfigView,
     AdminUserPasswordView,
 )
+from .support_views import (
+    SupportTicketViewSet,
+    AdminAuditLogViewSet,
+    NotificationHistoryViewSet,
+    ReferralViewSet,
+    ReferralSummaryViewSet,
+)
 from services.admin_views import (
     ServiceTypeListCreateView,
     ServiceTypeRetrieveUpdateDestroyView,
@@ -46,6 +53,15 @@ from locations.admin_views import (
     RealtimeLocationsMapView,
 )
 from .admin_auth import AdminTokenObtainPairView
+from rest_framework.routers import DefaultRouter
+
+# Create router for viewsets
+router = DefaultRouter()
+router.register(r'auth/admin/support-tickets', SupportTicketViewSet, basename='support-ticket')
+router.register(r'auth/admin/audit-logs', AdminAuditLogViewSet, basename='audit-log')
+router.register(r'auth/admin/notification-history', NotificationHistoryViewSet, basename='notification-history')
+router.register(r'auth/admin/referrals', ReferralViewSet, basename='referral')
+router.register(r'auth/admin/referral-summaries', ReferralSummaryViewSet, basename='referral-summary')
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -108,3 +124,6 @@ urlpatterns = [
     path('auth/admin/users/<int:pk>/password/', AdminUserPasswordView.as_view(), name='admin_user_password_change'),
     path('auth/admin/requests/<int:pk>/assign/', AdminAssignRodieView.as_view(), name='admin_request_assign'),
 ]
+
+# Add router URLs
+urlpatterns += router.urls

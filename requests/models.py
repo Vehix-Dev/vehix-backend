@@ -135,6 +135,22 @@ class ServiceRequest(models.Model):
     arrived_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Username visibility fields for rider/roadie interfaces
+    show_rider_username = models.BooleanField(default=True)
+    show_rodie_username = models.BooleanField(default=True)
+    
+    # Additional notes from rider
+    additional_notes = models.TextField(blank=True, null=True)
+    
+    # Service fee tracking (per-service fee, not global)
+    service_fee_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Service fee deducted from Roadie wallet for this request"
+    )
 
     def __str__(self):
         return f"Request #{self.id} - {self.service_type} - {self.status}"
