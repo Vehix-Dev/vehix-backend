@@ -10,14 +10,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='servicerequest',
-            name='rider_rating',
-            field=models.PositiveSmallIntegerField(blank=True, help_text='Rating given by rider (1-5)', null=True),
-        ),
-        migrations.AddField(
-            model_name='servicerequest',
-            name='ROADIE_rating',
-            field=models.PositiveSmallIntegerField(blank=True, help_text='Rating given by roadie (1-5)', null=True),
-        ),
     ]

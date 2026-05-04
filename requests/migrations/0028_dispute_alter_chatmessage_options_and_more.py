@@ -38,14 +38,6 @@ class Migration(migrations.Migration):
             new_name='requests_ra_rated_u_58b232_idx',
             old_name='requests_ra_rated_u_idx',
         ),
-        migrations.RemoveField(
-            model_name='servicerequest',
-            name='ROADIE_rating',
-        ),
-        migrations.RemoveField(
-            model_name='servicerequest',
-            name='rider_rating',
-        ),
         migrations.AddField(
             model_name='chatmessage',
             name='is_read',
