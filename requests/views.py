@@ -154,7 +154,7 @@ class CreateServiceRequestView(generics.CreateAPIView):
 
             if active_request:
                 from rest_framework.exceptions import ValidationError
-                raise ValidationError("You already have an active request. Please complete or cancel it first.")
+                raise ValidationError({'detail': "You already have an active request. Please complete or cancel it first."})
 
             # Check wallet balance BEFORE creating the request (prevents orphaned records)
             cfg = PlatformConfig.objects.first()
