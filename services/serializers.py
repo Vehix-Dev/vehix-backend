@@ -3,10 +3,11 @@ from .models import ServiceType, RodieService
 
 
 class ServiceTypeSerializer(serializers.ModelSerializer):
+    ref_name = 'PublicServiceTypeSerializer'
+    
     class Meta:
         model = ServiceType
         fields = ('id', 'name', 'code', 'category', 'fixed_price', 'image', 'is_active', 'created_at', 'updated_at')
-
 
 class RodieServiceSerializer(serializers.ModelSerializer):
     service = ServiceTypeSerializer(read_only=True)

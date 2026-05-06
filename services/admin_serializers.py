@@ -9,7 +9,8 @@ class ServiceTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True, allow_blank=False)
     code = serializers.CharField(required=True, allow_blank=False)
     rodie_count = serializers.SerializerMethodField(read_only=True)
-
+    ref_name = 'AdminServiceTypeSerializer'
+    
     class Meta:
         model = ServiceType
         fields = ('id', 'name', 'code', 'fixed_price', 'image', 'is_active', 'created_at', 'updated_at', 'rodie_count')
