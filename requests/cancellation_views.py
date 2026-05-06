@@ -1,4 +1,4 @@
-from rest_framework import generics, viewsets, filters, status
+from rest_framework import generics, viewsets, filters, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -9,6 +9,24 @@ from django.db.models import Q, Avg, Count
 from .models import RequestCancellation, CancellationReason, ServiceRequest
 from .models_rating import Rating
 from .cancellation_serializers import RequestCancellationSerializer, CancellationReasonSerializer
+
+
+# Define the RatingSerializer at module level to avoid Swagger generation issues
+class RatingSerializer(serializers.ModelSerializer):
+    rater_username = serializers.CharField(source='rater.username', read_only=True)
+    rated_user_username = serializers.CharField(source='rated_user.username', read_only=True)
+    service_request_id = serializers.IntegerField(source='service_request.id', read_only=True)
+    
+    class Meta:
+        model = Rating
+        fields = (
+            'id', 'service_request', 'service_request_id', 'rater', 'rater_username',
+            'rated_user', 'rated_user_username', 'rating', 'comment',
+            'created_at', 'updated_at'
+        )
+        read_only_fields = ('created_at', 'updated_at')
+        # Explicitly set ref_name to avoid any naming conflicts
+        ref_name = 'RatingSerializer'
 
 
 class CancellationReasonViewSet(viewsets.ModelViewSet):
@@ -69,7 +87,7 @@ class RatingViewSet(viewsets.ModelViewSet):
     Users can create ratings after service completion
     Admins can view all ratings
     """
-    serializer_class = None  # Will be defined per action
+    serializer_class = RatingSerializer  # Use the module-level serializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['service_request__status', 'created_at']
@@ -86,25 +104,6 @@ class RatingViewSet(viewsets.ModelViewSet):
         return Rating.objects.filter(
             Q(rater=user) | Q(rated_user=user)
         ).select_related('service_request', 'rater', 'rated_user')
-    
-    def get_serializer_class(self):
-        from .models_rating import Rating as RatingModel
-        
-        class RatingSerializer(serializers.ModelSerializer):
-            rater_username = serializers.CharField(source='rater.username', read_only=True)
-            rated_user_username = serializers.CharField(source='rated_user.username', read_only=True)
-            service_request_id = serializers.IntegerField(source='service_request.id', read_only=True)
-            
-            class Meta:
-                model = RatingModel
-                fields = (
-                    'id', 'service_request', 'service_request_id', 'rater', 'rater_username',
-                    'rated_user', 'rated_user_username', 'rating', 'comment',
-                    'created_at', 'updated_at'
-                )
-                read_only_fields = ('created_at', 'updated_at')
-        
-        return RatingSerializer
     
     def perform_create(self, serializer):
         # Set the rater to the current user
@@ -163,10 +162,3 @@ class RatingViewSet(viewsets.ModelViewSet):
         ratings = self.get_queryset().filter(service_request=service_request)
         serializer = self.get_serializer(ratings, many=True)
         return Response(serializer.data)
-
-
-# Import serializers at the bottom to avoid circular imports
-try:
-    from rest_framework import serializers
-except ImportError:
-    serializers = None
