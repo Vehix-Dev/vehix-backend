@@ -3,11 +3,12 @@ from .models import ServiceType, RodieService
 
 
 class ServiceTypeSerializer(serializers.ModelSerializer):
-    ref_name = 'PublicServiceTypeSerializer'
     
     class Meta:
         model = ServiceType
         fields = ('id', 'name', 'code', 'category', 'fixed_price', 'image', 'is_active', 'created_at', 'updated_at')
+        ref_name = 'PublicServiceTypeSerializer'  # Moved inside Meta class
+
 
 class RodieServiceSerializer(serializers.ModelSerializer):
     service = ServiceTypeSerializer(read_only=True)
@@ -16,3 +17,4 @@ class RodieServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = RodieService
         fields = ('id', 'rodie', 'rodie_username', 'service', 'created_at', 'updated_at')
+        ref_name = 'PublicRodieServiceSerializer'  # Added ref_name inside Meta class

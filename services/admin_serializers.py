@@ -9,12 +9,12 @@ class ServiceTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True, allow_blank=False)
     code = serializers.CharField(required=True, allow_blank=False)
     rodie_count = serializers.SerializerMethodField(read_only=True)
-    ref_name = 'AdminServiceTypeSerializer'
     
     class Meta:
         model = ServiceType
         fields = ('id', 'name', 'code', 'fixed_price', 'image', 'is_active', 'created_at', 'updated_at', 'rodie_count')
         read_only_fields = ('created_at', 'updated_at')
+        ref_name = 'AdminServiceTypeSerializer'  # Moved inside Meta class
 
     def validate(self, attrs):
         return attrs
@@ -36,6 +36,7 @@ class RodieServiceSerializer(serializers.ModelSerializer):
         model = RodieService
         fields = ('id', 'rodie', 'rodie_username', 'rodie_username_input', 'service', 'service_display', 'created_at', 'updated_at')
         read_only_fields = ('created_at', 'updated_at')
+        ref_name = 'AdminRodieServiceSerializer'  # Added ref_name inside Meta class
 
     def validate(self, attrs):
         rodie_username = self.initial_data.get('rodie_username') or self.initial_data.get('rodie_username_input')
