@@ -18,6 +18,7 @@ from .admin_views import (
     AdminDeletedRoadiesView,
     AdminRestoreUserView,
     AdminPendingDeletionListView,
+    AdminPermanentDeleteUserView,
     AdminNotificationListCreateView,
     AdminNotificationRUDView,
     AdminRegisterView,
