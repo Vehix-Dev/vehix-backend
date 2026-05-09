@@ -21,6 +21,11 @@ from .fcm import send_push_notification, broadcast_role_push
 User = get_user_model()
 
 
+class IsAdminRole(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        return bool(user and getattr(user, 'is_authenticated', False) and getattr(user, 'role', None) == 'ADMIN' and getattr(user, 'is_active', True))
+
 
 class AdminRegisterView(generics.CreateAPIView):
     serializer_class = AdminCreateSerializer
@@ -291,12 +296,6 @@ class RealtimeRidersView(APIView):
             qs = qs.filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
         serializer = AdminUserSerializer(qs, many=True)
         return Response(serializer.data)
-
-
-class IsAdminRole(permissions.BasePermission):
-    def has_permission(self, request, view):
-        user = getattr(request, 'user', None)
-        return bool(user and getattr(user, 'is_authenticated', False) and getattr(user, 'role', None) == 'ADMIN' and getattr(user, 'is_active', True))
 
 
 class AdminListCreateView(generics.ListCreateAPIView):
