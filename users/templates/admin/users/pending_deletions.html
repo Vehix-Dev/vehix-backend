@@ -1,0 +1,51 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>External ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Deletion Status</th>
+                    <th>Requested At</th>
+                    <th>Reason</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.external_id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.phone }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>{{ user.deletion_status|default:"—" }}</td>
+                    <td>{{ user.deletion_requested_at|default:"—" }}</td>
+                    <td>{{ user.deletion_reason|default:"—" }}</td>
+                    <td>
+                        <a href="{% url 'admin:users_user_restore' user.id %}">Restore</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9">No pending deletion requests found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p>
+            <a href="{% url 'admin:users_user_deleted' %}">Deleted Users</a> |
+            <a href="{% url 'admin:users_user_deleted_riders' %}">Deleted Riders</a> |
+            <a href="{% url 'admin:users_user_deleted_roadies' %}">Deleted Roadies</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

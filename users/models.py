@@ -250,6 +250,9 @@ class User(AbstractUser):
             except Exception:
                 self.referral_code = f"VX{uuid.uuid4().hex[:6].upper()}"
 
+        if self.role == 'RIDER' and is_new and not self.is_approved:
+            self.is_approved = True
+
         if self.role == 'ADMIN':
             self.is_approved = False
 
@@ -381,6 +384,11 @@ class Notification(models.Model):
     )
     title = models.CharField(max_length=200)
     message = models.TextField(blank=True, default='')
+    url = models.URLField(
+        null=True,
+        blank=True,
+        help_text='Optional deep link or external URL for the notification'
+    )
     notification_type = models.CharField(
         max_length=20, 
         choices=NOTIFICATION_TYPES, 

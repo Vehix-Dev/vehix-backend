@@ -41,7 +41,7 @@ class RiderListCreateView(generics.ListCreateAPIView):
 
 
 class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -59,7 +59,7 @@ class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                 async_to_sync(channel_layer.group_send)(group, {'type': 'user.status', 'is_deleted': True, 'user_id': instance.id})
         except Exception:
             pass
-        return Response(status=204)
+        return Response({'detail': 'Rider deleted successfully.'}, status=200)
     
     def get(self, request, *args, **kwargs):
         """Override GET to include summary statistics"""
@@ -135,7 +135,7 @@ class RoadieListCreateView(generics.ListCreateAPIView):
 
 
 class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -388,7 +388,7 @@ class RoadieSummaryView(APIView):
 
 
 class AdminDeletedUsersView(generics.ListAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -407,7 +407,7 @@ class AdminPendingDeletionListView(generics.ListAPIView):
 
 
 class AdminRestoreUserView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def post(self, request, pk):
         try:
@@ -474,6 +474,17 @@ class AdminPlatformConfigView(APIView):
         return Response(serializer.data)
 
 
+class IsSuperAdminRole(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        return bool(
+            user and getattr(user, 'is_authenticated', False) and
+            getattr(user, 'role', None) == 'ADMIN' and
+            getattr(user, 'is_active', True) and
+            getattr(user, 'is_superuser', False)
+        )
+
+
 class AdminNotificationListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
     serializer_class = NotificationSerializer
@@ -488,42 +499,57 @@ class AdminNotificationListCreateView(generics.ListCreateAPIView):
             from channels.layers import get_channel_layer
             channel_layer = get_channel_layer()
 
-            # Prepare payload for WebSockets
             payload = {
                 'type': 'notification',
                 'notification': NotificationSerializer(notif).data
             }
 
-            # Prepare data for Push Notifications
             push_data = {
                 'notification_id': str(notif.id),
                 'type': notif.notification_type,
+                'url': notif.url or ''
             }
 
-            # 1. Global Broadcast
             if notif.target_role == 'ALL':
-                # WebSocket
                 async_to_sync(channel_layer.group_send)('notifications', payload)
-                # Push
                 broadcast_role_push('RIDER', notif.title, notif.message, push_data)
                 broadcast_role_push('RODIE', notif.title, notif.message, push_data)
-            
-            # 2. Role Broadcast
             elif notif.target_role in ['RIDER', 'RODIE']:
-                # WebSocket
                 async_to_sync(channel_layer.group_send)(f'role_{notif.target_role}', payload)
-                # Push
                 broadcast_role_push(notif.target_role, notif.title, notif.message, push_data)
-
-            # 3. Individual Broadcast
             elif notif.recipient_id:
-                # WebSocket
                 async_to_sync(channel_layer.group_send)(f'user_{notif.recipient_id}', payload)
-                # Push
                 send_push_notification(notif.recipient, notif.title, notif.message, push_data)
-
         except Exception as e:
             print(f"DEBUG Error in Broadcast: {str(e)}")
+
+
+class AdminDeletedRidersView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = AdminUserSerializer
+
+    def get_queryset(self):
+        return User.objects.filter(role='RIDER', is_deleted=True).order_by('-updated_at')
+
+
+class AdminDeletedRoadiesView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = AdminUserSerializer
+
+    def get_queryset(self):
+        return User.objects.filter(role='RODIE', is_deleted=True).order_by('-updated_at')
+
+
+class AdminPermanentDeleteUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminRole]
+
+    def delete(self, request, pk, role):
+        try:
+            user = User.objects.get(pk=pk, role=role, is_deleted=True)
+            user.delete()
+            return Response({'detail': 'User permanently deleted.'})
+        except User.DoesNotExist:
+            return Response({'detail': 'Deleted user not found.'}, status=404)
 
 
 class AdminNotificationRUDView(generics.RetrieveUpdateDestroyAPIView):

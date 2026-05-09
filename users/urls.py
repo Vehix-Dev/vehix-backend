@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback, PasswordResetRequestView, PasswordResetConfirmView, AccountDeletionEligibilityView, RequestAccountDeletionView
+from .views import RegisterView, MeView, MyWalletView, MyReferralsView, RoadieStatusUpdateView, PlatformConfigView, NotificationListCreateView, NotificationRUDView, DepositView, WithdrawView, PesapalIPNView, RoadiePaymentsView, PaymentStatusView, UserProfileUpdateView, RegisterFcmTokenView, UserProfilePhotoUploadView, UserProfilePasswordChangeView, submit_feedback, PasswordResetRequestView, PasswordResetConfirmView, AccountDeletionEligibilityView, RequestAccountDeletionView
 from .tokens import CustomTokenObtainPairView, RiderLoginView, RoadieLoginView
 from .admin_views import (
     RiderListCreateView,
@@ -14,6 +14,8 @@ from .admin_views import (
     AdminListCreateView,
     AdminRetrieveUpdateDestroyView,
     AdminDeletedUsersView,
+    AdminDeletedRidersView,
+    AdminDeletedRoadiesView,
     AdminRestoreUserView,
     AdminPendingDeletionListView,
     AdminNotificationListCreateView,
@@ -73,6 +75,7 @@ urlpatterns = [
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('me/', MeView.as_view(), name='me'),
     path('profile/', UserProfileUpdateView.as_view(), name='user_profile_update'),
+    path('profile/fcm-token/', RegisterFcmTokenView.as_view(), name='user_profile_fcm_token'),
     path('profile/photo/', UserProfilePhotoUploadView.as_view(), name='user_profile_photo_upload'),
     path('profile/change-password/', UserProfilePasswordChangeView.as_view(), name='user_profile_password_change'),
     path('profile/deletion-eligibility/', AccountDeletionEligibilityView.as_view(), name='deletion_eligibility'),
@@ -99,8 +102,11 @@ urlpatterns = [
     path('auth/admin/users/', AdminListCreateView.as_view(), name='admin_users_list_create'),
     path('auth/admin/users/<int:pk>/', AdminRetrieveUpdateDestroyView.as_view(), name='admin_users_rud'),
     path('auth/admin/users/deleted/', AdminDeletedUsersView.as_view(), name='admin_users_deleted'),
+    path('auth/admin/riders/deleted/', AdminDeletedRidersView.as_view(), name='admin_riders_deleted'),
+    path('auth/admin/roadies/deleted/', AdminDeletedRoadiesView.as_view(), name='admin_roadies_deleted'),
     path('auth/admin/users/pending-deletions/', AdminPendingDeletionListView.as_view(), name='admin_users_pending_deletion'),
     path('auth/admin/users/<int:pk>/restore/', AdminRestoreUserView.as_view(), name='admin_user_restore'),
+    path('auth/admin/users/<int:pk>/permanent-delete/<str:role>/', AdminPermanentDeleteUserView.as_view(), name='admin_user_permanent_delete'),
     path('auth/admin/services/', ServiceTypeListCreateView.as_view(), name='admin_services_list_create'),
     path('auth/admin/services/<int:pk>/', ServiceTypeRetrieveUpdateDestroyView.as_view(), name='admin_services_rud'),
     path('auth/admin/rodie-services/', RodieServiceListCreateView.as_view(), name='admin_rodie_services_list_create'),

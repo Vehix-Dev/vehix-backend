@@ -341,9 +341,14 @@ if DEBUG:
     print(f"Pesapal IPN ID: {'SET' if PESAPAL_IPN_ID else 'NOT SET'}")
 # Firebase Cloud Messaging Configuration
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
+FCM_SERVICE_ACCOUNT_FILE = config('FCM_SERVICE_ACCOUNT_FILE', default='')
+if FCM_SERVICE_ACCOUNT_FILE:
+    if not os.path.isabs(FCM_SERVICE_ACCOUNT_FILE):
+        FCM_SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, FCM_SERVICE_ACCOUNT_FILE)
 
 if DEBUG:
     print(f"FCM Server Key: {'SET' if FCM_SERVER_KEY else 'NOT SET'}")
+    print(f"FCM service account file: {'SET' if FCM_SERVICE_ACCOUNT_FILE else 'NOT SET'}")
 
 
 # Email Configuration

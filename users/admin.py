@@ -6,6 +6,7 @@ from django.utils.html import format_html
 from django.urls import path
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.utils import timezone
 from .forms import STKPushDepositForm
 from .models import Payment
 from .pesapal import PesapalClient
@@ -24,15 +25,29 @@ class RodieServiceInline(admin.TabularInline):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('external_id', 'username', 'email', 'role', 'wallet_balance', 'stk_deposit_link', 'is_active', 'is_approved')
-    list_filter = ('role', 'is_active', 'is_approved')
+    list_display = (
+        'external_id',
+        'username',
+        'email',
+        'role',
+        'wallet_balance',
+        'is_deleted',
+        'deletion_status',
+        'deletion_requested_at',
+        'stk_deposit_link',
+        'is_active',
+        'is_approved',
+    )
+    list_filter = ('role', 'is_active', 'is_approved', 'is_deleted', 'deletion_status')
     search_fields = ('external_id', 'username', 'email', 'phone')
-    readonly_fields = ('external_id', 'referral_code')
+    readonly_fields = ('external_id', 'referral_code', 'deletion_requested_at')
+    actions = ['restore_users', 'mark_as_deleted', 'mark_pending_deletion', 'permanently_delete_users']
     fieldsets = (
         (None, {'fields': ('external_id', 'username', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'phone')}),
         ('Identifiers', {'fields': ('role', 'referral_code')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_approved')}),
+        ('Deletion', {'fields': ('is_deleted', 'deletion_status', 'deletion_requested_at', 'deletion_reason')}),
     )
 
     inlines = [RodieServiceInline]
@@ -97,8 +112,95 @@ class UserAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path('<int:user_id>/stk-deposit/', self.admin_site.admin_view(self.stk_deposit_view), name='user-stk-deposit'),
+            path('deleted/', self.admin_site.admin_view(self.deleted_users_view), name='users_user_deleted'),
+            path('deleted/riders/', self.admin_site.admin_view(self.deleted_riders_view), name='users_user_deleted_riders'),
+            path('deleted/roadies/', self.admin_site.admin_view(self.deleted_roadies_view), name='users_user_deleted_roadies'),
+            path('pending-deletions/', self.admin_site.admin_view(self.pending_deletions_view), name='users_user_pending_deletions'),
+            path('<int:user_id>/restore/', self.admin_site.admin_view(self.restore_user_view), name='users_user_restore'),
+            path('<int:user_id>/permanent-delete/', self.admin_site.admin_view(self.permanent_delete_user_view), name='users_user_permanent_delete'),
+            path('mechanics/', self.admin_site.admin_view(self.mechanics_view), name='users_user_mechanics'),
         ]
         return custom_urls + urls
+
+    def deleted_users_view(self, request):
+        users = User.objects.filter(is_deleted=True).order_by('-updated_at')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Deleted Users',
+            'users': users,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/deleted_users.html', context)
+
+    def deleted_riders_view(self, request):
+        users = User.objects.filter(role='RIDER', is_deleted=True).order_by('-updated_at')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Deleted Riders',
+            'users': users,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/deleted_users.html', context)
+
+    def deleted_roadies_view(self, request):
+        users = User.objects.filter(role='RODIE', is_deleted=True).order_by('-updated_at')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Deleted Roadies',
+            'users': users,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/deleted_users.html', context)
+
+    def pending_deletions_view(self, request):
+        users = User.objects.filter(deletion_status='PENDING').order_by('-deletion_requested_at')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Pending Deletion Requests',
+            'users': users,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/pending_deletions.html', context)
+
+    def restore_user_view(self, request, user_id):
+        user = self.get_object(request, user_id)
+        if user:
+            user.is_deleted = False
+            user.is_active = True
+            user.deletion_status = None
+            user.deletion_requested_at = None
+            user.save()
+            self.message_user(request, f'User {user.username} restored successfully.', messages.SUCCESS)
+        return redirect('admin:users_user_deleted')
+
+    def permanent_delete_user_view(self, request, user_id):
+        user = self.get_object(request, user_id)
+        if user:
+            username = user.username
+            user.delete()
+            self.message_user(request, f'User {username} permanently deleted.', messages.SUCCESS)
+        return redirect('admin:users_user_deleted')
+
+    def restore_users(self, request, queryset):
+        updated = queryset.filter(is_deleted=True).update(is_deleted=False, is_active=True, deletion_status=None, deletion_requested_at=None)
+        self.message_user(request, f'{updated} user(s) restored successfully.')
+    restore_users.short_description = 'Restore selected deleted users'
+
+    def mark_as_deleted(self, request, queryset):
+        updated = queryset.update(is_deleted=True, is_active=False)
+        self.message_user(request, f'{updated} user(s) marked as deleted.')
+    mark_as_deleted.short_description = 'Mark selected users as deleted'
+
+    def mark_pending_deletion(self, request, queryset):
+        updated = queryset.update(deletion_status='PENDING', deletion_requested_at=timezone.now())
+        self.message_user(request, f'{updated} user(s) marked as pending deletion.')
+    mark_pending_deletion.short_description = 'Mark selected users as pending deletion'
+
+    def permanently_delete_users(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'{count} user(s) permanently deleted.')
+    permanently_delete_users.short_description = 'Permanently delete selected users'
 
     def stk_deposit_view(self, request, user_id):
         user = self.get_object(request, user_id)
@@ -182,8 +284,9 @@ class ReferralAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('recipient', 'title', 'is_read', 'created_at')
-    search_fields = ('recipient__username', 'title', 'message')
+    list_display = ('recipient', 'target_role', 'title', 'notification_type', 'is_read', 'url', 'created_at')
+    list_filter = ('target_role', 'notification_type', 'is_read', 'created_at')
+    search_fields = ('recipient__username', 'title', 'message', 'url')
 
 
 @admin.register(PlatformConfig)

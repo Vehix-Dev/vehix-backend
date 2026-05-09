@@ -11,6 +11,7 @@ from django.db import models
 from .serializers import RegisterSerializer, UserSerializer
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer, DepositSerializer, WithdrawSerializer, PaymentSerializer, TransactionHistorySerializer, RoadiePaymentSummarySerializer, UserProfileUpdateSerializer, UserProfilePhotoSerializer
 from .models import Wallet, Referral, PlatformConfig, Notification, Payment, WalletTransaction, PasswordResetToken
+from .fcm import send_push_notification
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 try:
@@ -41,7 +42,7 @@ class UserProfileUpdateView(APIView):
     """
     Update authenticated user's profile information
     GET: Get user profile details
-    PATCH: Update profile fields (name, email, phone, username)
+    PATCH: Update profile fields (name, email, phone, username, fcm_token)
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -68,6 +69,20 @@ class UserProfileUpdateView(APIView):
             'success': False,
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterFcmTokenView(APIView):
+    """Register or update the authenticated user's FCM token."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get('fcm_token')
+        if not token:
+            return Response({'success': False, 'message': 'fcm_token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.fcm_token = token
+        request.user.save(update_fields=['fcm_token'])
+        return Response({'success': True, 'message': 'FCM token registered successfully.'}, status=status.HTTP_200_OK)
 
 
 class UserProfilePhotoUploadView(APIView):
@@ -200,6 +215,19 @@ class NotificationListCreateView(generics.ListCreateAPIView):
             from channels.layers import get_channel_layer
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(f'user_{self.request.user.id}', {'type': 'notification', 'notification': NotificationSerializer(notif).data})
+        except Exception:
+            pass
+
+        try:
+            send_push_notification(
+                self.request.user,
+                notif.title,
+                notif.message,
+                {
+                    'notification_id': str(notif.id),
+                    'type': notif.notification_type,
+                }
+            )
         except Exception:
             pass
 

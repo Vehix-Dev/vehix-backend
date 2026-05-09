@@ -220,6 +220,29 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                             f'rider_{req.rider_id}',
                             {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}
                         )
+                        from users.fcm import send_push_notification
+                        from users.models import Notification
+
+                        title = 'Request Expired'
+                        body = 'Your service request expired before a roadie could accept it.'
+                        if req.rider_id:
+                            Notification.objects.create(
+                                recipient=req.rider,
+                                target_role='SPECIFIC',
+                                title=title,
+                                message=body,
+                                notification_type='URGENT'
+                            )
+                            send_push_notification(
+                                req.rider,
+                                title,
+                                body,
+                                {
+                                    'notification_id': str(req.id),
+                                    'type': 'request_expired',
+                                    'request_id': str(req.id)
+                                }
+                            )
                     except Exception:
                         pass
                     logger.info(f"⌛ Request #{request_id} EXPIRED — no roadie accepted")

@@ -327,6 +327,9 @@ class AcceptRequestView(APIView):
             # 5. Notify parties
             try:
                 from .serializers import ServiceRequestSerializer
+                from users.fcm import send_push_notification
+                from users.models import Notification
+
                 serializer = ServiceRequestSerializer(req)
                 resp_data = serializer.data
                 
@@ -346,6 +349,26 @@ class AcceptRequestView(APIView):
                         'type': 'request_accepted',
                         'status': 'ACCEPTED',
                         'request': resp_data
+                    }
+                )
+
+                title = 'Roadie Accepted Your Request'
+                body = f'{user.first_name or user.username} is on the way to your location.'
+                Notification.objects.create(
+                    recipient=req.rider,
+                    target_role='SPECIFIC',
+                    title=title,
+                    message=body,
+                    notification_type='UPDATE'
+                )
+                send_push_notification(
+                    req.rider,
+                    title,
+                    body,
+                    {
+                        'notification_id': str(req.id),
+                        'type': 'request_accepted',
+                        'request_id': str(req.id)
                     }
                 )
             except Exception as e:

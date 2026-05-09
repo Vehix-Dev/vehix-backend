@@ -25,6 +25,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'role',
             'nin',
             'referred_by_code',
+            'fcm_token',
         )
 
     def create(self, validated_data):
@@ -44,6 +45,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             phone=validated_data.get('phone'),
             role=validated_data.get('role'),
             nin=validated_data.get('nin'),
+            fcm_token=validated_data.get('fcm_token'),
         )
 
         wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -382,7 +384,31 @@ class UserProfilePhotoSerializer(serializers.Serializer):
         return value
 
 class NotificationSerializer(serializers.ModelSerializer):
+    recipient_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='recipient',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    recipient_external_id = serializers.CharField(
+        source='recipient.external_id',
+        read_only=True
+    )
+    target_role = serializers.CharField(required=False)
+
     class Meta:
         model = Notification
-        fields = ['id', 'title', 'message', 'notification_type', 'is_read', 'created_at']
+        fields = [
+            'id',
+            'recipient_id',
+            'recipient_external_id',
+            'target_role',
+            'title',
+            'message',
+            'url',
+            'notification_type',
+            'is_read',
+            'created_at'
+        ]
         read_only_fields = ['id', 'created_at']

@@ -1,83 +1,130 @@
-import requests
-import json
+import os
 from django.conf import settings
-from .models import User
+from django.contrib.auth import get_user_model
 
-def send_push_notification(user, title, message, data=None):
-    """
-    Sends a push notification to a user's fcm_token using Firebase Legacy server key 
-    or FCM V1 (implementation depends on credentials).
-    """
-    if not user.fcm_token:
-        print(f"DEBUG: No FCM token for user {user.username}. Skipping push.")
-        return False
+User = get_user_model()
 
-    # Get server key from settings (YOU MUST SET THIS IN settings.py)
-    server_key = getattr(settings, 'FCM_SERVER_KEY', None)
-    if not server_key:
-        print("DEBUG: FCM_SERVER_KEY not set in settings.py")
-        return False
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+except ImportError:
+    firebase_admin = None
+    credentials = None
+    messaging = None
 
-    fcm_url = "https://fcm.googleapis.com/fcm/send"
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'key={server_key}'
-    }
 
-    payload = {
-        'to': user.fcm_token,
-        'notification': {
-            'title': title,
-            'body': message,
-            'sound': 'default',
-            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
-        },
-        'data': data or {},
-        'priority': 'high'
-    }
+_firebase_app = None
+
+
+def _get_firebase_app():
+    global _firebase_app
+    if _firebase_app is not None:
+        return _firebase_app
+
+    if not firebase_admin:
+        print('DEBUG: firebase_admin package is not installed.')
+        return None
+
+    service_account = getattr(settings, 'FCM_SERVICE_ACCOUNT_FILE', '')
+    if not service_account:
+        print('DEBUG: No FCM service account file configured.')
+        return None
+
+    if not os.path.exists(service_account):
+        print(f'DEBUG: FCM service account file not found at {service_account}')
+        return None
 
     try:
-        response = requests.post(fcm_url, headers=headers, data=json.dumps(payload), timeout=10)
-        print(f"DEBUG: FCM response for {user.username}: {response.status_code} {response.text}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"DEBUG Error sending FCM: {str(e)}")
+        cred = credentials.Certificate(service_account)
+        _firebase_app = firebase_admin.initialize_app(cred)
+        return _firebase_app
+    except Exception as exc:
+        print(f'DEBUG: Failed to initialize Firebase Admin SDK: {exc}')
+        return None
+
+
+def _send_with_admin(token, title, message, data=None):
+    app = _get_firebase_app()
+    if not app or not messaging:
         return False
 
-def broadcast_role_push(role, title, message, data=None):
-    """
-    Sends a push notification to all users of a specific role (RIDER/RODIE)
-    """
-    tokens = User.objects.filter(role=role, fcm_token__isnull=False).exclude(fcm_token='').values_list('fcm_token', flat=True)
-    
+    if not token:
+        return False
+
+    msg = messaging.Message(
+        token=token,
+        notification=messaging.Notification(title=title, body=message),
+        data={k: str(v) for k, v in (data or {}).items()},
+        android=messaging.AndroidConfig(priority='high', notification=messaging.AndroidNotification(click_action='FLUTTER_NOTIFICATION_CLICK', sound='default')),
+        apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(sound='default'))),
+    )
+    try:
+        response = messaging.send(msg, app=app)
+        print(f'DEBUG: Firebase Admin send response: {response}')
+        return True
+    except Exception as exc:
+        print(f'DEBUG: Firebase Admin send error: {exc}')
+        return False
+
+
+def _send_multicast_with_admin(tokens, title, message, data=None):
+    app = _get_firebase_app()
+    if not app or not messaging:
+        return False
+
     if not tokens:
         return False
-        
-    # FCM allows multicast up to 1000 tokens
-    server_key = getattr(settings, 'FCM_SERVER_KEY', None)
-    if not server_key:
+
+    chunks = [tokens[i:i + 500] for i in range(0, len(tokens), 500)]
+    results = []
+    for chunk in chunks:
+        multicast = messaging.MulticastMessage(
+            tokens=chunk,
+            notification=messaging.Notification(title=title, body=message),
+            data={k: str(v) for k, v in (data or {}).items()},
+            android=messaging.AndroidConfig(priority='high', notification=messaging.AndroidNotification(click_action='FLUTTER_NOTIFICATION_CLICK', sound='default')),
+            apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(sound='default'))),
+        )
+        try:
+            response = messaging.send_multicast(multicast, app=app)
+            results.append(response)
+            print(f'DEBUG: Firebase Admin multicast success={response.success_count} failure={response.failure_count}')
+        except Exception as exc:
+            print(f'DEBUG: Firebase Admin multicast error: {exc}')
+            return False
+
+    return any(response.success_count > 0 for response in results)
+
+
+def send_push_notification(user, title, message, data=None):
+    """Send a push notification to a single user's registered FCM token."""
+    if not user or not getattr(user, 'fcm_token', None):
+        print(f"DEBUG: No FCM token for user {getattr(user, 'username', 'unknown')}. Skipping push.")
         return False
 
-    fcm_url = "https://fcm.googleapis.com/fcm/send"
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'key={server_key}'
-    }
+    if _get_firebase_app():
+        return _send_with_admin(user.fcm_token, title, message, data)
 
-    payload = {
-        'registration_ids': list(tokens),
-        'notification': {
-            'title': title,
-            'body': message,
-            'sound': 'default',
-        },
-        'data': data or {},
-        'priority': 'high'
-    }
+    print('DEBUG: Falling back to legacy FCM HTTP V1 path is not implemented when service account is unavailable.')
+    return False
 
-    try:
-        response = requests.post(fcm_url, headers=headers, data=json.dumps(payload), timeout=10)
-        return response.status_code == 200
-    except Exception:
+
+def send_push_notification_by_token(token, title, message, data=None):
+    """Send a push notification directly to a raw FCM registration token."""
+    if not token:
         return False
+    if _get_firebase_app():
+        return _send_with_admin(token, title, message, data)
+    return False
+
+
+def broadcast_role_push(role, title, message, data=None):
+    """Send a push notification to all users belonging to a role."""
+    tokens = list(User.objects.filter(role=role, fcm_token__isnull=False).exclude(fcm_token='').values_list('fcm_token', flat=True))
+    if not tokens:
+        return False
+
+    if _get_firebase_app():
+        return _send_multicast_with_admin(tokens, title, message, data)
+
+    return False

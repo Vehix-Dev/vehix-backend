@@ -51,3 +51,4 @@ whitenoise==6.11.0
 channels_redis==4.0.0
 django-redis==5.2.0
 requests==2.32.3
+firebase-admin==6.5.0
