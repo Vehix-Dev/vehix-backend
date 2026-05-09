@@ -30,6 +30,7 @@ class ServiceRequestAdminSerializer(serializers.ModelSerializer):
         )
     
     service_type_details = ServiceTypeSerializer(source='service_type', read_only=True)
+    ratings = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
@@ -40,11 +41,19 @@ class ServiceRequestAdminSerializer(serializers.ModelSerializer):
             'is_paid', 'fee_charged',
             'accepted_at', 'en_route_at', 'started_at', 'completed_at',
             'created_at', 'updated_at',
-            'rider_username_input', 'rodie_username_input'
+            'rider_username_input', 'rodie_username_input', 'ratings'
         )
 
         if ServiceType:
             fields += ('service_type_id',)
+
+    def get_ratings(self, obj):
+        try:
+            from .models_rating import Rating
+            ratings = Rating.objects.filter(service_request=obj).select_related('rater', 'rated_user')
+            return RatingSerializer(ratings, many=True).data
+        except Exception:
+            return []
 
     def validate(self, attrs):
         rider_username = self.initial_data.get('rider_username') or self.initial_data.get('rider_username_input')

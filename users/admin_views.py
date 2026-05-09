@@ -3,7 +3,7 @@ from rest_framework import generics, permissions, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Avg
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
 from requests.models import ServiceRequest 
@@ -236,12 +236,23 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         ).order_by('-count')[:5]  
         
         recent_assignments = roadie_requests.order_by('-created_at')[:5].values(
-            'id', 'service_type__name', 'status', 'created_at', 'rider__username'
+            'id', 'service_type__name', 'status', 'created_at', 'rider__username',
+            'rider_lat', 'rider_lng'
         )
         
         completion_rate = (completed_requests / total_assigned * 100) if total_assigned > 0 else 0
         
         unique_riders_served = roadie_requests.values('rider').distinct().count()
+        
+        # Calculate average rating from ratings received
+        try:
+            from requests.models_rating import Rating
+            avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
+                avg_rating=models.Avg('rating')
+            )['avg_rating'] or 0
+            avg_rating = round(float(avg_rating), 1) if avg_rating else 0.0
+        except Exception:
+            avg_rating = 0.0
         
         summary_data = {
             'stats': {
@@ -258,7 +269,7 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             'created_date': instance.created_at,
             'last_active': roadie_requests.order_by('-updated_at').first().updated_at if roadie_requests.exists() else instance.updated_at,
             'is_approved': instance.is_approved,
-            'rating': 4.5,  
+            'rating': avg_rating,
         }
         
         response_data = serializer.data
