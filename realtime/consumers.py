@@ -957,7 +957,11 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
 
     async def request_declined(self, event):
-        await self.send_json({"type": "REQUEST_UPDATE", "status": "DECLINED", "request": event.get("request")})
+        # 🟢 BUG FIX: Silent Decline.
+        # We DO NOT send "DECLINED" status to the rider because the matching logic
+        # is still running in the background and will offer the request to the next roadie.
+        pass
+
 
     async def request_cancelled(self, event):
         """Handle request cancellation confirmation"""

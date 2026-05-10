@@ -708,11 +708,10 @@ class PesapalIPNView(APIView):
 @permission_classes([IsAuthenticated])
 def submit_feedback(request):
     """
-    Submit user feedback to support/CRM
+    Submit user feedback/inquiries as a SupportTicket to the CRM
     """
     try:
         message = request.data.get('message', '').strip()
-        feedback_type = request.data.get('type', 'app_feedback')
         
         if not message:
             return Response(
@@ -720,20 +719,26 @@ def submit_feedback(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Here you can:
-        # 1. Save to database
-        # 2. Send email to support
-        # 3. Integrate with CRM system
-        # 4. Send notification to admin
+        from .models import SupportTicket
         
-        # For now, just log it (in production, implement proper storage)
-        print(f"Feedback received from {request.user.username}: {message}")
-        print(f"Type: {feedback_type}")
+        # Create a support ticket in the database (CRM)
+        ticket = SupportTicket.objects.create(
+            user=request.user,
+            user_type=request.user.role if request.user.role in ['RIDER', 'RODIE'] else 'RIDER',
+            subject="App Feedback/Inquiry",
+            message=message,
+            status='PENDING'
+        )
+        
+        print(f"✅ Support Ticket {ticket.support_id} created for {request.user.username}")
         
         return Response({
-            'message': 'Feedback submitted successfully'
+            'success': True,
+            'message': 'Feedback submitted successfully',
+            'support_id': ticket.support_id
         }, status=status.HTTP_200_OK)
     except Exception as e:
+        print(f"❌ Feedback Error: {e}")
         return Response({
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

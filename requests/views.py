@@ -470,11 +470,11 @@ class CancelRequestView(APIView):
 
         if user.role == 'RIDER' and req.rider_id == user.id:
             # Rider can cancel if request has not started yet
-            if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
+            if req.status in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
                 with transaction.atomic():
                     # Re-fetch with row lock to prevent race conditions
                     req = ServiceRequest.objects.select_for_update().get(id=pk)
-                    if req.status not in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE']:
+                    if req.status not in ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
                         return Response(
                             {'detail': f'Request status changed to {req.status}'},
                             status=status.HTTP_409_CONFLICT
@@ -530,19 +530,32 @@ class CancelRequestView(APIView):
                                 )
                                 print(f"🚫 Sent cancellation to offered roadie {r.username}")
                     
+                    from users.fcm import send_push_notification
+                    if req.rodie:
+                        send_push_notification(
+                            req.rodie,
+                            "Request Cancelled",
+                            f"The Rider has cancelled request #{req.id}.",
+                            {
+                                "type": "REQUEST_CANCELLED",
+                                "request_id": str(req.id),
+                                "status": "CANCELLED"
+                            }
+                        )
+                    
                     print(f"🚫 Broadcasted cancellation for request {req.id} to all parties")
                 except Exception as e:
                     print(f"❌ Error broadcasting cancellation: {e}")
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': 'Cannot cancel request: The service has already started.'},
+                    {'detail': 'Cannot cancel request: The service has already started or is completed.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
         # Rodie can cancel if request is accepted or en_route
         if user.role == 'RODIE' and req.rodie_id == user.id:
-            if req.status in ['ACCEPTED', 'EN_ROUTE']:
+            if req.status in ['ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
                 # Calculate distance for record keeping if location is provided
                 dist_km = None
                 if current_lat and current_lng:
@@ -554,7 +567,7 @@ class CancelRequestView(APIView):
                 with transaction.atomic():
                     # Re-fetch with row lock to prevent race conditions
                     req = ServiceRequest.objects.select_for_update().get(id=pk)
-                    if req.status not in ['ACCEPTED', 'EN_ROUTE']:
+                    if req.status not in ['ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
                         return Response(
                             {'detail': f'Request status changed to {req.status}'},
                             status=status.HTTP_409_CONFLICT
@@ -592,15 +605,39 @@ class CancelRequestView(APIView):
                         }
                     )
                     
+                    from users.fcm import send_push_notification
+                    send_push_notification(
+                        req.rider,
+                        "Request Cancelled",
+                        f"The Roadie has cancelled request #{req.id}.",
+                        {
+                            "type": "REQUEST_CANCELLED",
+                            "request_id": str(req.id),
+                            "status": "CANCELLED"
+                        }
+                    )
+                    
                     print(f"🚫 Roadie cancelled request {req.id} - reason: {cancellation_reason.reason}")
                 except Exception as e:
                     print(f"❌ Error broadcasting roadie cancellation: {e}")
                 
+                    from users.fcm import send_push_notification
+                    send_push_notification(
+                        req.rider,
+                        "Request Cancelled",
+                        "The Roadie has cancelled the request.",
+                        {
+                            "type": "REQUEST_CANCELLED",
+                            "request_id": str(req.id),
+                            "status": "CANCELLED"
+                        }
+                    )
+                    
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': f'Cannot cancel request with status {req.status}. Once you arrive, you must fulfill the job.'},
-                    status=status.HTTP_403_FORBIDDEN
+                    {'detail': 'Cannot cancel request: The service has already started or is completed.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         return Response({'detail': 'Not authorized to cancel'}, status=status.HTTP_403_FORBIDDEN)
@@ -646,6 +683,19 @@ class ArrivedRequestView(APIView):
                     f'rider_{req.rider_id}',
                     {'type': 'request_arrived', 'status': 'ARRIVED', 'request': data}
                 )
+                
+                # Push Notification
+                from users.fcm import send_push_notification
+                send_push_notification(
+                    req.rider,
+                    "Roadie has Arrived!",
+                    f"{user.username} has arrived at your location.",
+                    {
+                        "type": "REQUEST_ARRIVED",
+                        "request_id": str(req.id),
+                        "status": "ARRIVED"
+                    }
+                )
                 print(f"✅ [ArrivedView] ARRIVED broadcast complete for request {req.id}")
         except Exception as e:
             print(f"❌ [ArrivedView] Error broadcasting arrived: {e}")
@@ -677,6 +727,7 @@ class EnrouteRequestView(APIView):
         try:
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
+                from users.fcm import send_push_notification
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
@@ -690,6 +741,17 @@ class EnrouteRequestView(APIView):
                 async_to_sync(channel_layer.group_send)(
                     f'rider_{req.rider_id}',
                     {'type': 'request_enroute', 'request': data}
+                )
+                # Push Notification
+                send_push_notification(
+                    req.rider,
+                    "Roadie is on the way!",
+                    f"{user.username} is now en route to your location.",
+                    {
+                        "type": "REQUEST_ENROUTE",
+                        "request_id": str(req.id),
+                        "status": "EN_ROUTE"
+                    }
                 )
                 print(f"✅ [EnrouteView] EN_ROUTE broadcast complete for request {req.id}")
         except Exception as e:
@@ -717,6 +779,7 @@ class StartRequestView(APIView):
         try:
             if get_channel_layer and async_to_sync:
                 from .serializers import ServiceRequestSerializer
+                from users.fcm import send_push_notification
                 data = ServiceRequestSerializer(req).data
                 channel_layer = get_channel_layer()
                 
@@ -730,6 +793,17 @@ class StartRequestView(APIView):
                 async_to_sync(channel_layer.group_send)(
                     f'rider_{req.rider_id}',
                     {'type': 'request_started', 'status': 'STARTED', 'request': data}
+                )
+                # Push Notification
+                send_push_notification(
+                    req.rider,
+                    "Service Started",
+                    f"{user.username} has started the service.",
+                    {
+                        "type": "REQUEST_STARTED",
+                        "request_id": str(req.id),
+                        "status": "STARTED"
+                    }
                 )
                 print(f"✅ [StartView] STARTED broadcast complete for request {req.id}")
         except Exception as e:
@@ -795,6 +869,19 @@ class CompleteRequestView(APIView):
                 async_to_sync(channel_layer.group_send)(
                     f'rider_{req.rider_id}',
                     {'type': 'request_completed', 'status': 'COMPLETED', 'request': data}
+                )
+                
+                # Push Notification
+                from users.fcm import send_push_notification
+                send_push_notification(
+                    req.rider,
+                    "Assist Completed!",
+                    "Thank you for using Vehix. Your assist has been completed.",
+                    {
+                        "type": "REQUEST_COMPLETED",
+                        "request_id": str(req.id),
+                        "status": "COMPLETED"
+                    }
                 )
                 print(f"✅ [CompleteView] COMPLETED broadcast complete for request {req.id}")
         except Exception as e:

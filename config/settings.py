@@ -362,3 +362,15 @@ else:
 # These are used by the custom ResendEmailBackend
 EMAIL_HOST_PASSWORD = config('RESEND_API_KEY', default='your-resend-api-key-here')
 DEFAULT_FROM_EMAIL = 'Vehix <info@vehix.ug>'
+
+# Celery Beat Schedule
+CELERY_BEAT_SCHEDULE = {
+    'permanent-account-deletion-daily': {
+        'task': 'users.tasks.permanent_deletion_of_old_requests',
+        'schedule': timedelta(days=1),
+    },
+    'flush-locations-every-10-seconds': {
+        'task': 'config.tasks.flush_locations_task',
+        'schedule': 10.0,
+    },
+}

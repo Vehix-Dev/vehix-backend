@@ -54,4 +54,13 @@ flutter_logs.txt
 Sound.mpeg
 TUTU.jpeg
 Screenshot*.png
-jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
+# Security / Credentials (NEVER COMMIT THESE)
+*.json
+!composer.json
+!package.json
+!package-lock.json
+!tsconfig.json
+google-services.json
+GoogleService-Info.plist
+firebase-key*.json
+jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json

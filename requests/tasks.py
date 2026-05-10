@@ -166,6 +166,19 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     {"type": "offer_request", "request": payload}
                 )
                 
+                # Push Notification for New Offer
+                from users.fcm import send_push_notification
+                send_push_notification(
+                    rodie_user,
+                    "New Assist Request!",
+                    f"A rider nearby needs {service_name}. Tap to view details.",
+                    {
+                        "type": "OFFER_REQUEST",
+                        "request_id": str(request_id),
+                        "status": "OFFERED"
+                    }
+                )
+                
                 async_to_sync(channel_layer.group_send)(
                     f"request_{request_id}",
                     {
