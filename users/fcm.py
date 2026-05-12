@@ -8,15 +8,24 @@ try:
     import sys
     import os
     
+    # 1. Identify the project root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    # 2. PURGE POISONED CACHE: If 'requests' was already imported pointing to our local app, kill it.
+    if 'requests' in sys.modules:
+        req_mod = sys.modules['requests']
+        if not hasattr(req_mod, '__file__') or os.path.abspath(project_root) in os.path.abspath(getattr(req_mod, '__file__', '')):
+            del sys.modules['requests']
+            # Also purge submodules if they exist
+            for mod_name in list(sys.modules.keys()):
+                if mod_name.startswith('requests.'):
+                    del sys.modules[mod_name]
+    
     _original_path = sys.path[:]
     try:
-        # 1. Identify the project root
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        # 2. Re-order sys.path: Put site-packages at the VERY FRONT and project root at the VERY END
+        # 3. Re-order sys.path: Put site-packages at the VERY FRONT
         site_packages = [p for p in sys.path if 'site-packages' in p]
         others = [p for p in sys.path if 'site-packages' not in p and os.path.abspath(p) != os.path.abspath(project_root) and p not in ('', '.')]
-        
         sys.path = site_packages + others + [project_root]
         
         import firebase_admin
