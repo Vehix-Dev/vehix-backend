@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Count, Q, Avg
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
-from requests.models import ServiceRequest 
+from django.apps import apps
 from rest_framework import generics, permissions
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer
 from .models import Wallet, Referral, PlatformConfig, Notification
@@ -70,6 +70,7 @@ class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         """Override GET to include summary statistics"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
         rider_requests = ServiceRequest.objects.filter(rider=instance)
         total_requests = rider_requests.count()
         
@@ -216,6 +217,7 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         """Override GET to include summary statistics"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
         roadie_requests = ServiceRequest.objects.filter(rodie=instance)
         total_assigned = roadie_requests.count()
         
@@ -246,7 +248,8 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         
         # Calculate average rating from ratings received
         try:
-            from requests.models_rating import Rating
+            from django.apps import apps
+            Rating = apps.get_model('requests', 'Rating')
             avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
                 avg_rating=models.Avg('rating')
             )['avg_rating'] or 0
@@ -349,6 +352,7 @@ class RiderSummaryView(APIView):
     def get(self, request, pk):
         try:
             rider = User.objects.get(id=pk, role='RIDER')
+            ServiceRequest = apps.get_model('requests', 'ServiceRequest')
             rider_requests = ServiceRequest.objects.filter(rider=rider)
             
             total_requests = rider_requests.count()
@@ -375,6 +379,7 @@ class RoadieSummaryView(APIView):
     def get(self, request, pk):
         try:
             roadie = User.objects.get(id=pk, role='RODIE')
+            ServiceRequest = apps.get_model('requests', 'ServiceRequest')
             roadie_requests = ServiceRequest.objects.filter(rodie=roadie)
             
             total_assignments = roadie_requests.count()

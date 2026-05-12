@@ -225,17 +225,24 @@ class UserSerializer(serializers.ModelSerializer):
             return None
 
     def get_rating(self, obj):
-        from requests.models_rating import Rating
-        from django.db.models import Avg
-        avg = Rating.objects.filter(rated_user=obj).aggregate(Avg('rating'))['rating__avg']
-        # Default to 5.0 for new users instead of 0.0
-        return float(avg) if avg is not None else 5.0
+        try:
+            from django.apps import apps
+            Rating = apps.get_model('requests', 'Rating')
+            from django.db.models import Avg
+            avg = Rating.objects.filter(rated_user=obj).aggregate(Avg('rating'))['rating__avg']
+            return float(avg) if avg is not None else 5.0
+        except Exception:
+            return 5.0
 
     def get_total_assists(self, obj):
-        from requests.models import ServiceRequest
-        if obj.role == 'RIDER':
-            return ServiceRequest.objects.filter(rider=obj, status='COMPLETED').count()
-        return ServiceRequest.objects.filter(rodie=obj, status='COMPLETED').count()
+        try:
+            from django.apps import apps
+            ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+            if obj.role == 'RIDER':
+                return ServiceRequest.objects.filter(rider=obj, status='COMPLETED').count()
+            return ServiceRequest.objects.filter(rodie=obj, status='COMPLETED').count()
+        except Exception:
+            return 0
 
     def get_total_rides(self, obj):
         return self.get_total_assists(obj)

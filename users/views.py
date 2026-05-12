@@ -178,6 +178,13 @@ class MyWalletView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from django.apps import apps
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+        Dispute = apps.get_model('requests', 'Dispute')
+        
+        # Get rider stats
+        total_requests = ServiceRequest.objects.filter(rider=request.user).count()
+        
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
         
         # Get all payments
@@ -729,6 +736,10 @@ def submit_feedback(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        from django.apps import apps
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+        Dispute = apps.get_model('requests', 'Dispute')
+        
         from .models import SupportTicket
         
         # Create a support ticket in the database (CRM)
@@ -875,7 +886,9 @@ class AccountDeletionEligibilityView(APIView):
         user = request.user
         reasons = []
         
-        from requests.models import ServiceRequest, Dispute
+        from django.apps import apps
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+        Dispute = apps.get_model('requests', 'Dispute')
         
         # 1. Check for active request/job
         if user.role == 'RIDER':
