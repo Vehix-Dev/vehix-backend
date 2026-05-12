@@ -28,18 +28,17 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
         
         # Import here to avoid circular imports
         from .osrm import get_route_info
+        from .services import find_nearby_rodies
         
-        logger.info(f"🚀 Starting matching task for Request #{request_id} with {len(rodie_details)} rodies")
+        logger.info(f"🚀 Starting matching task for Request #{request_id} with {len(rodie_details)} initial roadies")
+        
+        offered_rodie_ids = set()
+        # Convert initial details to a working list
+        current_rodies = list(rodie_details)
 
-        for detail in rodie_details:
-            # 1. Stop if overall timeout reached (90s)
-            if time.time() - total_start > expiry_seconds:
-                logger.info(f"⌛ Total matching window expired for Request #{request_id}")
-                break
-            
-            # 2. Check current status - Database is source of truth
+        while (time.time() - total_start) < expiry_seconds:
+            # 1. Check current status - Database is source of truth
             try:
-                # Refresh status directly from DB
                 req_obj = ServiceRequest.objects.get(id=request_id)
                 status = req_obj.status
                 cache.set(f"request_status:{request_id}", status, timeout=300)
@@ -53,10 +52,38 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
             except Exception as e:
                 logger.warning(f"⚠️ Status check failed: {e}")
 
+            # 2. If no roadies in our current list, try to find more nearby
+            if not current_rodies:
+                logger.info(f"🔍 [Task] No roadies in queue for Request #{request_id}. Searching...")
+                try:
+                    service_type = ServiceType.objects.get(id=service_type_id)
+                    new_found = find_nearby_rodies(service_type, rider_lat, rider_lng)
+                    
+                    # Filter for roadies we haven't offered to yet
+                    for item in new_found:
+                        r_id = item['rodie'].id
+                        if r_id not in offered_rodie_ids:
+                            current_rodies.append({
+                                'id': r_id,
+                                'distance': float(item['distance'])
+                            })
+                    
+                    if not current_rodies:
+                        logger.info(f"⏳ [Task] Still no new roadies for Request #{request_id}. Sleeping 5s...")
+                        time.sleep(5)
+                        continue
+                except Exception as e:
+                    logger.error(f"❌ Error during re-scan for roadies: {e}")
+                    time.sleep(5)
+                    continue
+
+            # 3. Take the next roadie
+            detail = current_rodies.pop(0)
             rodie_id = detail['id']
             distance_km = detail['distance']
+            offered_rodie_ids.add(rodie_id)
             
-            # 3. Check if roadie is still valid (Online & Not Busy & Active Location)
+            # 4. Check if roadie is still valid (Online & Not Busy & Active Location)
             try:
                 from users.models import User
                 from locations.models import RodieLocation
@@ -69,20 +96,18 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     logger.info(f"📵 Rodie {rodie_id} is offline. Skipping.")
                     continue
                 
-                # Skip if location is stale (No update in 60 mins)
-                # (Increased from 10m to improve reliability)
-                sixty_mins_ago = timezone.now() - timezone.timedelta(minutes=60)
-                if not RodieLocation.objects.filter(rodie=rodie_user, updated_at__gte=sixty_mins_ago).exists():
-                    logger.info(f"👻 Rodie {rodie_id} has a stale location/ghost. Skipping.")
+                # Skip if heartbeat is stale (Safety check)
+                if not cache.get(f"rodie_heartbeat:{rodie_id}"):
+                    logger.info(f"👻 Rodie {rodie_id} has no active heartbeat. Skipping.")
                     continue
 
-                # Skip if already in an active session (Accepted/Started/En-route)
+                # Skip if already in an active session
                 if ServiceRequest.objects.filter(rodie=rodie_user, status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']).exists():
-                    logger.info(f"🚧 Rodie {rodie_id} is now busy with another request. Skipping.")
+                    logger.info(f"🚧 Rodie {rodie_id} is busy. Skipping.")
                     continue
 
                 if cache.get(f"rodie_locked:{rodie_id}"):
-                    logger.info(f"🔒 Rodie {rodie_id} is locked by another offer. Skipping.")
+                    logger.info(f"🔒 Rodie {rodie_id} is locked. Skipping.")
                     continue
             except User.DoesNotExist:
                 continue
@@ -90,7 +115,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                 logger.warning(f"⚠️ Availability check failed for rodie {rodie_id}: {e}")
                 continue
                 
-            # 4. Get actual route info (ETA)
+            # 5. Get actual route info (ETA)
             duration_s = None
             distance_m = distance_km * 1000
             
@@ -107,7 +132,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                 except Exception as e:
                     logger.warning(f"⚠️ OSRM failed for rodie {rodie_id}: {e}")
 
-            # 5. Construct payload
+            # 6. Construct payload
             try:
                 req_obj = ServiceRequest.objects.get(id=request_id)
                 service_name = ServiceType.objects.get(id=service_type_id).name
@@ -125,7 +150,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     "eta_seconds": duration_s,
                     "distance_meters": distance_m,
                     "distance_km": round(distance_m / 1000.0, 1),
-                    "fee": 15000, 
+                    "fee": float(service_name == 'Towing' and 50000 or 15000), 
                     "rider": {
                         "id": req_obj.rider.id,
                         "username": req_obj.rider.username,
@@ -135,32 +160,15 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     }
                 }
             except Exception as e:
-                logger.error(f"❌ Failed to fetch request/service info: {e}")
+                logger.error(f"❌ Failed to construct payload: {e}")
                 continue
-
-            # 6. Live Eligibility Check (direct ORM — we are in a sync Celery worker)
-            try:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                is_eligible = User.objects.filter(
-                    id=rodie_id,
-                    is_online=True,
-                    is_active=True,
-                    is_approved=True,
-                    services_selected=True,  # must have selected services
-                    is_deleted=False,
-                ).exists()
-                if not is_eligible:
-                    logger.info(f"📵 Rodie {rodie_id} ineligible (offline/unapproved/no services). Skipping.")
-                    continue
-            except Exception as e:
-                logger.warning(f"⚠️ Eligibility check failed for {rodie_id}: {e}")
 
             # 7. Lock Rodie and Send offer
             try:
                 cache.set(f"rodie_locked:{rodie_id}", request_id, timeout=offer_seconds + 5)
                 cache.set(f"active_offer:{rodie_id}", payload, timeout=offer_seconds + 5)
                 
+                logger.info(f"📡 Sending offer to Rodie {rodie_user.username} ({payload['distance_km']}km away)")
                 async_to_sync(channel_layer.group_send)(
                     f"rodie_{rodie_id}",
                     {"type": "offer_request", "request": payload}
@@ -187,7 +195,6 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                         "eta_seconds": payload["eta_seconds"]
                     }
                 )
-                logger.info(f"📡 Offer sent to Rodie {rodie_id}")
             except Exception as e:
                 logger.error(f"❌ WebSocket notification failed: {e}")
 
@@ -211,15 +218,11 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     pass
                 time.sleep(1)
                 
-            # Cleanup turn (lock release BEFORE resetting status to avoid race)
+            # Cleanup turn
             cache.delete(f"rodie_locked:{rodie_id}")
             cache.delete(f"active_offer:{rodie_id}")
-            # Reset DECLINED -> REQUESTED so next roadie sees a fresh status
-            current_status = cache.get(f"request_status:{request_id}")
-            if current_status == 'DECLINED':
-                cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
 
-        # 9. Expiration — inline since there is no separate expire_request function
+        # 9. Expiration (Window finished without acceptance)
         try:
             with transaction.atomic():
                 req = ServiceRequest.objects.select_for_update().get(id=request_id)
@@ -228,7 +231,6 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     req.save(update_fields=['status'])
                     cache.set(f"request_status:{request_id}", 'EXPIRED', timeout=300)
                     try:
-                        # Send to rider's personal channel (most reliable for this critical event)
                         async_to_sync(channel_layer.group_send)(
                             f'rider_{req.rider_id}',
                             {'type': 'request_expired', 'status': 'EXPIRED', 'request': {'id': request_id}}
@@ -258,7 +260,10 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                             )
                     except Exception:
                         pass
-                    logger.info(f"⌛ Request #{request_id} EXPIRED — no roadie accepted")
+                    logger.info(f"⌛ Request #{request_id} EXPIRED after {expiry_seconds}s window")
+        except Exception as e:
+            logger.error(f"❌ Error expiring request #{request_id}: {e}")
+        return "Expired"
         except Exception as e:
             logger.error(f"❌ Error expiring request #{request_id}: {e}")
         return "Expired"
