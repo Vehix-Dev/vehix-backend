@@ -5,8 +5,19 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 try:
-    import firebase_admin
-    from firebase_admin import credentials, messaging
+    import sys
+    import os
+    # Temporarily remove current directory from path to prevent local 'requests' app 
+    # from shadowing the 'requests' library used by firebase_admin
+    _original_path = sys.path[:]
+    try:
+        if '' in sys.path: sys.path.remove('')
+        if os.getcwd() in sys.path: sys.path.remove(os.getcwd())
+        
+        import firebase_admin
+        from firebase_admin import credentials, messaging
+    finally:
+        sys.path[:] = _original_path
 except ImportError:
     firebase_admin = None
     credentials = None
