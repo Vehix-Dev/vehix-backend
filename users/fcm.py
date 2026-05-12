@@ -7,19 +7,17 @@ User = get_user_model()
 try:
     import sys
     import os
-    # Identify shadowing: check if 'requests' folder exists in project root
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    local_requests = os.path.join(project_root, 'requests')
     
     _original_path = sys.path[:]
     try:
-        if os.path.exists(local_requests):
-            # Temporarily remove any paths that would cause 'requests' shadowing
-            sys.path = [p for p in sys.path if p not in ('', '.', project_root) and os.path.abspath(p) != os.path.abspath(project_root)]
-            # Force a check to see if we now get the real requests library
-            import requests
-            if 'site-packages' in getattr(requests, '__file__', ''):
-                print("DEBUG: Shadowing detected and bypassed successfully!")
+        # 1. Identify the project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # 2. Re-order sys.path: Put site-packages at the VERY FRONT and project root at the VERY END
+        site_packages = [p for p in sys.path if 'site-packages' in p]
+        others = [p for p in sys.path if 'site-packages' not in p and os.path.abspath(p) != os.path.abspath(project_root) and p not in ('', '.')]
+        
+        sys.path = site_packages + others + [project_root]
         
         import firebase_admin
         from firebase_admin import credentials, messaging
