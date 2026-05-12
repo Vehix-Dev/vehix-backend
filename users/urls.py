@@ -43,14 +43,7 @@ from services.admin_views import (
     RodieServiceRetrieveUpdateDestroyView,
 )
 from services.views import RodieMyServicesView, RodieInitialServiceSelectionView
-from requests.admin_views import (
-    ServiceRequestListCreateView,
-    ServiceRequestRetrieveUpdateDestroyView,
-    RealtimeRiderLocationsView,
-    RealtimeRiderMapView,
-    ServiceRequestRouteView,
-    AdminAssignRodieView,
-)
+# Lazy imports for requests app below
 from locations.admin_views import (
     RealtimeLocationsView,
     RealtimeLocationsMapView,
@@ -114,11 +107,11 @@ urlpatterns = [
     path('auth/admin/rodie-services/<int:pk>/', RodieServiceRetrieveUpdateDestroyView.as_view(), name='admin_rodie_services_rud'),
     path('auth/rodie/services/', RodieMyServicesView.as_view(), name='rodie_my_services'),
     path('auth/rodie/services/initial/', RodieInitialServiceSelectionView.as_view(), name='rodie_initial_service_selection'),
-    path('auth/admin/requests/', ServiceRequestListCreateView.as_view(), name='admin_requests_list_create'),
-    path('auth/admin/requests/<int:pk>/', ServiceRequestRetrieveUpdateDestroyView.as_view(), name='admin_requests_rud'),
-    path('auth/admin/requests/realtime/', RealtimeRiderLocationsView.as_view(), name='admin_requests_realtime'),
-    path('auth/admin/requests/realtime/map/', RealtimeRiderMapView.as_view(), name='admin_requests_realtime_map'),
-    path('auth/admin/requests/<int:pk>/route/', ServiceRequestRouteView.as_view(), name='admin_request_route'),
+    path('auth/admin/requests/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['ServiceRequestListCreateView']).ServiceRequestListCreateView.as_view()(r, *a, **k), name='admin_requests_list_create'),
+    path('auth/admin/requests/<int:pk>/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['ServiceRequestRetrieveUpdateDestroyView']).ServiceRequestRetrieveUpdateDestroyView.as_view()(r, *a, **k), name='admin_requests_rud'),
+    path('auth/admin/requests/realtime/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['RealtimeRiderLocationsView']).RealtimeRiderLocationsView.as_view()(r, *a, **k), name='admin_requests_realtime'),
+    path('auth/admin/requests/realtime/map/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['RealtimeRiderMapView']).RealtimeRiderMapView.as_view()(r, *a, **k), name='admin_requests_realtime_map'),
+    path('auth/admin/requests/<int:pk>/route/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['ServiceRequestRouteView']).ServiceRequestRouteView.as_view()(r, *a, **k), name='admin_request_route'),
     path('auth/admin/locations/realtime/', RealtimeLocationsView.as_view(), name='admin_locations_realtime'),
     path('auth/admin/locations/realtime/map/', RealtimeLocationsMapView.as_view(), name='admin_locations_realtime_map'),
     path('auth/admin/wallets/', AdminWalletListCreateView.as_view(), name='admin_wallets_list_create'),
@@ -129,7 +122,7 @@ urlpatterns = [
     path('auth/admin/notifications/', AdminNotificationListCreateView.as_view(), name='admin_notifications_list_create'),
     path('auth/admin/notifications/<int:pk>/', AdminNotificationRUDView.as_view(), name='admin_notifications_rud'),
     path('auth/admin/users/<int:pk>/password/', AdminUserPasswordView.as_view(), name='admin_user_password_change'),
-    path('auth/admin/requests/<int:pk>/assign/', AdminAssignRodieView.as_view(), name='admin_request_assign'),
+    path('auth/admin/requests/<int:pk>/assign/', lambda r, *a, **k: __import__('requests.admin_views', fromlist=['AdminAssignRodieView']).AdminAssignRodieView.as_view()(r, *a, **k), name='admin_request_assign'),
 ]
 
 # Add router URLs
