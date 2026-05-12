@@ -141,17 +141,16 @@ class User(AbstractUser):
     @property
     def trial_days_left(self):
         """Returns the number of days left in the free trial, or 0 if expired/not applicable."""
-        try:
-            if not self.trial_end_date:
-                return 0
-            from django.utils import timezone
-            diff = self.trial_end_date - timezone.now()
-            total_seconds = diff.total_seconds()
-            if total_seconds <= 0:
-                return 0
-            return int(total_seconds // 86400) + 1
-        except Exception:
+        if not self.trial_end_date:
             return 0
+        from django.utils import timezone
+        diff = self.trial_end_date - timezone.now()
+        total_seconds = diff.total_seconds()
+        if total_seconds <= 0:
+            return 0
+        # diff.days returns floor, but we want to include today. 
+        # For example, if 0.5 days left, it should show 1 day.
+        return int(total_seconds // 86400) + 1
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None

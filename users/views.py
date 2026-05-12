@@ -34,18 +34,8 @@ class RegisterView(generics.CreateAPIView):
 
 class MeView(APIView):
     def get(self, request):
-        try:
-            serializer = UserSerializer(request.user, context={'request': request})
-            return Response(serializer.data)
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"❌ CRASH in MeView: {error_details}")
-            return Response({
-                'error': 'Internal Serializer Error',
-                'details': str(e),
-                'traceback': error_details
-            }, status=500)
+        serializer = UserSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
 
 
 class UserProfileUpdateView(APIView):
@@ -178,13 +168,6 @@ class MyWalletView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from django.apps import apps
-        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
-        Dispute = apps.get_model('requests', 'Dispute')
-        
-        # Get rider stats
-        total_requests = ServiceRequest.objects.filter(rider=request.user).count()
-        
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
         
         # Get all payments
@@ -736,10 +719,6 @@ def submit_feedback(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        from django.apps import apps
-        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
-        Dispute = apps.get_model('requests', 'Dispute')
-        
         from .models import SupportTicket
         
         # Create a support ticket in the database (CRM)
@@ -886,9 +865,7 @@ class AccountDeletionEligibilityView(APIView):
         user = request.user
         reasons = []
         
-        from django.apps import apps
-        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
-        Dispute = apps.get_model('requests', 'Dispute')
+        from requests.models import ServiceRequest, Dispute
         
         # 1. Check for active request/job
         if user.role == 'RIDER':
