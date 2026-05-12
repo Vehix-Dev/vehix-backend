@@ -7,15 +7,25 @@ User = get_user_model()
 try:
     import sys
     import os
-    # Temporarily remove current directory from path to prevent local 'requests' app 
-    # from shadowing the 'requests' library used by firebase_admin
+    # Identify shadowing: check if 'requests' folder exists in project root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_requests = os.path.join(project_root, 'requests')
+    
     _original_path = sys.path[:]
     try:
-        if '' in sys.path: sys.path.remove('')
-        if os.getcwd() in sys.path: sys.path.remove(os.getcwd())
+        if os.path.exists(local_requests):
+            # Temporarily remove any paths that would cause 'requests' shadowing
+            sys.path = [p for p in sys.path if p not in ('', '.', project_root) and os.path.abspath(p) != os.path.abspath(project_root)]
+            # Force a check to see if we now get the real requests library
+            import requests
+            if 'site-packages' in getattr(requests, '__file__', ''):
+                print("DEBUG: Shadowing detected and bypassed successfully!")
         
         import firebase_admin
         from firebase_admin import credentials, messaging
+    except Exception as e:
+        print(f"DEBUG: FCM Initialization failed: {e}")
+        firebase_admin = None
     finally:
         sys.path[:] = _original_path
 except ImportError:
