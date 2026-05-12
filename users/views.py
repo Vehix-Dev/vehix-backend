@@ -34,8 +34,18 @@ class RegisterView(generics.CreateAPIView):
 
 class MeView(APIView):
     def get(self, request):
-        serializer = UserSerializer(request.user, context={'request': request})
-        return Response(serializer.data)
+        try:
+            serializer = UserSerializer(request.user, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ CRASH in MeView: {error_details}")
+            return Response({
+                'error': 'Internal Serializer Error',
+                'details': str(e),
+                'traceback': error_details
+            }, status=500)
 
 
 class UserProfileUpdateView(APIView):
