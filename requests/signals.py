@@ -22,7 +22,7 @@ def broadcast_request_update(sender, instance, created, **kwargs):
     if not channel_layer:
         return
 
-    from requests.serializers import ServiceRequestSerializer
+    from .serializers import ServiceRequestSerializer
 
     data = ServiceRequestSerializer(instance).data
 

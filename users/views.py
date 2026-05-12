@@ -865,7 +865,9 @@ class AccountDeletionEligibilityView(APIView):
         user = request.user
         reasons = []
         
-        from requests.models import ServiceRequest, Dispute
+        from django.apps import apps
+        ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+        Dispute = apps.get_model('requests', 'Dispute')
         
         # 1. Check for active request/job
         if user.role == 'RIDER':

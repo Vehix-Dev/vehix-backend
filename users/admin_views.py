@@ -6,7 +6,8 @@ from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Count, Q, Avg
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
-from requests.models import ServiceRequest 
+from django.apps import apps
+ServiceRequest = apps.get_model('requests', 'ServiceRequest')
 from rest_framework import generics, permissions
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer
 from .models import Wallet, Referral, PlatformConfig, Notification

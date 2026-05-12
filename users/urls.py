@@ -43,14 +43,22 @@ from services.admin_views import (
     RodieServiceRetrieveUpdateDestroyView,
 )
 from services.views import RodieMyServicesView, RodieInitialServiceSelectionView
-from requests.admin_views import (
-    ServiceRequestListCreateView,
-    ServiceRequestRetrieveUpdateDestroyView,
-    RealtimeRiderLocationsView,
-    RealtimeRiderMapView,
-    ServiceRequestRouteView,
-    AdminAssignRodieView,
-)
+import sys
+import os
+# Temporarily prioritize local path to import shadowed 'requests' app
+_old_path = sys.path[:]
+try:
+    if '' not in sys.path: sys.path.insert(0, '')
+    from requests.admin_views import (
+        ServiceRequestListCreateView,
+        ServiceRequestRetrieveUpdateDestroyView,
+        RealtimeRiderLocationsView,
+        RealtimeRiderMapView,
+        ServiceRequestRouteView,
+        AdminAssignRodieView,
+    )
+finally:
+    sys.path[:] = _old_path
 from locations.admin_views import (
     RealtimeLocationsView,
     RealtimeLocationsMapView,

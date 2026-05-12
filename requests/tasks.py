@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.db import transaction
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from requests.models import ServiceRequest
+from .models import ServiceRequest
 from services.models import ServiceType
 
 logger = logging.getLogger(__name__)

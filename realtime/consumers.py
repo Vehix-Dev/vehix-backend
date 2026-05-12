@@ -1,8 +1,9 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-from requests.models import ServiceRequest
-from requests.models_chat import ChatMessage
+from django.apps import apps
+ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+ChatMessage = apps.get_model('requests', 'ChatMessage')
 from users.models import RiderAvailabilityLog
 from locations.models import RodieLocation
 from django.utils import timezone
@@ -107,7 +108,7 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
             
             # --- AUTO-REJOIN ACTIVE REQUESTS ---
             try:
-                from requests.models import ServiceRequest
+                ServiceRequest = apps.get_model('requests', 'ServiceRequest')
                 from django.db.models import Q
                 def get_active_request_id():
                     req = ServiceRequest.objects.filter(
@@ -122,7 +123,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                     print(f"🔄 [RodieConsumer] Auto-rejoined request group: request_{req.id}")
                     
                     # Send current state immediately to sync UI
-                    from requests.serializers import ServiceRequestSerializer
+                    # Use shadow-safe serializer import
+                    import sys
+                    _old_path = sys.path[:]
+                    try:
+                        if '' not in sys.path: sys.path.insert(0, '')
+                        from requests.serializers import ServiceRequestSerializer
+                    finally:
+                        sys.path[:] = _old_path
                     serializer_data = await database_sync_to_async(lambda: ServiceRequestSerializer(req).data)()
                     await self.send_json({
                         "type": "REQUEST_UPDATE",
@@ -656,7 +664,14 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
                     print(f"🔄 [RiderConsumer] Auto-rejoined request group: request_{req.id}")
                     
                     # Send current state immediately to sync UI
-                    from requests.serializers import ServiceRequestSerializer
+                    # Use shadow-safe serializer import
+                    import sys
+                    _old_path = sys.path[:]
+                    try:
+                        if '' not in sys.path: sys.path.insert(0, '')
+                        from requests.serializers import ServiceRequestSerializer
+                    finally:
+                        sys.path[:] = _old_path
                     serializer_data = await database_sync_to_async(lambda: ServiceRequestSerializer(req).data)()
                     await self.send_json({
                         "type": "REQUEST_UPDATE",
