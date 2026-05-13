@@ -9,6 +9,9 @@ from django.db import transaction
 
 User = get_user_model()
 
+from .models_rating import Rating
+from .models_chat import ChatMessage
+
 
 class CancellationReason(models.Model):
     """Predefined cancellation reasons for different user roles"""
