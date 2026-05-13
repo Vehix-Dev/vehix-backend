@@ -1,5 +1,20 @@
 from django.contrib import admin
-from django.urls import path, include
+import sys
+import os
+
+# CRITICAL: Deep purge 'requests' from module cache and prioritize local path.
+# This prevents the system library from shadowing the local Django 'requests' app.
+_old_path = sys.path[:]
+_old_mods = {k: v for k, v in sys.modules.items() if k == 'requests' or k.startswith('requests.')}
+try:
+    if '' not in sys.path: sys.path.insert(0, '')
+    for mod_name in list(_old_mods.keys()):
+        del sys.modules[mod_name]
+    
+    from django.urls import path, include
+finally:
+    sys.path[:] = _old_path
+    sys.modules.update(_old_mods)
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import permissions
