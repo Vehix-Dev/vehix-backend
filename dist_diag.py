@@ -7,7 +7,7 @@ django.setup()
 
 from users.models import User
 from services.models import ServiceType, RodieService
-from requests.models import ServiceRequest
+from service_requests.models import ServiceRequest
 from locations.utils import calculate_distance_km
 
 def final_check():

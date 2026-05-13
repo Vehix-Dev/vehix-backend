@@ -8,8 +8,8 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('requests', '0008_add_rating_fields'),
-        ('requests', '0027_merge_0008_add_cancellation_models_0026_rating'),
+        ('service_requests', '0008_add_rating_fields'),
+        ('service_requests', '0027_merge_0008_add_cancellation_models_0026_rating'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -61,6 +61,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='dispute',
             name='request',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='disputes', to='requests.servicerequest'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='disputes', to='service_requests.servicerequest'),
         ),
     ]

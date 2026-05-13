@@ -15,8 +15,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from requests.models import ServiceRequest
-from requests.services import _sequential_offers
+from service_requests.models import ServiceRequest
+from service_requests.services import _sequential_offers
 from services.models import RodieService, ServiceType
 from users.models import User
 from channels.layers import get_channel_layer

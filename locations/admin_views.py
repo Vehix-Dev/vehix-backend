@@ -4,8 +4,8 @@ from rest_framework import permissions
 from django.db.models import Q, Avg
 from .models import RodieLocation
 from django.apps import apps
-ServiceRequest = apps.get_model('requests', 'ServiceRequest')
-Rating = apps.get_model('requests', 'Rating')
+ServiceRequest = apps.get_model('service_requests', 'ServiceRequest')
+Rating = apps.get_model('service_requests', 'Rating')
 
 
 class RealtimeLocationsView(APIView):

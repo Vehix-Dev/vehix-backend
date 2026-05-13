@@ -1,4 +1,4 @@
-import requests
+import service_requests
 import time
 import json
 import asyncio

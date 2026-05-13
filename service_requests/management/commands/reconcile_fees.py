@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from requests.models import ServiceRequest
+from service_requests.models import ServiceRequest
 from users.models import WalletTransaction
 
 class Command(BaseCommand):
@@ -23,7 +23,7 @@ class Command(BaseCommand):
                         fixed_flags += 1
                     continue
                 # create charge
-                from requests.models import charge_fee_for_request
+                from service_requests.models import charge_fee_for_request
                 ok = charge_fee_for_request(req)
                 if ok:
                     created += 1

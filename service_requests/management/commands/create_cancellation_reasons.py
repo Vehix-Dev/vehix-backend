@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from requests.models_cancellation import CancellationReason
+from service_requests.models_cancellation import CancellationReason
 
 
 class Command(BaseCommand):

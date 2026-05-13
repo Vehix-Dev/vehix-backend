@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from requests.models import ServiceRequest
+from service_requests.models import ServiceRequest
 
 class Command(BaseCommand):
     help = 'Charge fees for existing completed ServiceRequest records that have not had fees charged yet.'
@@ -10,7 +10,7 @@ class Command(BaseCommand):
         success = 0
         for req in qs:
             try:
-                from requests.models import charge_fee_for_request
+                from service_requests.models import charge_fee_for_request
                 ok = charge_fee_for_request(req)
                 if ok:
                     success += 1

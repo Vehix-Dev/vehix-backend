@@ -2,7 +2,7 @@ from django.apps import AppConfig
 
 
 class RequestsConfig(AppConfig):
-    name = 'requests'
+    name = 'service_requests'
 
     def ready(self):
-        import requests.signals
+        import service_requests.signals

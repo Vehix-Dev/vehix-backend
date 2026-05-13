@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('requests', '0006_servicerequest_accepted_at_and_more'),
+        ('service_requests', '0006_servicerequest_accepted_at_and_more'),
     ]
 
     operations = [

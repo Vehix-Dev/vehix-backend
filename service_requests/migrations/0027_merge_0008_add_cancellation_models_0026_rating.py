@@ -6,9 +6,9 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('requests', '0008_add_cancellation_models'),
-        ('requests', '0008_add_rating_fields'),
-        ('requests', '0026_rating'),
+        ('service_requests', '0008_add_cancellation_models'),
+        ('service_requests', '0008_add_rating_fields'),
+        ('service_requests', '0026_rating'),
     ]
 
     operations = [

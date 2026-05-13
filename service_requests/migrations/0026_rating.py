@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('requests', '0008_add_rating_fields'),
+        ('service_requests', '0008_add_rating_fields'),
     ]
 
     operations = [
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('rated_user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings_received', to=settings.AUTH_USER_MODEL)),
                 ('rater', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings_given', to=settings.AUTH_USER_MODEL)),
-                ('service_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings', to='requests.servicerequest')),
+                ('service_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings', to='service_requests.servicerequest')),
             ],
             options={
                 'ordering': ['-created_at'],

@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     # Local apps
     'users',
     'services',
-    'requests',
+    'service_requests',
     'locations',
     'images',
     'realtime',

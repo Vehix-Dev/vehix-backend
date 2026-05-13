@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('requests', '0005_servicerequest_is_paid'),
+        ('service_requests', '0005_servicerequest_is_paid'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ('text', models.TextField()),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('sender', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('service_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='requests.servicerequest')),
+                ('service_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='service_requests.servicerequest')),
             ],
         ),
     ]

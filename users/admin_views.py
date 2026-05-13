@@ -7,7 +7,7 @@ from django.db.models import Count, Q, Avg
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
 from django.apps import apps
-ServiceRequest = apps.get_model('requests', 'ServiceRequest')
+ServiceRequest = apps.get_model('service_requests', 'ServiceRequest')
 from rest_framework import generics, permissions
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer
 from .models import Wallet, Referral, PlatformConfig, Notification
@@ -247,7 +247,7 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         
         # Calculate average rating from ratings received
         try:
-            from requests.models_rating import Rating
+            from service_requests.models_rating import Rating
             avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
                 avg_rating=models.Avg('rating')
             )['avg_rating'] or 0

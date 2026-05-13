@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from requests.models import CancellationReason
+from service_requests.models import CancellationReason
 
 class Command(BaseCommand):
     help = 'Ensures basic cancellation reasons exist in the database'

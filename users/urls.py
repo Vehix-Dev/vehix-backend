@@ -43,29 +43,14 @@ from services.admin_views import (
     RodieServiceRetrieveUpdateDestroyView,
 )
 from services.views import RodieMyServicesView, RodieInitialServiceSelectionView
-import sys
-import os
-# Temporarily prioritize local path and clear module cache to import shadowed 'requests' app
-_old_path = sys.path[:]
-_old_mods = {k: v for k, v in sys.modules.items() if k == 'requests' or k.startswith('requests.')}
-try:
-    if '' not in sys.path: sys.path.insert(0, '')
-    # Deep purge requests from cache
-    for mod_name in list(_old_mods.keys()):
-        del sys.modules[mod_name]
-        
-    from requests.admin_views import (
-        ServiceRequestListCreateView,
-        ServiceRequestRetrieveUpdateDestroyView,
-        RealtimeRiderLocationsView,
-        RealtimeRiderMapView,
-        ServiceRequestRouteView,
-        AdminAssignRodieView,
-    )
-finally:
-    sys.path[:] = _old_path
-    # Restore original modules to avoid breaking other libraries
-    sys.modules.update(_old_mods)
+from service_requests.admin_views import (
+    ServiceRequestListCreateView,
+    ServiceRequestRetrieveUpdateDestroyView,
+    RealtimeRiderLocationsView,
+    RealtimeRiderMapView,
+    ServiceRequestRouteView,
+    AdminAssignRodieView,
+)
 from locations.admin_views import (
     RealtimeLocationsView,
     RealtimeLocationsMapView,

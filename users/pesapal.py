@@ -4,37 +4,8 @@ import json
 import importlib.util
 from django.conf import settings
 
-def _import_requests_safely():
-    # Attempt to find requests in site-packages specifically to avoid shadowing by local 'requests' app
-    for path in sys.path:
-        if 'site-packages' in path.lower():
-            requests_init = os.path.join(path, 'requests', '__init__.py')
-            if os.path.exists(requests_init):
-                try:
-                    spec = importlib.util.spec_from_file_location("requests_standard_lib", requests_init)
-                    lib = importlib.util.module_from_spec(spec)
-                    # Add to sys.modules under a unique name to avoid further conflicts
-                    sys.modules["requests_standard_lib"] = lib
-                    spec.loader.exec_module(lib)
-                    if hasattr(lib, 'post'):
-                        return lib
-                except Exception:
-                    continue
-    
-    # Fallback: try standard import but check for post attribute
-    try:
-        import requests as lib
-        if hasattr(lib, 'post'):
-            return lib
-    except ImportError:
-        pass
-    
-    # Extreme fallback: return something that won't cause immediate crash if possible, 
-    # but at this point we are in trouble.
-    return None
+import service_requests
 
-# Get the real requests library
-requests_lib = _import_requests_safely()
 
 class PesapalClient:
     # Switch to https://cybqa.pesapal.com/pesapalv3 for sandbox
@@ -53,7 +24,7 @@ class PesapalClient:
             "consumer_key": self.CONSUMER_KEY,
             "consumer_secret": self.CONSUMER_SECRET
         }
-        response = requests_lib.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
             return response.json().get('token')
         print(f"Pesapal Auth Failed: {response.status_code} - {response.text}")
@@ -99,7 +70,7 @@ class PesapalClient:
         }
 
         print(f"Pesapal SubmitOrder Payload: {json.dumps(payload)}")
-        response = requests_lib.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers)
         print(f"Pesapal SubmitOrder Status: {response.status_code}")
         print(f"Pesapal SubmitOrder Response: {response.text}")
         if response.status_code == 200:
@@ -118,7 +89,7 @@ class PesapalClient:
             "Authorization": f"Bearer {token}"
         }
 
-        response = requests_lib.get(url, headers=headers)
+        response = requests.get(url, headers=headers)
         if response.status_code == 200:
             return response.json()
         return None
@@ -139,7 +110,7 @@ class PesapalClient:
             "phone_number": phone_number,
             "payment_method": payment_method
         }
-        response = requests_lib.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
             return response.json()
         else:

@@ -7,7 +7,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 def _import_requests_safely():
     for path in sys.path:
         if 'site-packages' in path.lower():
-            requests_init = os.path.join(path, 'requests', '__init__.py')
+            requests_init = os.path.join(path, 'service_requests', '__init__.py')
             if os.path.exists(requests_init):
                 try:
                     spec = importlib.util.spec_from_file_location("requests_standard_lib", requests_init)
@@ -19,7 +19,7 @@ def _import_requests_safely():
                 except Exception:
                     continue
     try:
-        import requests as lib
+        import service_requests as lib
         if hasattr(lib, 'post'):
             return lib
     except ImportError:
