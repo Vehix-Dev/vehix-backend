@@ -3,13 +3,14 @@ from django.conf import settings
 
 
 class ChatMessage(models.Model):
-    service_request = models.ForeignKey('requests.ServiceRequest', on_delete=models.CASCADE, related_name='messages')
+    service_request = models.ForeignKey('service_requests.ServiceRequest', on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     text = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = 'requests_chatmessage'
         ordering = ['created_at']
 
     @property

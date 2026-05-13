@@ -28,6 +28,7 @@ class CancellationReason(models.Model):
     order = models.PositiveIntegerField(default=0)
     
     class Meta:
+        db_table = 'requests_cancellationreason'
         ordering = ['role', 'order', 'reason']
         unique_together = ['role', 'reason']
     
@@ -72,6 +73,7 @@ class RequestCancellation(models.Model):
     )
     
     class Meta:
+        db_table = 'requests_requestcancellation'
         ordering = ['-cancelled_at']
     
     def __str__(self):
@@ -154,6 +156,9 @@ class ServiceRequest(models.Model):
         blank=True,
         help_text="Service fee deducted from Roadie wallet for this request"
     )
+
+    class Meta:
+        db_table = 'requests_servicerequest'
 
     def __str__(self):
         return f"Request #{self.id} - {self.service_type} - {self.status}"
@@ -320,5 +325,8 @@ class Dispute(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    class Meta:
+        db_table = 'requests_dispute'
+
     def __str__(self):
         return f"Dispute on Request #{self.request.id} by {self.raised_by.username}"

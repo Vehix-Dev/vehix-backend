@@ -7,7 +7,7 @@ class Rating(models.Model):
     """Rating model for service requests - riders rate roadies and vice versa"""
     
     service_request = models.ForeignKey(
-        'requests.ServiceRequest',
+        'service_requests.ServiceRequest',
         on_delete=models.CASCADE,
         related_name='ratings'
     )
@@ -35,6 +35,7 @@ class Rating(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
+        db_table = 'requests_rating'
         unique_together = ('service_request', 'rater')
         ordering = ['-created_at']
         indexes = [
