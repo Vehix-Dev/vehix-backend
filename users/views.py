@@ -573,7 +573,7 @@ class RoadiePaymentsView(APIView):
             reference=reference,
             description=f"Wallet deposit by {request.user.username}"
         )
-
+        try:
             client = PesapalClient()
             # Redirect URL for roadies
             callback_url = request.build_absolute_uri('/api/roadie/payments/')
