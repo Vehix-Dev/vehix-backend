@@ -28,16 +28,16 @@ class Migration(migrations.Migration):
             name='chatmessage',
             options={'ordering': ['created_at']},
         ),
-        migrations.RenameIndex(
-            model_name='rating',
-            new_name='requests_ra_service_c01108_idx',
-            old_name='requests_ra_service_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='rating',
-            new_name='requests_ra_rated_u_58b232_idx',
-            old_name='requests_ra_rated_u_idx',
-        ),
+        # migrations.RenameIndex(
+        #     model_name='rating',
+        #     new_name='requests_ra_service_c01108_idx',
+        #     old_name='requests_ra_service_idx',
+        # ),
+        # migrations.RenameIndex(
+        #     model_name='rating',
+        #     new_name='requests_ra_rated_u_58b232_idx',
+        #     old_name='requests_ra_rated_u_idx',
+        # ),
         migrations.AddField(
             model_name='chatmessage',
             name='is_read',
