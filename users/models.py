@@ -95,7 +95,7 @@ class User(AbstractUser):
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
     lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, editable=False)
 
-    current_login_id = models.UUIDField(null=True, blank=True, help_text="Used to enforce single device login")
+    current_login_id = models.UUIDField(null=True, blank=True, help_text="Used to enforce single device login", default=uuid.uuid4)
 
     services_selected = models.BooleanField(
         default=False,
@@ -264,6 +264,23 @@ class User(AbstractUser):
 
 class RiderAvailabilityLog(models.Model):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='availability_logs')
+    went_online_at = models.DateTimeField()
+    went_offline_at = models.DateTimeField(null=True, blank=True)
+
+    def duration_seconds(self):
+        if self.went_offline_at:
+            return (self.went_offline_at - self.went_online_at).total_seconds()
+        from django.utils import timezone
+        return (timezone.now() - self.went_online_at).total_seconds()
+
+    def __str__(self):
+        return f"{self.user.username} online {self.went_online_at} - {self.went_offline_at or 'now'}"
+
+    device_type = models.CharField(max_length=10, choices=DEVICE_TYPE_CHOICES, null=True, blank=True)
+
+
+class RodieAvailabilityLog(models.Model):
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='rodie_availability_logs')
     went_online_at = models.DateTimeField()
     went_offline_at = models.DateTimeField(null=True, blank=True)
 

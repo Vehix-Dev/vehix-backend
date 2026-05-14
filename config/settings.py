@@ -341,6 +341,13 @@ if DEBUG:
     print(f"Pesapal IPN ID: {'SET' if PESAPAL_IPN_ID else 'NOT SET'}")
 # Firebase Cloud Messaging Configuration
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
+
+# OpenFloat (Payouts) Configuration
+OPENFLOAT_BASE_URL = config('OPENFLOAT_BASE_URL', default='https://api.openfloat.africa/v1')
+OPENFLOAT_CLIENT_ID = config('OPENFLOAT_CLIENT_ID', default='')
+OPENFLOAT_CLIENT_SECRET = config('OPENFLOAT_CLIENT_SECRET', default='')
+OPENFLOAT_ACCOUNT_ID = config('OPENFLOAT_ACCOUNT_ID', default='')
+
 FCM_SERVICE_ACCOUNT_FILE = config('FCM_SERVICE_ACCOUNT_FILE', default='')
 if FCM_SERVICE_ACCOUNT_FILE:
     if not os.path.isabs(FCM_SERVICE_ACCOUNT_FILE):

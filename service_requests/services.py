@@ -200,8 +200,12 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                     if status == 'CANCELLED':
                         print(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
                         return # Exit loop
-                    print(f"👎 {rodie.username} declined. Moving to next...")
+                    
+                    # FIX: Reset status to REQUESTED so the next roadie in the loop sees a fresh state
+                    cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
+                    print(f"👎 {rodie.username} declined. Resetting status and moving to next...")
                     break # Break wait, move to next roadie
+
                 time.sleep(1)
             
             # Clear lock after turn

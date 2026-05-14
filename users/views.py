@@ -262,9 +262,22 @@ class RoadieStatusUpdateView(APIView):
                 'error': 'Select a service to provide'
             }, status=status.HTTP_403_FORBIDDEN)
 
-        from django.contrib.auth import get_user_model
-        get_user_model().objects.filter(id=request.user.id).update(is_online=bool(is_online))
-        request.user.is_online = bool(is_online)  # Update in-memory for the response
+        from .models import RodieAvailabilityLog
+        from django.utils import timezone
+        
+        is_online_bool = bool(is_online)
+        get_user_model().objects.filter(id=request.user.id).update(is_online=is_online_bool)
+        request.user.is_online = is_online_bool  # Update in-memory for the response
+
+        # Logging logic
+        if is_online_bool:
+            # Check for existing open log to avoid duplicates
+            if not RodieAvailabilityLog.objects.filter(user=request.user, went_offline_at__isnull=True).exists():
+                RodieAvailabilityLog.objects.create(user=request.user, went_online_at=timezone.now())
+        else:
+            # Close all open logs
+            RodieAvailabilityLog.objects.filter(user=request.user, went_offline_at__isnull=True).update(went_offline_at=timezone.now())
+
         try:
             if get_channel_layer and async_to_sync:
                 channel_layer = get_channel_layer()
@@ -335,7 +348,11 @@ class DepositView(APIView):
 
         try:
             client = PesapalClient()
-            callback_url = request.build_absolute_uri('/api/users/wallet/callback/')
+            # Correct redirect URL for the user after payment
+            callback_url = request.build_absolute_uri('/api/wallet/')
+            # IPN URL for server-to-server confirmation
+            ipn_url = request.build_absolute_uri('/api/pesapal/ipn/')
+            
             response = client.submit_order(payment, callback_url, phone_number=None)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
@@ -410,9 +427,36 @@ class WithdrawView(APIView):
                     reason=f"Withdrawal request {reference}"
                 )
 
+                # --- NEW: Automated OpenFloat Payout ---
+                # This only runs if credentials are provided in .env
+                from .openfloat import OpenFloatClient
+                client = OpenFloatClient()
+                
+                if client.client_id and client.client_secret:
+                    payout_response = client.transfer_to_mobile_money(
+                        phone_number=phone_number,
+                        amount=amount,
+                        reference=reference,
+                        description=f"Vehix Withdrawal: {request.user.username}"
+                    )
+                    
+                    if payout_response.get('success'):
+                        payment.status = 'COMPLETED'
+                        payment.processor_id = payout_response.get('transaction_id')
+                        payment.save()
+                        message = 'Withdrawal processed and sent successfully via OpenFloat'
+                    else:
+                        # If the API call fails, we keep it as PENDING 
+                        # so admin can process it manually or retry
+                        payment.description += f" | Auto-payout failed: {payout_response.get('error')}"
+                        payment.save()
+                        message = f'Withdrawal requested successfully (Auto-payout pending: {payout_response.get('error')})'
+                else:
+                    message = 'Withdrawal request submitted successfully'
+
                 return Response({
                     'success': True,
-                    'message': 'Withdrawal request submitted successfully',
+                    'message': message,
                     'reference': reference,
                     'amount': str(amount),
                     'phone_number': phone_number,
@@ -530,9 +574,9 @@ class RoadiePaymentsView(APIView):
             description=f"Wallet deposit by {request.user.username}"
         )
 
-        try:
             client = PesapalClient()
-            callback_url = request.build_absolute_uri('/api/users/payments/pesapal/ipn/')
+            # Redirect URL for roadies
+            callback_url = request.build_absolute_uri('/api/roadie/payments/')
             response = client.submit_order(payment, callback_url, phone_number=None)
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id

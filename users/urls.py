@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -72,6 +72,8 @@ urlpatterns = [
     path('login/rider/', RiderLoginView.as_view(), name='rider_login'),
     path('login/roadie/', RoadieLoginView.as_view(), name='roadie_login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Images alias (for KYC and profile)
+    path('images/', include('images.urls')),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('me/', MeView.as_view(), name='me'),
@@ -88,6 +90,7 @@ urlpatterns = [
     path('payments/status/<str:reference>/', PaymentStatusView.as_view(), name='payment_status'),
     path('pesapal/ipn/', PesapalIPNView.as_view(), name='pesapal_ipn'),
     path('referrals/', MyReferralsView.as_view(), name='my_referrals'),
+    path('users/referrals/', MyReferralsView.as_view(), name='my_referrals_alias'),
     path('roadie/status/', RoadieStatusUpdateView.as_view(), name='roadie_status_update'),
     path('auth/platform/config/', PlatformConfigView.as_view(), name='platform_config'),
     path('notifications/', NotificationListCreateView.as_view(), name='my_notifications'),

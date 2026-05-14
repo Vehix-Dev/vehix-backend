@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import User, Wallet, WalletTransaction, PlatformConfig
-from .models import Referral
+from .models import Referral, RodieAvailabilityLog
 from .models import Notification
 from django.utils.html import format_html
 from django.urls import path
@@ -300,3 +300,16 @@ class PaymentAdmin(admin.ModelAdmin):
     list_filter = ('transaction_type', 'status', 'created_at')
     search_fields = ('reference', 'user__username', 'processor_id')
 
+@admin.register(RodieAvailabilityLog)
+class RodieAvailabilityLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'went_online_at', 'went_offline_at', 'duration')
+    list_filter = ('went_online_at', 'went_offline_at')
+    search_fields = ('user__username', 'user__email')
+
+    def duration(self, obj):
+        if obj.went_offline_at:
+            diff = obj.went_offline_at - obj.went_online_at
+            minutes = int(diff.total_seconds() / 60)
+            return f"{minutes} min"
+        return "Online"
+    duration.short_description = 'Online Duration'

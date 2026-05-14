@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import importlib.util
+import requests
 from django.conf import settings
 
 import service_requests
