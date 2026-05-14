@@ -943,3 +943,76 @@ class RateServiceRequestView(APIView):
         ratings = Rating.objects.filter(service_request=req)
         serializer = RatingSerializer(ratings, many=True)
         return Response(serializer.data)
+
+
+# Consolidated from cancellation_views.py
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q, Avg, Count
+from rest_framework.decorators import action
+from .models import CancellationReason, RequestCancellation
+from .serializers import CancellationReasonSerializer, RequestCancellationSerializer, RatingSerializer
+
+class CancellationReasonsView(APIView):
+    """Get cancellation reasons for the current user's role"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_role = request.user.role
+        reasons = CancellationReason.objects.filter(
+            role=user_role,
+            is_active=True
+        ).order_by('order')
+        
+        from .serializers import CancellationReasonSerializer
+        serializer = CancellationReasonSerializer(reasons, many=True)
+        return Response({
+            'role': user_role,
+            'reasons': serializer.data
+        })
+
+class CancellationReasonViewSet(viewsets.ModelViewSet):
+    serializer_class = CancellationReasonSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['role', 'is_active']
+    ordering_fields = ['order', 'role']
+    ordering = ['role', 'order']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.role == 'ADMIN':
+            return CancellationReason.objects.all()
+        return CancellationReason.objects.filter(role=user.role, is_active=True)
+
+class RequestCancellationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RequestCancellationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['cancelled_by__role', 'reason__role']
+    ordering_fields = ['cancelled_at']
+    ordering = ['-cancelled_at']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.role == 'ADMIN':
+            return RequestCancellation.objects.all().select_related('request', 'cancelled_by', 'reason')
+        return RequestCancellation.objects.filter(cancelled_by=user).select_related('request', 'cancelled_by', 'reason')
+
+class RatingViewSet(viewsets.ModelViewSet):
+    serializer_class = RatingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['service_request__status', 'created_at']
+    ordering_fields = ['created_at', 'rating']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        user = self.request.user
+        from .models_rating import Rating
+        if user.is_staff or user.role == 'ADMIN':
+            return Rating.objects.all().select_related('service_request', 'rater', 'rated_user')
+        return Rating.objects.filter(Q(rater=user) | Q(rated_user=user)).select_related('service_request', 'rater', 'rated_user')
+    
+    def perform_create(self, serializer):
+        serializer.save(rater=self.request.user)

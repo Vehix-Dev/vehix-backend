@@ -15,9 +15,7 @@ from .views import (
     NearbyRodieListView,
     RateServiceRequestView,
     ArrivedRequestView,
-)
-from .api_cancellation import CancellationReasonsView
-from .cancellation_views import (
+    CancellationReasonsView,
     CancellationReasonViewSet,
     RequestCancellationViewSet,
     RatingViewSet,
