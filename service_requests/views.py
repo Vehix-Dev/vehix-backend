@@ -2,7 +2,7 @@ from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
-from .models import ServiceRequest
+from .models import ServiceRequest, CancellationReason, RequestCancellation
 from .serializers import ServiceRequestCreateSerializer
 from .services import find_nearby_rodies
 from services.models import RodieService

@@ -1,7 +1,7 @@
 from django.core.cache import cache
 from locations.utils import calculate_distance_km
 from rest_framework import serializers
-from .models import ServiceRequest
+from .models import ServiceRequest, CancellationReason, RequestCancellation
 from services.models import ServiceType
 try:
     from .models_chat import ChatMessage
