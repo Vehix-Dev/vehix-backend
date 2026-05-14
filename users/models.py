@@ -262,6 +262,12 @@ class User(AbstractUser):
         return f"{self.username} ({self.role})"
 
 
+DEVICE_TYPE_CHOICES = (
+    ('IOS', 'iOS'),
+    ('ANDROID', 'Android'),
+)
+
+
 class RiderAvailabilityLog(models.Model):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='availability_logs')
     went_online_at = models.DateTimeField()
@@ -293,10 +299,6 @@ class RodieAvailabilityLog(models.Model):
     def __str__(self):
         return f"{self.user.username} online {self.went_online_at} - {self.went_offline_at or 'now'}"
 
-    DEVICE_TYPE_CHOICES = (
-        ('IOS', 'iOS'),
-        ('ANDROID', 'Android'),
-    )
     device_type = models.CharField(max_length=10, choices=DEVICE_TYPE_CHOICES, null=True, blank=True)
 
 
