@@ -1,4 +1,4 @@
-import requests
+import service_requests
 import time
 
 OSRM_ROUTE_URL = 'https://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false&annotations=duration,distance'

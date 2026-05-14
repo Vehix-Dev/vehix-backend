@@ -76,7 +76,7 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
 
         try:
             distance = calculate_distance_km(
-                float(rider_lat), float(rider_lng),
+                rider_lat, rider_lng,
                 float(loc.get('lat')), float(loc.get('lng'))
             )
             print(f"📍 {rs.rodie.username} is {distance:.2f}km away")
