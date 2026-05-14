@@ -4,14 +4,11 @@ from django.core.cache import cache
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from threading import Thread
-import logging
 import time
 from .osrm import get_route_info
 from django.db import transaction
 from .models import ServiceRequest
 from .tasks import sequential_offers_task
-
-logger = logging.getLogger(__name__)
 
 MAX_DISTANCE_KM = 50 # Increased for development/testing
 
@@ -28,8 +25,8 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
         status__in=['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'STARTED']
     ).exclude(rodie__isnull=True).values_list('rodie_id', flat=True)
 
-    logger.info(f"🔍 DEBUG MATCHING: Requesting {service_type.name} at ({rider_lat}, {rider_lng})")
-    logger.info(f"🔍 DEBUG MATCHING: Busy Roadies: {list(busy_rodie_ids)}")
+    print(f"🔍 DEBUG MATCHING: Requesting {service_type.name} at ({rider_lat}, {rider_lng})")
+    print(f"🔍 DEBUG MATCHING: Busy Roadies: {list(busy_rodie_ids)}")
 
     rodie_services = RodieService.objects.filter(
         service=service_type,
@@ -40,19 +37,19 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
         rodie__is_deleted=False,
     ).exclude(rodie_id__in=busy_rodie_ids).select_related('rodie')
     
-    logger.info(f"🔍 DEBUG MATCHING: Roadies offering this service: {[r.rodie.username for r in rodie_services]}")
+    print(f"🔍 DEBUG MATCHING: Roadies offering this service (Filtered for Active/Online/Approved): {[r.rodie.username for r in rodie_services]}")
 
     filtered_services = []
     for rs in rodie_services:
         is_locked = cache.get(f"rodie_locked:{rs.rodie_id}")
         
         if is_locked:
-            logger.info(f"🔒 {rs.rodie.username} skipped: Currently locked by another offer.")
+            print(f"🔒 {rs.rodie.username} skipped: Currently locked by another offer.")
             continue
             
         # SAFETY: Check for heartbeat with 10-minute window
         if not cache.get(f"rodie_heartbeat:{rs.rodie_id}"):
-            logger.info(f"👻 {rs.rodie.username} (ID: {rs.rodie_id}) skipped: No heartbeat in 10m.")
+            print(f"👻 {rs.rodie.username} (ID: {rs.rodie_id}) skipped: No heartbeat in 10m.")
             continue
             
         filtered_services.append(rs)
@@ -82,9 +79,9 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
                 float(rider_lat), float(rider_lng),
                 float(loc.get('lat')), float(loc.get('lng'))
             )
-            logger.info(f"📍 {rs.rodie.username} is {distance:.2f}km away")
+            print(f"📍 {rs.rodie.username} is {distance:.2f}km away")
         except Exception as e:
-            logger.error(f"❌ Error calculating distance for {rs.rodie.username}: {e}")
+            print(f"❌ Error calculating distance for {rs.rodie.username}: {e}")
             continue
 
         if distance <= MAX_DISTANCE_KM:
@@ -176,7 +173,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             cache.set(f"rodie_locked:{rodie.id}", True, timeout=offer_seconds + 2)
             cache.set(f"active_offer:{rodie.id}", payload, timeout=offer_seconds + 2)
             
-            logger.info(f"📡 [Search Loop] Sending offer to {rodie.username} ({payload['distance_km']}km away)")
+            print(f"📡 [Search Loop] Sending offer to {rodie.username} ({payload['distance_km']}km away)")
             async_to_sync(channel_layer.group_send)(
                 f"rodie_{rodie.id}",
                 {"type": "offer.request", "request": payload}
@@ -197,16 +194,16 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
             while time.time() - wait_start < offer_seconds:
                 status = cache.get(f"request_status:{request_id}")
                 if status == 'ACCEPTED':
-                    logger.info(f"✅ Request {request_id} accepted by {rodie.username}")
+                    print(f"✅ Request {request_id} accepted by {rodie.username}")
                     return # Exit loop
                 if status in ['DECLINED', 'CANCELLED']:
                     if status == 'CANCELLED':
-                        logger.info(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
+                        print(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
                         return # Exit loop
                     
                     # FIX: Reset status to REQUESTED so the next roadie in the loop sees a fresh state
                     cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
-                    logger.info(f"👎 {rodie.username} declined. Resetting status and moving to next...")
+                    print(f"👎 {rodie.username} declined. Resetting status and moving to next...")
                     break # Break wait, move to next roadie
 
                 time.sleep(1)
@@ -223,7 +220,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
     elapsed = time.time() - start_time
     if elapsed < expiry_seconds:
         remaining = expiry_seconds - elapsed
-        logger.info(f"⏳ [Search Loop] No more roadies found. Waiting remaining {int(remaining)}s for potential new arrivals...")
+        print(f"⏳ [Search Loop] No more roadies found. Waiting remaining {int(remaining)}s for potential new arrivals...")
         time.sleep(remaining)
 
     # Check if request was accepted, cancelled, or needs expiry

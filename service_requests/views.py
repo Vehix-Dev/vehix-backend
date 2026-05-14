@@ -210,6 +210,7 @@ class CreateServiceRequestView(generics.CreateAPIView):
         
         # Celery Dispatch: Use external tasks for reliability
         from .services import notify_rodies
+        print(f"🚀 [MATCHING START] Triggering notify_rodies for Request #{request_obj.id}")
         # Ensure we always call notify_rodies even if filtered is empty
         notify_rodies(filtered, request_obj, offer_seconds=15, expiry_seconds=90)
         # mark ephemeral request status in cache so notify worker can poll without DB locks
