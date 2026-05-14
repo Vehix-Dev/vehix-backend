@@ -76,7 +76,7 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
 
         try:
             distance = calculate_distance_km(
-                rider_lat, rider_lng,
+                float(rider_lat), float(rider_lng),
                 float(loc.get('lat')), float(loc.get('lng'))
             )
             print(f"📍 {rs.rodie.username} is {distance:.2f}km away")
@@ -215,6 +215,13 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         except Exception as e:
             print(f"❌ [Search Loop] Error offering to {rodie.id}: {e}")
             cache.delete(f"rodie_locked:{rodie.id}")
+
+    # NEW: Ensure the process lasts for the full expiry_seconds regardless of roadie count
+    elapsed = time.time() - start_time
+    if elapsed < expiry_seconds:
+        remaining = expiry_seconds - elapsed
+        print(f"⏳ [Search Loop] No more roadies found. Waiting remaining {int(remaining)}s for potential new arrivals...")
+        time.sleep(remaining)
 
     # Check if request was accepted, cancelled, or needs expiry
     try:
