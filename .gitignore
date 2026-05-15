@@ -36,8 +36,8 @@ ENV/
 Thumbs.db
 
 # Mobile Apps (Vehix) - Explicitly ignored to keep backend separate
-roadie_app/
-rider-app/
+# roadie_app/
+# rider-app/
 
 # Logs
 *.log
@@ -63,4 +63,4 @@ Screenshot*.png
 google-services.json
 GoogleService-Info.plist
 firebase-key*.json
-jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
+jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
