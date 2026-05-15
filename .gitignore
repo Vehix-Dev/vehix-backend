@@ -64,3 +64,13 @@ google-services.json
 GoogleService-Info.plist
 firebase-key*.json
 jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
+
+# Flutter artifacts
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/*.temp
+**/*.dill
