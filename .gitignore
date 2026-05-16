@@ -61,7 +61,6 @@ Screenshot*.png
 !package-lock.json
 !tsconfig.json
 google-services.json
-GoogleService-Info.plist
 firebase-key*.json
 jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
 
