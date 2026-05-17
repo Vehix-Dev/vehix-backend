@@ -1,0 +1,262 @@
+Building com.vehix.roadieApp for simulator (ios)...
+Running Xcode build...                                          
+Xcode build done.                                           13.4s
+Failed to build iOS app
+Error output from Xcode build:
+↳
+    ** BUILD FAILED **
+
+
+Xcode's output:
+↳
+    Writing result bundle at path:
+    	/var/folders/n1/vryp7qz5207f7_4bhhwd0gs00000gn/T/flutter_tools.rWvo4L/flutter_ios_build_temp_dirvCTqrl/temporary_xcresult_bundle
+
+    libtool: warning: 'UIApplication+idleTimerLock.o' has no symbols
+    libtool: warning: 'UIApplication+idleTimerLock.o' has no symbols
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:175:7: warning: class 'FlutterBackgroundRefreshAppOperation' must restate inherited '@unchecked Sendable' conformance
+    class FlutterBackgroundRefreshAppOperation: Operation {
+          ^
+                                                         , @unchecked Sendable
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:175:7: warning: class 'FlutterBackgroundRefreshAppOperation' must restate inherited '@unchecked Sendable' conformance
+    class FlutterBackgroundRefreshAppOperation: Operation {
+          ^
+                                                         , @unchecked Sendable
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/FirebaseCoreInternal/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsPayload.swift:20:24: warning: using '@_implementationOnly' without enabling library evolution for 'FirebaseCoreInternal' may lead to instability during execution
+      @_implementationOnly import GoogleUtilities
+                           ^
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/FirebaseCoreInternal/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsPayload.swift:20:24: warning: using '@_implementationOnly' without enabling library evolution for 'FirebaseCoreInternal' may lead to instability during execution
+      @_implementationOnly import GoogleUtilities
+                           ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/share_plus-13.1.0/ios/share_plus/Sources/share_plus/FPPSharePlusPlugin.m:25:46: warning: 'keyWindow' is deprecated: first deprecated in iOS 13.0 - Should not be used for applications that support multiple scenes as it returns a key window across all connected scenes [-Wdeprecated-declarations]
+       25 |     return [UIApplication sharedApplication].keyWindow.rootViewController;
+          |                                              ^
+    In module 'UIKit' imported from /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Target Support Files/share_plus/share_plus-prefix.pch:2:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIApplication.h:108:51: note: 'keyWindow' has been explicitly marked deprecated here
+      108 | @property(nullable, nonatomic,readonly) UIWindow *keyWindow API_DEPRECATED("Should not be used for applications that support multiple scenes as it returns a key window across all connected scenes", ios(2.0, 13.0)) API_UNAVAILABLE(visionos, watchos);
+          |                                                   ^
+    1 warning generated.
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/share_plus-13.1.0/ios/share_plus/Sources/share_plus/FPPSharePlusPlugin.m:25:46: warning: 'keyWindow' is deprecated: first deprecated in iOS 13.0 - Should not be used for applications that support multiple scenes as it returns a key window across all connected scenes [-Wdeprecated-declarations]
+       25 |     return [UIApplication sharedApplication].keyWindow.rootViewController;
+          |                                              ^
+    In module 'UIKit' imported from /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Target Support Files/share_plus/share_plus-prefix.pch:2:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIApplication.h:108:51: note: 'keyWindow' has been explicitly marked deprecated here
+      108 | @property(nullable, nonatomic,readonly) UIWindow *keyWindow API_DEPRECATED("Should not be used for applications that support multiple scenes as it returns a key window across all connected scenes", ios(2.0, 13.0)) API_UNAVAILABLE(visionos, watchos);
+          |                                                   ^
+    1 warning generated.
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:49:35: warning: 'subscriberCellularProvider' is deprecated: first deprecated in iOS 12.0 [-Wdeprecated-declarations]
+       49 |     CTCarrier *carrier = [netInfo subscriberCellularProvider];
+          |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~
+          |                                   serviceSubscriberCellularProviders
+    In module 'CoreTelephony' imported from /Users/aheebwasteven/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:8:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: property 'subscriberCellularProvider' is declared deprecated here
+      114 | @property(readonly, retain, nullable) CTCarrier *subscriberCellularProvider API_DEPRECATED_WITH_REPLACEMENT("serviceSubscriberCellularProviders", ios(4.0, 12.0)) API_UNAVAILABLE(macos);
+          |                                                  ^
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: 'subscriberCellularProvider' has been explicitly marked deprecated here
+    1 warning generated.
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:49:35: warning: 'subscriberCellularProvider' is deprecated: first deprecated in iOS 12.0 [-Wdeprecated-declarations]
+       49 |     CTCarrier *carrier = [netInfo subscriberCellularProvider];
+          |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~
+          |                                   serviceSubscriberCellularProviders
+    In module 'CoreTelephony' imported from /Users/aheebwasteven/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:8:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: property 'subscriberCellularProvider' is declared deprecated here
+      114 | @property(readonly, retain, nullable) CTCarrier *subscriberCellularProvider API_DEPRECATED_WITH_REPLACEMENT("serviceSubscriberCellularProviders", ios(4.0, 12.0)) API_UNAVAILABLE(macos);
+          |                                                  ^
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: 'subscriberCellularProvider' has been explicitly marked deprecated here
+    1 warning generated.
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:175:7: warning: class 'FlutterBackgroundRefreshAppOperation' must restate inherited '@unchecked Sendable' conformance
+    class FlutterBackgroundRefreshAppOperation: Operation {
+          ^
+                                                         , @unchecked Sendable
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:37:30: warning: 'setMinimumBackgroundFetchInterval' was deprecated in iOS 13.0: Use a BGAppRefreshTask in the BackgroundTasks framework instead
+            UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+                                 ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:175:7: warning: class 'FlutterBackgroundRefreshAppOperation' must restate inherited '@unchecked Sendable' conformance
+    class FlutterBackgroundRefreshAppOperation: Operation {
+          ^
+                                                         , @unchecked Sendable
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/ios/Classes/SwiftFlutterBackgroundServicePlugin.swift:37:30: warning: 'setMinimumBackgroundFetchInterval' was deprecated in iOS 13.0: Use a BGAppRefreshTask in the BackgroundTasks framework instead
+            UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+                                 ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/device_info_plus-13.1.0/ios/device_info_plus/Sources/device_info_plus/FPPDeviceInfoPlusPlugin.m:101:45: warning: implicit conversion loses integer precision: 'vm_size_t' (aka 'unsigned long') to 'natural_t' (aka 'unsigned int') [-Wshorten-64-to-32]
+      101 |     natural_t mem_free = vm_stat.free_count * page_size;
+          |               ~~~~~~~~   ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+    1 warning generated.
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:205:14: warning: main actor-isolated property 'eventHandler' can not be referenced from a Sendable closure
+            self.eventHandler.onLog(message: "player status: \(status), change: \(change)")
+                 ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:20:20: note: property declared here
+      private(set) var eventHandler: AudioPlayersStreamHandler
+                       ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:211:16: warning: call to main actor-isolated instance method 'reset()' in a synchronous nonisolated context
+              self.reset()
+                   ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:250:16: note: calls to instance method 'reset()' from outside of its actor context are implicitly asynchronous
+      private func reset() {
+                   ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/AudioContext.swift:88:17: warning: 'allowBluetooth' was deprecated in iOS 8.0: renamed to 'AVAudioSession.CategoryOptions.allowBluetoothHFP'
+            return .allowBluetooth
+                    ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/AudioContext.swift:88:17: note: use 'AVAudioSession.CategoryOptions.allowBluetoothHFP' instead
+            return .allowBluetooth
+                    ^~~~~~~~~~~~~~
+                    AVAudioSession.CategoryOptions.allowBluetoothHFP
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/AudioContext.swift:88:17: warning: 'allowBluetooth' was deprecated in iOS 8.0: renamed to 'AVAudioSession.CategoryOptions.allowBluetoothHFP'
+            return .allowBluetooth
+                    ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/AudioContext.swift:88:17: note: use 'AVAudioSession.CategoryOptions.allowBluetoothHFP' instead
+            return .allowBluetooth
+                    ^~~~~~~~~~~~~~
+                    AVAudioSession.CategoryOptions.allowBluetoothHFP
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:205:14: warning: main actor-isolated property 'eventHandler' can not be referenced from a Sendable closure
+            self.eventHandler.onLog(message: "player status: \(status), change: \(change)")
+                 ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:20:20: note: property declared here
+      private(set) var eventHandler: AudioPlayersStreamHandler
+                       ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:211:16: warning: call to main actor-isolated instance method 'reset()' in a synchronous nonisolated context
+              self.reset()
+                   ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/audioplayers_darwin-6.4.0/darwin/audioplayers_darwin/Sources/audioplayers_darwin/WrappedMediaPlayer.swift:250:16: note: calls to instance method 'reset()' from outside of its actor context are implicitly asynchronous
+      private func reset() {
+                   ^
+    /Users/aheebwasteven/.pub-cache/hosted/pub.dev/device_info_plus-13.1.0/ios/device_info_plus/Sources/device_info_plus/FPPDeviceInfoPlusPlugin.m:101:45: warning: implicit conversion loses integer precision: 'vm_size_t' (aka 'unsigned long') to 'natural_t' (aka 'unsigned int') [-Wshorten-64-to-32]
+      101 |     natural_t mem_free = vm_stat.free_count * page_size;
+          |               ~~~~~~~~   ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+    1 warning generated.
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/FirebaseCoreInternal/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsPayload.swift:20:24: warning: using '@_implementationOnly' without enabling library evolution for 'FirebaseCoreInternal' may lead to instability during execution
+      @_implementationOnly import GoogleUtilities
+                           ^
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/FirebaseCoreInternal/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsPayload.swift:20:24: warning: using '@_implementationOnly' without enabling library evolution for 'FirebaseCoreInternal' may lead to instability during execution
+      @_implementationOnly import GoogleUtilities
+                           ^
+    libtool: warning: 'SqfliteDarwinDatabaseAdditions.o' has no symbols
+    libtool: warning: 'SqfliteDarwinDatabaseAdditions.o' has no symbols
+    libtool: warning: 'GDTCOREvent+GDTMetricsSupport.o' has no symbols
+    libtool: warning: 'GDTCOREvent+GDTMetricsSupport.o' has no symbols
+    libtool: warning: 'FIRInstallationsItem+RegisterInstallationAPI.o' has no symbols
+    libtool: warning: 'FIRInstallationsItem+RegisterInstallationAPI.o' has no symbols
+    libtool: warning: 'NSDictionary+FIRMessaging.o' has no symbols
+    libtool: warning: 'NSError+FIRMessaging.o' has no symbols
+    libtool: warning: 'NSDictionary+FIRMessaging.o' has no symbols
+    libtool: warning: 'NSError+FIRMessaging.o' has no symbols
+    No file or variants found for asset: assets/Strong.mpeg.
+
+    Target debug_ios_bundle_flutter_assets failed: Exception: Failed to bundle asset files.
+    Failed to package /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app.
+    Command PhaseScriptExecution failed with a nonzero exit code
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/GoogleDataTransport/GoogleDataTransport_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseMessaging/FirebaseMessaging_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseCore/FirebaseCore_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseInstallations/FirebaseInstallations_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/wakelock_plus/wakelock_plus_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseCoreInternal/FirebaseCoreInternal_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/url_launcher_ios/url_launcher_ios_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/vibration/vibration_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/wakelock_plus/wakelock_plus.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/shared_preferences_foundation/shared_preferences_foundation_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/share_plus/share_plus_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/sqflite_darwin/sqflite_darwin_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseMessaging/FirebaseMessaging.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseCoreInternal/FirebaseCoreInternal.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/permission_handler_apple/permission_handler_apple_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/vibration/vibration.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/package_info_plus/package_info_plus_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseInstallations/FirebaseInstallations.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/GoogleDataTransport/GoogleDataTransport.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/nanopb/nanopb_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/geolocator_apple/geolocator_apple_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/image_picker_ios/image_picker_ios_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/sqflite_darwin/sqflite_darwin.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/share_plus/share_plus.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/nanopb/nanopb.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/shared_preferences_foundation/shared_preferences_foundation.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/flutter_background_service_ios/flutter_background_service_ios.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/url_launcher_ios/url_launcher_ios.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/package_info_plus/package_info_plus.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/firebase_messaging/firebase_messaging.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/ReachabilitySwift/ReachabilitySwift.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/PromisesObjC/FBLPromises_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/permission_handler_apple/permission_handler_apple.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/device_info_plus/device_info_plus.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/GoogleUtilities/GoogleUtilities_Privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/Pods_Runner.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/device_info_plus/device_info_plus_privacy.bundle'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/firebase_core/firebase_core.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/PromisesObjC/FBLPromises.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/FirebaseCore/FirebaseCore.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/audioplayers_darwin/audioplayers_darwin.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/image_picker_ios/image_picker_ios.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/connectivity_plus/connectivity_plus.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/ReachabilitySwift/Reachability.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/geolocator_apple/geolocator_apple.framework'
+
+    note: Removed stale file '/Users/aheebwasteven/Library/Developer/Xcode/DerivedData/Runner-cubngrjcxbzmgbdfuleugyehlqvk/Build/Products/Debug-iphonesimulator/GoogleUtilities/GoogleUtilities.framework'
+
+    note: Run script build phase 'Run Script' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    note: Run script build phase 'Thin Binary' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'nanopb' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleDataTransport-GoogleDataTransport_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'PromisesObjC' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleUtilities' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleDataTransport' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseMessaging' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseInstallations' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCoreInternal' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCore' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'permission_handler_apple-permission_handler_apple_privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'nanopb-nanopb_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'geolocator_apple-geolocator_apple_privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'PromisesObjC-FBLPromises_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleUtilities-GoogleUtilities_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseMessaging-FirebaseMessaging_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseInstallations-FirebaseInstallations_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCoreInternal-FirebaseCoreInternal_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCore-FirebaseCore_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/roadie_app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'Firebase' from project 'Pods')
+
+Encountered error while building for simulator.

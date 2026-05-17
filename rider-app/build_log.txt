@@ -1,0 +1,43 @@
+Building com.vehix.riderApp for simulator (ios)...
+Running Xcode build...                                          
+Xcode build done.                                            4.8s
+Failed to build iOS app
+Error output from Xcode build:
+↳
+    ** BUILD FAILED **
+
+
+Xcode's output:
+↳
+    Writing result bundle at path:
+    	/var/folders/n1/vryp7qz5207f7_4bhhwd0gs00000gn/T/flutter_tools.2TVtCR/flutter_ios_build_temp_dircrQ0sJ/temporary_xcresult_bundle
+
+    No file or variants found for asset: assets/logo.jpeg.
+
+    Target debug_ios_bundle_flutter_assets failed: Exception: Failed to bundle asset files.
+    Failed to package /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app.
+    Command PhaseScriptExecution failed with a nonzero exit code
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'permission_handler_apple-permission_handler_apple_privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'nanopb-nanopb_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'geolocator_apple-geolocator_apple_privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'flutter_secure_storage-flutter_secure_storage' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'PromisesObjC-FBLPromises_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'nanopb' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'PromisesObjC' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleUtilities-GoogleUtilities_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleUtilities' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCoreInternal-FirebaseCoreInternal_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleDataTransport-GoogleDataTransport_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 9.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'GoogleDataTransport' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCoreInternal' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCore-FirebaseCore_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseCore' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseInstallations-FirebaseInstallations_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 10.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseInstallations' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseMessaging-FirebaseMessaging_Privacy' from project 'Pods')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'FirebaseMessaging' from project 'Pods')
+    note: Run script build phase 'Run Script' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    note: Run script build phase 'Thin Binary' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    /Users/aheebwasteven/Mahad-Temp/vehix-backend/rider-app/ios/Pods/Pods.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 26.5.99. (in target 'Firebase' from project 'Pods')
+
+Encountered error while building for simulator.
