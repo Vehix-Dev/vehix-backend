@@ -328,7 +328,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         _showSuccess('Withdrawal submitted! Ref: ${result['reference']}. Your new balance: UGX ${result['new_balance']}');
                         _loadWallet();
                       } else {
-                        _showError(result?['error'] ?? 'Withdrawal failed. Please try again.');
+                        _showError(_parseErrorMessage(result) ?? 'Withdrawal failed. Please try again.');
                       }
                     } catch (e) {
                       _showError('Error: $e');
@@ -355,6 +355,19 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   // ─── HELPERS ────────────────────────────────────────────────────────────────
+
+  String? _parseErrorMessage(dynamic result) {
+    if (result == null) return null;
+    if (result is! Map) return null;
+    // Top-level error string
+    if (result['error'] is String) return result['error'];
+    // DRF field-level errors: {"field": ["message", ...]}
+    for (final value in result.values) {
+      if (value is List && value.isNotEmpty) return value.first.toString();
+      if (value is String) return value;
+    }
+    return null;
+  }
 
   void _showError(String msg) {
     if (!mounted) return;

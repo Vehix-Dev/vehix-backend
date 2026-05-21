@@ -817,21 +817,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         
         if (mounted) {
           if (response != null && response['success'] == true) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(response['message'] ?? 'Deletion request submitted'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            
-            // Wait a moment then logout
-            await Future.delayed(const Duration(seconds: 2));
-            
-            // Clear local data and logout
+            // Clear local data and logout immediately
             await ApiService.logout();
-            
+
             if (mounted) {
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',

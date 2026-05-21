@@ -1143,8 +1143,8 @@ class _RideScreenState extends State<RideScreen> {
       thumbColor = const Color(0xFFFF8C00);
     }
 
-    // Cancellation is only allowed before starting the assist (so ACCEPTED, EN_ROUTE, and ARRIVED are all cancellable)
-    final showCancel = status == null || status == "ACCEPTED" || status == "EN_ROUTE" || status == "ARRIVED";
+    // Cancellation is only allowed before the roadie marks arrival
+    final showCancel = status == null || status == "ACCEPTED" || status == "EN_ROUTE";
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),

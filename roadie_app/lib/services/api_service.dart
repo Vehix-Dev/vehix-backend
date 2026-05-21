@@ -571,7 +571,7 @@ class ApiService {
     }
   }
 
-  static Future<dynamic> withdrawFunds(
+  static Future<Map<String, dynamic>?> withdrawFunds(
     double amount,
     String phoneNumber,
   ) async {
@@ -583,15 +583,14 @@ class ApiService {
     print("💸 [ROADIE] Initiating withdrawal:");
     print("   Amount: $amount");
     print("   Phone: $phoneNumber");
-    print("   Data: $data");
     
     try {
       final response = await post("/wallet/withdraw/", data, requiresAuth: true);
       print("📥 [ROADIE] Withdrawal response: $response");
-      return response;
+      return response is Map<String, dynamic> ? response : null;
     } catch (e) {
       print("❌ [ROADIE] Withdrawal error: $e");
-      rethrow;
+      return null;
     }
   }
 

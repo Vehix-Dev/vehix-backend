@@ -950,12 +950,11 @@ class AccountDeletionEligibilityView(APIView):
             if unpaid_fees:
                 reasons.append("You have unpaid service fees for completed jobs.")
                 
-        # 5. Check for unresolved disputes
-        unresolved_disputes = Dispute.objects.filter(
-            models.Q(raised_by=user) | models.Q(request__rider=user) | models.Q(request__rodie=user),
-            status='PENDING'
-        ).distinct().exists()
-        if unresolved_disputes:
+        # 5. Check for unresolved disputes (use separate queries for better performance)
+        has_dispute_raised = Dispute.objects.filter(raised_by=user, status='PENDING').exists()
+        has_dispute_as_rider = Dispute.objects.filter(request__rider=user, status='PENDING').exists()
+        has_dispute_as_rodie = Dispute.objects.filter(request__rodie=user, status='PENDING').exists()
+        if has_dispute_raised or has_dispute_as_rider or has_dispute_as_rodie:
             reasons.append("You have one or more unresolved disputes.")
             
         return Response({

@@ -160,27 +160,6 @@ class _AppDrawerState extends State<AppDrawer> {
               nav.push(MaterialPageRoute(builder: (_) => const SupportScreen()));
             },
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip, color: Color(0xFF10223D)),
-            title: const Text('Privacy Policy'),
-            onTap: () async {
-              final url = Uri.parse('https://vehix.ug/privacy-policy/');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description, color: Color(0xFF10223D)),
-            title: const Text('Terms of Service'),
-            onTap: () async {
-              final url = Uri.parse('https://vehix.ug/terms-of-service/');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-          ),
           const SizedBox(height: 32),
           ListTile(
             leading: const Icon(Icons.exit_to_app),

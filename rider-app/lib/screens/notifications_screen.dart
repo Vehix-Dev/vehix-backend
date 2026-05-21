@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'notification_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -11,12 +13,31 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<dynamic> _notifications = [];
+  Set<int> _hiddenIds = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchNotifications();
+    _loadHiddenIds().then((_) => _fetchNotifications());
+  }
+
+  Future<void> _loadHiddenIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList('hidden_notification_ids') ?? [];
+    setState(() {
+      _hiddenIds = hidden.map((e) => int.parse(e)).toSet();
+    });
+  }
+
+  Future<void> _hideNotification(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    _hiddenIds.add(id);
+    await prefs.setStringList(
+      'hidden_notification_ids',
+      _hiddenIds.map((e) => e.toString()).toList(),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchNotifications() async {
@@ -52,14 +73,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         onRefresh: _fetchNotifications,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : _notifications.isEmpty
+            : _visibleNotifications.isEmpty
                 ? _buildEmptyState()
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _notifications.length,
+                    itemCount: _visibleNotifications.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final notif = _notifications[index];
+                      final notif = _visibleNotifications[index];
                       return _buildNotificationCard(notif);
                     },
                   ),
@@ -88,16 +109,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  List<dynamic> get _visibleNotifications =>
+      _notifications.where((n) => !_hiddenIds.contains(n['id'])).toList();
+
   Widget _buildNotificationCard(dynamic notif) {
     final bool isRead = notif['is_read'] ?? false;
     final DateTime createdAt = DateTime.parse(notif['created_at']);
     final String timeAgo = _formatTimeAgo(createdAt);
 
-    return InkWell(
-      onTap: () {
-        if (!isRead) {
-          _markAsRead(notif['id']);
-        }
+    return Dismissible(
+      key: Key('notif_${notif['id']}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('🗑️', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 4),
+            Text('Hide', style: TextStyle(color: Colors.red[600], fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+      onDismissed: (_) => _hideNotification(notif['id']),
+      child: InkWell(
+      onTap: () async {
+        if (!isRead) _markAsRead(notif['id']);
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NotificationDetailScreen(
+              notification: Map<String, dynamic>.from(notif),
+              onHide: () => _hideNotification(notif['id']),
+            ),
+          ),
+        );
+        if (result == 'hidden' && mounted) setState(() {});
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -149,6 +201,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     notif['message'] ?? '',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.grey[700],
                       fontSize: 14,
@@ -166,6 +220,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

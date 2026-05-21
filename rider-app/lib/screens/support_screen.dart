@@ -155,9 +155,9 @@ class ContactUsScreen extends StatelessWidget {
             _ContactCard(
               icon: Icons.phone,
               title: 'Direct Phone',
-              subtitle: '+256777501667',
+              subtitle: '+256794812199',
               onTap: () async {
-                final url = Uri.parse('tel:+256777501667');
+                final url = Uri.parse('tel:+256794812199');
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url);
                 }
@@ -167,9 +167,9 @@ class ContactUsScreen extends StatelessWidget {
             _ContactCard(
               icon: Icons.message,
               title: 'WhatsApp',
-              subtitle: '+256758533304',
+              subtitle: '+256706795451',
               onTap: () async {
-                final url = Uri.parse('https://wa.me/256758533304');
+                final url = Uri.parse('https://wa.me/256706795451');
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
                 }

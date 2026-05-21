@@ -553,9 +553,9 @@ class CancelRequestView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Rodie can cancel if request is accepted or en_route
+        # Rodie can cancel if request is accepted or en_route (not after arrival)
         if user.role == 'RODIE' and req.rodie_id == user.id:
-            if req.status in ['ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
+            if req.status in ['ACCEPTED', 'EN_ROUTE']:
                 # Calculate distance for record keeping if location is provided
                 dist_km = None
                 if current_lat and current_lng:
@@ -567,7 +567,7 @@ class CancelRequestView(APIView):
                 with transaction.atomic():
                     # Re-fetch with row lock to prevent race conditions
                     req = ServiceRequest.objects.select_for_update().get(id=pk)
-                    if req.status not in ['ACCEPTED', 'EN_ROUTE', 'ARRIVED']:
+                    if req.status not in ['ACCEPTED', 'EN_ROUTE']:
                         return Response(
                             {'detail': f'Request status changed to {req.status}'},
                             status=status.HTTP_409_CONFLICT
@@ -636,7 +636,7 @@ class CancelRequestView(APIView):
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
-                    {'detail': 'Cannot cancel request: The service has already started or is completed.'},
+                    {'detail': 'Cannot cancel request: The roadie has already arrived or the service has started.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 

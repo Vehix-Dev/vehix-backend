@@ -11,6 +11,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   Map<String, dynamic>? wallet;
+  Map<String, dynamic>? userData;
   List<dynamic> transactions = [];
   bool _isLoading = true;
   bool _isProcessingDeposit = false;
@@ -26,9 +27,11 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<void> _loadWallet() async {
     setState(() => _isLoading = true);
+    final userInfo = await ApiService.fetchUserInfo();
     final walletResponse = await ApiService.getWallet();
     if (mounted) {
       setState(() {
+        userData = userInfo;
         wallet = walletResponse;
         final txList = walletResponse?['transactions'];
         transactions = txList is List ? txList : [];
@@ -174,7 +177,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   void _showWithdrawModal() {
     final amountCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController(text: userData?['phone'] ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -304,7 +307,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         _showSuccess('Withdrawal submitted! Ref: ${result['reference']}');
                         _loadWallet();
                       } else {
-                        _showError(result?['error'] ?? 'Withdrawal failed.');
+                        _showError(_parseErrorMessage(result) ?? 'Withdrawal failed.');
                       }
                     } catch (e) {
                       _showError('Error: $e');
@@ -331,6 +334,19 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   // ─── HELPERS ────────────────────────────────────────────────────────────────
+
+  String? _parseErrorMessage(dynamic result) {
+    if (result == null) return null;
+    if (result is! Map) return null;
+    // Top-level error string
+    if (result['error'] is String) return result['error'];
+    // DRF field-level errors: {"field": ["message", ...]}
+    for (final value in result.values) {
+      if (value is List && value.isNotEmpty) return value.first.toString();
+      if (value is String) return value;
+    }
+    return null;
+  }
 
   void _showError(String msg) {
     if (!mounted) return;

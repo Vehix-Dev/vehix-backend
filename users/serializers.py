@@ -274,7 +274,7 @@ class DepositSerializer(serializers.Serializer):
 
 
 class WithdrawSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('1.00'))
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('5000.00'))
     phone_number = serializers.CharField(max_length=20, required=False)
 
     def validate_amount(self, value):

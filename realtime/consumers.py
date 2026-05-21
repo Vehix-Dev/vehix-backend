@@ -196,10 +196,12 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
 
     async def request_update(self, event):
         """Handle request_update from post_save signal — forward to roadie app"""
+        req_data = event.get("request") or event.get("data") or {}
+        status = event.get("status") or req_data.get("status")
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "request": event.get("request") or event.get("data"),
-            "status": event.get("status"),
+            "request": req_data,
+            "status": status,
         })
 
     async def user_status(self, event):
@@ -741,10 +743,12 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def request_update(self, event):
+        req_data = event.get("request") or event.get("data") or {}
+        status = event.get("status") or req_data.get("status")
         await self.send_json({
             "type": "REQUEST_UPDATE",
-            "request": event.get("request") or event.get("data"),
-            "status": event.get("status")
+            "request": req_data,
+            "status": status
         })
 
     async def session_invalidated(self, event):

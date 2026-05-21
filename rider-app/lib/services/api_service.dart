@@ -653,7 +653,7 @@ class ApiService {
     }
   }
 
-  /// Withdraw funds — max UGX 5,000 per transaction.
+  /// Withdraw funds — min UGX 5,000 per transaction.
   static Future<Map<String, dynamic>?> withdrawFunds(double amount, String phoneNumber) async {
     try {
       final response = await post("/wallet/withdraw/", {
