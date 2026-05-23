@@ -7,6 +7,8 @@ User = get_user_model()
 class AdminUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     wallet = None
+    is_online = serializers.BooleanField(read_only=True)
+    device_type = serializers.SerializerMethodField()
     profile_photo = serializers.SerializerMethodField()
     id_card_front = serializers.SerializerMethodField()
     id_card_back = serializers.SerializerMethodField()
@@ -24,8 +26,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'external_id', 'first_name', 'last_name', 'email', 'phone', 
             'username', 'password', 'role', 'referral_code', 'nin', 
-            'is_approved', 'created_at', 'updated_at', 'wallet', 
-            'is_active', 'is_deleted', 'profile_photo', 'id_card_front', 
+            'is_approved', 'is_online', 'device_type', 'created_at', 'updated_at', 'wallet',
+            'is_active', 'is_deleted',
+            'profile_photo', 'id_card_front', 
             'id_card_back', 'license_photo', 'vehicle_photo',
         )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
@@ -38,6 +41,20 @@ class AdminUserSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(image.original_image.url)
             return image.original_image.url
+        return None
+
+    def get_device_type(self, obj):
+        try:
+            from .models import RodieAvailabilityLog
+            log = (
+                RodieAvailabilityLog.objects.filter(user=obj)
+                .order_by('-went_online_at')
+                .first()
+            )
+            if log and log.device_type:
+                return log.device_type
+        except Exception:
+            pass
         return None
 
     def get_profile_photo(self, obj):
@@ -77,6 +94,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
             user.set_password(password)
         else:
             user.set_unusable_password()
+        if validated_data.get('role') == 'RIDER':
+            user.is_approved = True
+            user.is_active = True
         user.save()
         return user
 

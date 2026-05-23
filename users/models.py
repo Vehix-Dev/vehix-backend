@@ -250,8 +250,9 @@ class User(AbstractUser):
             except Exception:
                 self.referral_code = f"VX{uuid.uuid4().hex[:6].upper()}"
 
-        if self.role == 'RIDER' and is_new and not self.is_approved:
+        if self.role == 'RIDER' and is_new:
             self.is_approved = True
+            self.is_active = True
 
         if self.role == 'ADMIN':
             self.is_approved = False

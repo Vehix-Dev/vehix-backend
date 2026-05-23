@@ -120,17 +120,32 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
 class RatingSerializer(serializers.ModelSerializer):
     rater_username = serializers.CharField(source='rater.username', read_only=True)
     rated_user_username = serializers.CharField(source='rated_user.username', read_only=True)
+    rater_name = serializers.SerializerMethodField()
+    rated_user_name = serializers.SerializerMethodField()
     service_request_id = serializers.IntegerField(source='service_request.id', read_only=True)
-    
+
     class Meta:
         model = Rating
         fields = (
             'id', 'service_request', 'service_request_id', 'rater', 'rater_username',
-            'rated_user', 'rated_user_username', 'rating', 'comment',
-            'created_at', 'updated_at'
+            'rater_name', 'rated_user', 'rated_user_username', 'rated_user_name',
+            'rating', 'comment', 'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
         ref_name = 'ServiceRatingSerializer'
+
+    def _display_name(self, user):
+        if not user:
+            return ''
+        parts = [user.first_name or '', user.last_name or '']
+        name = ' '.join(p for p in parts if p).strip()
+        return name or user.username
+
+    def get_rater_name(self, obj):
+        return self._display_name(obj.rater)
+
+    def get_rated_user_name(self, obj):
+        return self._display_name(obj.rated_user)
 
 
 class CancellationReasonSerializer(serializers.ModelSerializer):

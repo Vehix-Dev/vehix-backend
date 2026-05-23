@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import ServiceRequest
+from .serializers import RatingSerializer
 from services.admin_serializers import ServiceTypeSerializer
 from django.contrib.auth import get_user_model
 from .models import charge_fee_for_request

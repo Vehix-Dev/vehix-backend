@@ -93,6 +93,22 @@ class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         )
         
         completion_rate = (completed_requests / total_requests * 100) if total_requests > 0 else 0
+
+        avg_rating = 0.0
+        reviews = []
+        try:
+            from service_requests.models_rating import Rating
+            from service_requests.serializers import RatingSerializer
+            avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
+                avg_rating=models.Avg('rating')
+            )['avg_rating'] or 0
+            avg_rating = round(float(avg_rating), 1) if avg_rating else 0.0
+            ratings_qs = Rating.objects.filter(rated_user=instance).select_related(
+                'rater', 'rated_user', 'service_request'
+            ).order_by('-created_at')[:20]
+            reviews = RatingSerializer(ratings_qs, many=True).data
+        except Exception:
+            pass
         
         summary_data = {
             'stats': {
@@ -107,6 +123,8 @@ class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             'recent_requests': list(recent_requests),
             'created_date': instance.created_at,
             'last_active': rider_requests.order_by('-updated_at').first().updated_at if rider_requests.exists() else instance.updated_at,
+            'rating': avg_rating,
+            'reviews': reviews,
         }
         
         response_data = serializer.data
@@ -245,15 +263,21 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         
         unique_riders_served = roadie_requests.values('rider').distinct().count()
         
-        # Calculate average rating from ratings received
+        avg_rating = 0.0
+        reviews = []
         try:
             from service_requests.models_rating import Rating
+            from service_requests.serializers import RatingSerializer
             avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
                 avg_rating=models.Avg('rating')
             )['avg_rating'] or 0
             avg_rating = round(float(avg_rating), 1) if avg_rating else 0.0
+            ratings_qs = Rating.objects.filter(rated_user=instance).select_related(
+                'rater', 'rated_user', 'service_request'
+            ).order_by('-created_at')[:20]
+            reviews = RatingSerializer(ratings_qs, many=True).data
         except Exception:
-            avg_rating = 0.0
+            pass
         
         summary_data = {
             'stats': {
@@ -271,6 +295,7 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             'last_active': roadie_requests.order_by('-updated_at').first().updated_at if roadie_requests.exists() else instance.updated_at,
             'is_approved': instance.is_approved,
             'rating': avg_rating,
+            'reviews': reviews,
         }
         
         response_data = serializer.data

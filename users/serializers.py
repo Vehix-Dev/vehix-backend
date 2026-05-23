@@ -36,6 +36,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         if referred_by_code and referred_by_code.strip():
             referrer = User.objects.filter(referral_code__iexact=referred_by_code.strip()).first()
 
+        role = validated_data.get('role')
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
@@ -43,10 +44,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             phone=validated_data.get('phone'),
-            role=validated_data.get('role'),
+            role=role,
             nin=validated_data.get('nin'),
             fcm_token=validated_data.get('fcm_token'),
         )
+
+        if role == 'RIDER':
+            user.is_approved = True
+            user.is_active = True
+            user.save(update_fields=['is_approved', 'is_active'])
 
         wallet, _ = Wallet.objects.get_or_create(user=user)
 
