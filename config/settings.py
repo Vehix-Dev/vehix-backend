@@ -342,11 +342,9 @@ if DEBUG:
 # Firebase Cloud Messaging Configuration
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
 
-# OpenFloat (Payouts) Configuration
-OPENFLOAT_BASE_URL = config('OPENFLOAT_BASE_URL', default='https://api.openfloat.africa/v1')
-OPENFLOAT_CLIENT_ID = config('OPENFLOAT_CLIENT_ID', default='')
-OPENFLOAT_CLIENT_SECRET = config('OPENFLOAT_CLIENT_SECRET', default='')
-OPENFLOAT_ACCOUNT_ID = config('OPENFLOAT_ACCOUNT_ID', default='')
+# Flutterwave (Payouts) Configuration
+FLUTTERWAVE_BASE_URL = config('FLUTTERWAVE_BASE_URL', default='https://api.flutterwave.com/v3')
+FLUTTERWAVE_SECRET_KEY = config('FLUTTERWAVE_SECRET_KEY', default='')
 
 FCM_SERVICE_ACCOUNT_FILE = config('FCM_SERVICE_ACCOUNT_FILE', default='')
 if FCM_SERVICE_ACCOUNT_FILE:

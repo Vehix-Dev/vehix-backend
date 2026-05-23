@@ -427,12 +427,12 @@ class WithdrawView(APIView):
                     reason=f"Withdrawal request {reference}"
                 )
 
-                # --- NEW: Automated OpenFloat Payout ---
+                # --- Automated Flutterwave Payout ---
                 # This only runs if credentials are provided in .env
-                from .openfloat import OpenFloatClient
-                client = OpenFloatClient()
+                from .flutterwave import FlutterwaveClient
+                client = FlutterwaveClient()
                 
-                if client.client_id and client.client_secret:
+                if client.secret_key:
                     payout_response = client.transfer_to_mobile_money(
                         phone_number=phone_number,
                         amount=amount,
@@ -444,7 +444,7 @@ class WithdrawView(APIView):
                         payment.status = 'COMPLETED'
                         payment.processor_id = payout_response.get('transaction_id')
                         payment.save()
-                        message = 'Withdrawal processed and sent successfully via OpenFloat'
+                        message = 'Withdrawal processed and sent successfully via Flutterwave'
                     else:
                         # If the API call fails, we keep it as PENDING 
                         # so admin can process it manually or retry
