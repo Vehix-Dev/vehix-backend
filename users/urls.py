@@ -28,6 +28,8 @@ from .admin_views import (
     AdminReferralRUDView,
     AdminPlatformConfigView,
     AdminUserPasswordView,
+    RoadieOnlineTimeFleetView,
+    RoadieOnlineTimeDetailView,
 )
 from .support_views import (
     SupportTicketViewSet,
@@ -102,6 +104,8 @@ urlpatterns = [
     path('auth/admin/riders/<int:pk>/', RiderRetrieveUpdateDestroyView.as_view(), name='admin_riders_rud'),
     path('auth/admin/roadies/', RoadieListCreateView.as_view(), name='admin_roadies_list_create'),
     path('auth/admin/roadies/<int:pk>/', RoadieRetrieveUpdateDestroyView.as_view(), name='admin_roadies_rud'),
+    path('auth/admin/roadies/online-time/summary/', RoadieOnlineTimeFleetView.as_view(), name='admin_roadies_online_time_summary'),
+    path('auth/admin/roadies/<int:pk>/online-time/', RoadieOnlineTimeDetailView.as_view(), name='admin_roadies_online_time_detail'),
     path('auth/admin/riders/realtime/', RealtimeRidersView.as_view(), name='admin_riders_realtime'),
     path('auth/admin/users/', AdminListCreateView.as_view(), name='admin_users_list_create'),
     path('auth/admin/users/<int:pk>/', AdminRetrieveUpdateDestroyView.as_view(), name='admin_users_rud'),

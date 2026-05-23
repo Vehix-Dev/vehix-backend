@@ -1,7 +1,8 @@
-from rest_framework import generics, viewsets, filters, status
+from rest_framework import generics, viewsets, filters, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from .admin_views import IsAdminRole
 try:
     from django_filters.rest_framework import DjangoFilterBackend
 except ImportError:
@@ -94,15 +95,22 @@ class AdminAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     Only admins can access this
     """
     serializer_class = AdminAuditLogSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['action_type', 'admin_user', 'created_at']
     search_fields = ['admin_user__username', 'action_description', 'target_user__username']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
-    
+
     def get_queryset(self):
         return AdminAuditLog.objects.all().select_related('admin_user', 'target_user')
+
+    @action(detail=False, methods=['post'], url_path='clear')
+    def clear(self, request):
+        qs = self.get_queryset()
+        count = qs.count()
+        qs.delete()
+        return Response({'detail': f'Deleted {count} audit log(s).'})
 
 
 class NotificationHistoryViewSet(viewsets.ReadOnlyModelViewSet):

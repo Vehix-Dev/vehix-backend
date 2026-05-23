@@ -615,3 +615,125 @@ class AdminUserPasswordView(APIView):
             return Response({'status': 'Password updated successfully'})
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
+
+
+def _format_duration(seconds):
+    seconds = int(max(0, seconds))
+    hours, rem = divmod(seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m"
+    return f"{secs}s"
+
+
+def _session_duration(log, now=None):
+    from django.utils import timezone
+    now = now or timezone.now()
+    end = log.went_offline_at or now
+    return max(0, (end - log.went_online_at).total_seconds())
+
+
+class RoadieOnlineTimeFleetView(APIView):
+    """Aggregate online time across all roadies for admin dashboard."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        from django.utils import timezone
+        from .models import RodieAvailabilityLog
+
+        now = timezone.now()
+        days = int(request.query_params.get('days', 30))
+        since = now - timezone.timedelta(days=days)
+
+        logs = RodieAvailabilityLog.objects.filter(
+            user__role='RODIE',
+            went_online_at__gte=since,
+        ).select_related('user')
+
+        total_seconds = sum(_session_duration(log, now) for log in logs)
+        roadie_ids = logs.values_list('user_id', flat=True).distinct()
+        roadie_count = len(set(roadie_ids))
+        avg_per_roadie = total_seconds / roadie_count if roadie_count else 0
+
+        return Response({
+            'days': days,
+            'total_online_seconds': int(total_seconds),
+            'total_online_formatted': _format_duration(total_seconds),
+            'average_per_roadie_seconds': int(avg_per_roadie),
+            'average_per_roadie_formatted': _format_duration(avg_per_roadie),
+            'roadies_with_sessions': roadie_count,
+            'session_count': logs.count(),
+        })
+
+
+class RoadieOnlineTimeDetailView(APIView):
+    """Per-roadie online sessions, averages, and calendar grouping."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request, pk):
+        from django.utils import timezone
+        from collections import defaultdict
+        from .models import RodieAvailabilityLog
+
+        try:
+            roadie = User.objects.get(pk=pk, role='RODIE')
+        except User.DoesNotExist:
+            return Response({'detail': 'Roadie not found.'}, status=404)
+
+        now = timezone.now()
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+
+        logs_qs = RodieAvailabilityLog.objects.filter(user=roadie).order_by('-went_online_at')
+        if date_from:
+            logs_qs = logs_qs.filter(went_online_at__date__gte=date_from)
+        if date_to:
+            logs_qs = logs_qs.filter(went_online_at__date__lte=date_to)
+
+        sessions = []
+        calendar = defaultdict(lambda: {'total_seconds': 0, 'sessions': []})
+
+        for log in logs_qs:
+            duration = _session_duration(log, now)
+            session = {
+                'id': log.id,
+                'went_online_at': log.went_online_at.isoformat(),
+                'went_offline_at': log.went_offline_at.isoformat() if log.went_offline_at else None,
+                'duration_seconds': int(duration),
+                'duration_formatted': _format_duration(duration),
+                'still_online': log.went_offline_at is None,
+                'device_type': log.device_type,
+            }
+            sessions.append(session)
+            day_key = log.went_online_at.date().isoformat()
+            calendar[day_key]['total_seconds'] += int(duration)
+            calendar[day_key]['sessions'].append(session)
+
+        total_seconds = sum(s['duration_seconds'] for s in sessions)
+        session_count = len(sessions)
+        avg_session = total_seconds / session_count if session_count else 0
+
+        calendar_out = {
+            day: {
+                'date': day,
+                'total_seconds': data['total_seconds'],
+                'total_formatted': _format_duration(data['total_seconds']),
+                'sessions': data['sessions'],
+            }
+            for day, data in sorted(calendar.items(), reverse=True)
+        }
+
+        return Response({
+            'roadie_id': roadie.id,
+            'roadie_external_id': roadie.external_id,
+            'roadie_name': f"{roadie.first_name} {roadie.last_name}".strip() or roadie.username,
+            'total_online_seconds': total_seconds,
+            'total_online_formatted': _format_duration(total_seconds),
+            'average_session_seconds': int(avg_session),
+            'average_session_formatted': _format_duration(avg_session),
+            'session_count': session_count,
+            'sessions': sessions,
+            'calendar': calendar_out,
+        })
