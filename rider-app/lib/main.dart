@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'screens/splash_screen.dart';
@@ -57,7 +58,7 @@ class MyApp extends StatelessWidget {
                   Theme.of(context).primaryTextTheme,
                 ),
                 scaffoldBackgroundColor: const Color(0xFF10223D),
-                pageTransitionsTheme: const PageTransitionsTheme(
+                pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
                     TargetPlatform.android: CupertinoPageTransitionsBuilder(),
                     TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),

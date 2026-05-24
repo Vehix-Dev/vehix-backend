@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'screens/splash_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -46,7 +47,7 @@ class MyApp extends StatelessWidget {
                 primaryTextTheme: GoogleFonts.dmSansTextTheme(
                   Theme.of(context).primaryTextTheme,
                 ),
-                pageTransitionsTheme: const PageTransitionsTheme(
+                pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
                     TargetPlatform.android: CupertinoPageTransitionsBuilder(),
                     TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
