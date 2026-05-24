@@ -45,14 +45,7 @@ debug_urls.html
 diag_output.txt
 flutter_logs.txt
 
-# Media / Temporary
-*.jpeg
-*.png
-*.mpeg
-*.mp3
-Sound.mpeg
-TUTU.jpeg
-Screenshot*.png
+
 # Security / Credentials (NEVER COMMIT THESE)
 *.json
 !composer.json
