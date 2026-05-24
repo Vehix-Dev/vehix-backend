@@ -34,10 +34,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Mobile Apps (Vehix) - Explicitly ignored to keep backend separate
-# roadie_app/
-# rider-app/
-
 # Logs
 *.log
 logs/
@@ -45,15 +41,14 @@ debug_urls.html
 diag_output.txt
 flutter_logs.txt
 
-
 # Security / Credentials (NEVER COMMIT THESE)
-*.json
-!composer.json
-!package.json
-!package-lock.json
-!tsconfig.json
+# Instead of ignoring ALL JSON files globally, we target only the private keys and credentials.
+# This ensures package.json, Contents.json, and other config JSONs compile and push correctly!
 google-services.json
+GoogleService-Info.plist
 firebase-key*.json
+*firebase-adminsdk*.json
+*service-account*.json
 jambo-park-firebase-adminsdk-fbsvc-306ea817bc.json
 
 # Flutter artifacts
