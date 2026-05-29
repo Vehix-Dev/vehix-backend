@@ -23,12 +23,23 @@ class FlutterwaveClient:
             "Content-Type": "application/json"
         }
 
+    def clean_ug_phone(self, phone):
+        """
+        Sanitizes Ugandan phone numbers into the E.164 format without '+' i.e., 2567...
+        """
+        phone = str(phone).strip().replace(" ", "").replace("+", "")
+        if phone.startswith("07"):
+            phone = "256" + phone[1:]
+        elif phone.startswith("7"):
+            phone = "256" + phone
+        return phone
+
     def transfer_to_mobile_money(self, phone_number, amount, reference, description=""):
         """
         Initiates a mobile money transfer (Payout) via Flutterwave.
         
         Args:
-            phone_number (str): Recipient phone in format 2567XXXXXXXX
+            phone_number (str): Recipient phone in format 2567XXXXXXXX or standard local format
             amount (Decimal): Amount to send
             reference (str): Internal unique reference (e.g. WTH-XXXX)
             description (str): Optional memo
@@ -41,10 +52,12 @@ class FlutterwaveClient:
 
         url = f"{self.base_url}/transfers"
         
+        cleaned_phone = self.clean_ug_phone(phone_number)
+        
         # Flutterwave transfer payload structure
         payload = {
-            "account_bank": self._detect_bank_code(phone_number),
-            "account_number": phone_number,
+            "account_bank": self._detect_bank_code(cleaned_phone),
+            "account_number": cleaned_phone,
             "amount": float(amount),
             "currency": "UGX",
             "reference": reference,
@@ -93,12 +106,12 @@ class FlutterwaveClient:
         Returns Flutterwave bank code for mobile money providers in Uganda.
         Flutterwave uses specific bank codes for mobile money.
         """
-        phone = str(phone)
-        # MTN Uganda Mobile Money
-        if '77' in phone or '78' in phone or '76' in phone:
-            return "UGMTH"
-        # Airtel Uganda Mobile Money
-        if '75' in phone or '70' in phone or '74' in phone:
-            return "UGARL"
+        cleaned = self.clean_ug_phone(phone)
+        if len(cleaned) >= 5:
+            prefix = cleaned[3:5] # Extract two-digit carrier prefix (e.g. "77", "75" from "25677...")
+            if prefix in ['77', '78', '76']:
+                return "UGMTH" # MTN
+            if prefix in ['75', '70', '74']:
+                return "UGARL" # Airtel
         # Default fallback
         return "UGMTH"

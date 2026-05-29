@@ -500,6 +500,20 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
+      try {
+        Position? lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null && mounted) {
+          setState(() {
+            currentLocation = LatLng(lastKnown.latitude, lastKnown.longitude);
+            _shouldFollowUser = true;
+          });
+          _mapController.move(currentLocation!, 16.0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Map centered to last known location'), duration: Duration(seconds: 2)),
+          );
+          return;
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

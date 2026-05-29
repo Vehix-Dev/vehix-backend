@@ -1120,6 +1120,7 @@ class _RideScreenState extends State<RideScreen> {
                       // Primary Actions (Call/Chat)
                       if (currentRequest["status"]?.toString().toUpperCase() == "ACCEPTED" ||
                           currentRequest["status"]?.toString().toUpperCase() == "EN_ROUTE" ||
+                          currentRequest["status"]?.toString().toUpperCase() == "ARRIVED" ||
                           currentRequest["status"]?.toString().toUpperCase() == "STARTED") ...[
                         Row(
                           children: [

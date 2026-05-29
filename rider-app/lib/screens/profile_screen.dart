@@ -813,26 +813,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isSaving = true);
         
         final deletionReason = reasonController.text.trim();
-        final response = await ApiService.requestAccountDeletion(deletionReason);
-        
-        if (mounted) {
-          if (response != null && response['success'] == true) {
-            // Clear local data and logout immediately
-            await ApiService.logout();
-
-            if (mounted) {
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/login',
-                (route) => false,
-              );
-            }
-          } else {
-            setState(() => _isSaving = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(response?['message'] ?? 'Failed to submit request'),
-                backgroundColor: Colors.red,
-              ),
+        try {
+          await ApiService.requestAccountDeletion(deletionReason);
+          await ApiService.logout();
+          if (mounted) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/login',
+              (route) => false,
+            );
+          }
+        } catch (e) {
+          await ApiService.logout();
+          if (mounted) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/login',
+              (route) => false,
             );
           }
         }

@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'package:roadie_app/screens/login_screen.dart';
@@ -247,6 +248,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _ensureOverlayPermission() async {
+    if (!Platform.isAndroid) return;
+    
     // Request "Display over other apps" permission (System Alert Window)
     // This is required to show the offer dialog when the app is in background or locked.
     if (!await Permission.systemAlertWindow.isGranted) {
@@ -422,9 +425,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _sendInitialLocation() async {
     if (!_isOnline) return;
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
+      );
       ws.sendLocation(lat: position.latitude, lng: position.longitude);
-    } catch (e) { debugPrint("Initial location error: $e"); }
+    } catch (e) {
+      debugPrint("Initial location high-accuracy error, using fallback: $e");
+      if (currentLocation != null) {
+        ws.sendLocation(lat: currentLocation!.latitude, lng: currentLocation!.longitude);
+      } else {
+        try {
+          Position? lastKnown = await Geolocator.getLastKnownPosition();
+          if (lastKnown != null) {
+            ws.sendLocation(lat: lastKnown.latitude, lng: lastKnown.longitude);
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   @override
@@ -494,6 +512,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _mapController.move(currentLocation!, 16.0);
       }
     } catch (e) {
+      try {
+        Position? lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null && mounted) {
+          setState(() {
+            currentLocation = LatLng(lastKnown.latitude, lastKnown.longitude);
+            _shouldFollowUser = true;
+          });
+          _mapController.move(currentLocation!, 16.0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Map centered to last known location'), duration: Duration(seconds: 2)),
+          );
+          return;
+        }
+      } catch (_) {}
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not get GPS fix. Check signal.'), backgroundColor: Colors.orange),

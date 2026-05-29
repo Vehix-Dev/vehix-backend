@@ -352,6 +352,16 @@ class AcceptRequestView(APIView):
                     }
                 )
 
+                # Redundantly notify via request channel group to ensure delivery to rider (and roadie)
+                async_to_sync(channel_layer.group_send)(
+                    f"request_{req.id}",
+                    {
+                        'type': 'request_accepted',
+                        'status': 'ACCEPTED',
+                        'request': resp_data
+                    }
+                )
+
                 title = 'Roadie Accepted Your Request'
                 body = f'{user.first_name or user.username} is on the way to your location.'
                 Notification.objects.create(

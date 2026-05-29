@@ -983,6 +983,23 @@ class RequestAccountDeletionView(APIView):
                 'reasons': eligibility_response.data.get('reasons')
             }, status=status.HTTP_400_BAD_REQUEST)
             
+        # Broadcast session invalidation to active websocket connections before deactivation
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                group_name = f"rider_{user.id}" if user.role == 'RIDER' else f"rodie_{user.id}"
+                async_to_sync(channel_layer.group_send)(
+                    group_name,
+                    {
+                        "type": "session_invalidated",
+                        "message": "Your account has been deleted. You have been logged out."
+                    }
+                )
+        except Exception as e:
+            print(f"DEBUG DELETION: Could not send session_invalidated WebSocket event: {e}", flush=True)
+
         # Set deletion status
         user.deletion_status = 'PENDING'
         user.deletion_requested_at = timezone.now()
