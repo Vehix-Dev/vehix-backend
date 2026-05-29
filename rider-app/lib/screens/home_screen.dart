@@ -250,9 +250,13 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pushReplacement(
+              final nav = Navigator.of(context);
+              if (nav.canPop()) {
+                nav.pop();
+              }
+              nav.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => LoginScreen(role: widget.role)),
+                (route) => false,
               );
             },
             child: const Text('OK'),
