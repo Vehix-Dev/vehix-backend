@@ -13,18 +13,32 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging? get _fcm {
+    try {
+      return FirebaseMessaging.instance;
+    } catch (e) {
+      print("⚠️ [RODIE] FirebaseMessaging not initialized: $e");
+      return null;
+    }
+  }
+  
   bool _initialized = false;
 
   Future<void> initialize() async {
     if (_initialized) return;
 
     try {
+      final fcmInstance = _fcm;
+      if (fcmInstance == null) {
+        print("⚠️ [RODIE] Skipping NotificationService initialization - Firebase not available");
+        return;
+      }
+
       // 1. Set background handler
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
       // 2. Request permissions (Required for Android 13+ and iOS)
-      NotificationSettings settings = await _fcm.requestPermission(
+      NotificationSettings settings = await fcmInstance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -65,13 +79,16 @@ class NotificationService {
 
   Future<void> _getTokenAndRegister() async {
     try {
-      String? token = await _fcm.getToken();
+      final fcmInstance = _fcm;
+      if (fcmInstance == null) return;
+
+      String? token = await fcmInstance.getToken();
       if (token != null) {
         print('🔑 [RODIE] FCM Token: $token');
         await ApiService.updateFcmToken(token);
       }
 
-      _fcm.onTokenRefresh.listen((newToken) async {
+      fcmInstance.onTokenRefresh.listen((newToken) async {
         print('🔑 [RODIE] FCM Token Refreshed: $newToken');
         await ApiService.updateFcmToken(newToken);
       });
