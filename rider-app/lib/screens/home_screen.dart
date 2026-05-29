@@ -132,24 +132,17 @@ class _HomeScreenState extends State<HomeScreen> {
         CacheManager().saveServices(serviceList);
       }
     } catch (e) {
+      debugPrint("❌ Failed to fetch services from API: $e");
       if (mounted && services.isEmpty) {
+        final cachedServices = CacheManager().getServices();
         setState(() {
-          services = _fallbackServices();
+          services = (cachedServices != null && cachedServices.isNotEmpty)
+              ? cachedServices
+              : []; // No fake services fallback! Only use real services from last successful API fetch.
           _loadingServices = false;
         });
       }
     }
-  }
-
-  List<Map<String, dynamic>> _fallbackServices() {
-    return [
-      {"id": 1, "name": "Battery Jumpstart", "description": "Battery jump start service"},
-      {"id": 2, "name": "Towing", "description": "Vehicle towing service"},
-      {"id": 3, "name": "Tire Change", "description": "Flat tire assistance and repair"},
-      {"id": 4, "name": "Fuel Delivery", "description": "Emergency fuel delivery service"},
-      {"id": 5, "name": "Mechanic Service", "description": "On-site mechanical repair"},
-      {"id": 6, "name": "Lockout Service", "description": "Car lockout and key assistance"},
-    ];
   }
 
   Future<void> _initializeScreen() async {
