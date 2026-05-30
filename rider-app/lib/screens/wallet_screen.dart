@@ -178,6 +178,7 @@ class _WalletScreenState extends State<WalletScreen> {
   void _showWithdrawModal() {
     final amountCtrl = TextEditingController();
     final phoneCtrl = TextEditingController(text: userData?['phone'] ?? '');
+    String? errorMessage;
 
     showModalBottomSheet(
       context: context,
@@ -255,6 +256,31 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
               const SizedBox(height: 16),
 
+              if (errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          errorMessage!,
+                          style: TextStyle(color: Colors.red.shade900, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // Amount
               TextField(
                 controller: amountCtrl,
@@ -292,13 +318,24 @@ class _WalletScreenState extends State<WalletScreen> {
                     final amount = double.tryParse(amountCtrl.text.trim());
                     final phone = phoneCtrl.text.trim();
 
-                    if (amount == null || amount <= 0) { _showError('Enter a valid amount.'); return; }
-                    if (amount < _minWithdrawal) { _showError('Minimum withdrawal is UGX $_minWithdrawal.'); return; }
-                    final bal = double.tryParse(wallet?['balance'].toString() ?? '0') ?? 0;
-                    if (amount > bal) { _showError('Insufficient balance. Available: UGX $bal'); return; }
-                    if (phone.isEmpty || phone.length < 10) { _showError('Enter a valid phone number.'); return; }
+                    if (amount == null || amount <= 0) {
+                      setS(() => errorMessage = 'Enter a valid amount.'); return;
+                    }
+                    if (amount < _minWithdrawal) {
+                      setS(() => errorMessage = 'Minimum withdrawal is UGX $_minWithdrawal.'); return;
+                    }
+                    final bal = double.tryParse(wallet?['balance']?.toString() ?? '0') ?? 0;
+                    if (amount > bal) {
+                      setS(() => errorMessage = 'Insufficient balance. Available: UGX $bal'); return;
+                    }
+                    if (phone.isEmpty || phone.length < 10) {
+                      setS(() => errorMessage = 'Enter a valid phone number.'); return;
+                    }
 
-                    setS(() => _isProcessingWithdrawal = true);
+                    setS(() {
+                      _isProcessingWithdrawal = true;
+                      errorMessage = null;
+                    });
                     try {
                       final result = await ApiService.withdrawFunds(amount, phone);
                       if (!mounted) return;
@@ -307,10 +344,10 @@ class _WalletScreenState extends State<WalletScreen> {
                         _showSuccess('Withdrawal submitted! Ref: ${result['reference']}');
                         _loadWallet();
                       } else {
-                        _showError(_parseErrorMessage(result) ?? 'Withdrawal failed.');
+                        setS(() => errorMessage = _parseErrorMessage(result) ?? 'Withdrawal failed.');
                       }
                     } catch (e) {
-                      _showError('Error: $e');
+                      setS(() => errorMessage = 'Error: $e');
                     } finally {
                       if (mounted) setS(() => _isProcessingWithdrawal = false);
                     }
