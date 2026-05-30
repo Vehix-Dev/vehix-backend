@@ -8,7 +8,8 @@ import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
-  const LoginScreen({required this.role, super.key});
+  final String? message;
+  const LoginScreen({required this.role, this.message, super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,6 +21,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
   bool isPasswordVisible = false;
   final WebSocketService ws = WebSocketService();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.message != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.message!),
+            backgroundColor: const Color(0xFF10223D),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      });
+    }
+  }
 
   void login() async {
     if (usernameController.text.isEmpty || passwordController.text.isEmpty) {

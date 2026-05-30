@@ -71,6 +71,6 @@ class CacheManager {
   Future<void> clearAll() async {
     if (!_initialized) return;
     await _userBox.clear();
-    await _cacheBox.clear();
+    await _cacheBox.delete(_keyLastLocation);
   }
 }

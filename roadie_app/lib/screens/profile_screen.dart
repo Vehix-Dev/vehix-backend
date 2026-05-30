@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/api_service.dart';
 import 'change_password_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -966,16 +967,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await ApiService.requestAccountDeletion(deletionReason);
           await ApiService.logout();
           if (mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/login',
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen(role: 'RODIE', message: 'Your account has been successfully deleted and session closed.')),
               (route) => false,
             );
           }
         } catch (e) {
           await ApiService.logout();
           if (mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/login',
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen(role: 'RODIE', message: 'Your account has been successfully deleted and session closed.')),
               (route) => false,
             );
           }

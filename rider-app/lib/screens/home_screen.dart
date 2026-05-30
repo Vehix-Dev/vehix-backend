@@ -129,7 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
           services = serviceList;
           _loadingServices = false;
         });
-        CacheManager().saveServices(serviceList);
+        if (serviceList.isNotEmpty) {
+          CacheManager().saveServices(serviceList);
+        }
       }
     } catch (e) {
       debugPrint("❌ Failed to fetch services from API: $e");
@@ -138,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           services = (cachedServices != null && cachedServices.isNotEmpty)
               ? cachedServices
-              : []; // No fake services fallback! Only use real services from last successful API fetch.
+              : [];
           _loadingServices = false;
         });
       }
@@ -228,7 +230,9 @@ class _HomeScreenState extends State<HomeScreen> {
           services = serviceList;
           _loadingServices = false;
         });
-        CacheManager().saveServices(serviceList);
+        if (serviceList.isNotEmpty) {
+          CacheManager().saveServices(serviceList);
+        }
       }
     } catch (e) {
       if (mounted && services.isEmpty) {
