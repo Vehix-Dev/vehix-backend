@@ -108,6 +108,7 @@ class OverlayService {
 
   /// Show floating overlay widget
   Future<void> showOverlay() async {
+    if (!Platform.isAndroid) return;
     if (!_isInitialized || !_hasPermission || !_isEnabled) return;
     
     try {
@@ -125,6 +126,7 @@ class OverlayService {
 
   /// Hide floating overlay widget
   Future<void> hideOverlay() async {
+    if (!Platform.isAndroid) return;
     if (!_isInitialized) return;
     
     try {
@@ -148,13 +150,20 @@ class OverlayService {
     }
     
     // Update background service
-    await _backgroundChannel.invokeMethod('updateStatus', {'isOnline': isOnline});
+    if (Platform.isAndroid) {
+      try {
+        await _backgroundChannel.invokeMethod('updateStatus', {'isOnline': isOnline});
+      } catch (e) {
+        print('⚠️ Failed to update background status: $e');
+      }
+    }
     
     print('🎯 Roadie status updated: ${isOnline ? "ONLINE" : "OFFLINE"}');
   }
 
   /// Handle app lifecycle changes
   Future<void> handleLifecycleChange(bool isInForeground) async {
+    if (!Platform.isAndroid) return;
     _isAppInForeground = isInForeground;
     
     if (isInForeground) {
@@ -168,6 +177,7 @@ class OverlayService {
 
   /// Show urgent request alert on overlay
   Future<void> showRequestAlert(Map<String, dynamic> requestData) async {
+    if (!Platform.isAndroid) return;
     if (!_isOverlayVisible) return;
     
     try {
@@ -189,6 +199,7 @@ class OverlayService {
 
   /// Enable/disable overlay feature
   Future<void> setEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
     if (!_isInitialized) return;
     
     try {
@@ -222,7 +233,13 @@ class OverlayService {
     
     // Hide overlay and stop background service
     await hideOverlay();
-    await _backgroundChannel.invokeMethod('stopService');
+    if (Platform.isAndroid) {
+      try {
+        await _backgroundChannel.invokeMethod('stopService');
+      } catch (e) {
+        print('⚠️ Failed to stop background service: $e');
+      }
+    }
     
     print('🎯 OverlayService disposed');
   }
@@ -246,6 +263,7 @@ class OverlayService {
   }
 
   Future<void> _setupBackgroundService() async {
+    if (!Platform.isAndroid) return;
     try {
       await _backgroundChannel.invokeMethod('initializeService', {
         'notificationTitle': 'Vehix Roadie',
@@ -272,6 +290,7 @@ class OverlayService {
 
   /// Handle overlay tap (called from native code)
   Future<void> onOverlayTapped() async {
+    if (!Platform.isAndroid) return;
     try {
       // Bring app to foreground
       await _channel.invokeMethod('bringAppToFront');
@@ -286,6 +305,7 @@ class OverlayService {
 
   /// Handle request alert tap (called from native code)
   Future<void> onRequestAlertTapped(Map<String, dynamic> requestData) async {
+    if (!Platform.isAndroid) return;
     try {
       // Bring app to foreground and navigate to request details
       await _channel.invokeMethod('bringAppToFront');

@@ -232,8 +232,11 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       if (mounted && services.isEmpty) {
+        final cachedServices = CacheManager().getServices();
         setState(() {
-          services = _fallbackServices();
+          services = (cachedServices != null && cachedServices.isNotEmpty)
+              ? cachedServices
+              : [];
           _loadingServices = false;
         });
       }
