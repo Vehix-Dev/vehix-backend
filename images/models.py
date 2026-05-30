@@ -107,6 +107,15 @@ class UserImage(models.Model):
         
         is_new = self.pk is None
         
+        # Clean up existing duplicate images of singular/unique types when a new one is uploaded
+        if is_new and self.image_type in ['PROFILE', 'NIN_FRONT', 'NIN_BACK', 'LICENSE', 'VEHICLE']:
+            existing_images = self.__class__.objects.filter(
+                user=self.user,
+                image_type=self.image_type
+            )
+            for img in existing_images:
+                img.delete()
+        
         if is_new and self.original_image:
             self.original_filename = os.path.basename(self.original_image.name)
             self.file_size = self.original_image.size
@@ -149,13 +158,7 @@ class UserImage(models.Model):
         super().save(*args, **kwargs)
     
     def delete(self, *args, **kwargs):
-        """Delete both original and thumbnail files"""
-        if self.original_image:
-            if os.path.isfile(self.original_image.path):
-                os.remove(self.original_image.path)
-        if self.thumbnail:
-            if os.path.isfile(self.thumbnail.path):
-                os.remove(self.thumbnail.path)
+        """Delete instance (files are cleaned up automatically by post_delete signal)"""
         super().delete(*args, **kwargs)
     
     
