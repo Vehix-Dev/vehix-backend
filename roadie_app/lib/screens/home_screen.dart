@@ -828,6 +828,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _checkPendingOfferRequest();
     }
+    OverlayService().handleLifecycleChange(state == AppLifecycleState.resumed);
   }
 
   Future<void> _checkPendingOfferRequest() async {
