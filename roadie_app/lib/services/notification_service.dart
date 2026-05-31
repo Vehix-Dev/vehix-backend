@@ -43,6 +43,8 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
+  static final Set<int> _processedRequestIds = {};
+
   static final StreamController<Map<String, dynamic>> _offerRequestStreamController = StreamController<Map<String, dynamic>>.broadcast();
   static Stream<Map<String, dynamic>> get offerRequestStream => _offerRequestStreamController.stream;
 
