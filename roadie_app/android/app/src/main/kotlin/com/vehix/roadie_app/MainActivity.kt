@@ -10,60 +10,13 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val OVERLAY_CHANNEL = "vehix/overlay"
     private val BACKGROUND_CHANNEL = "vehix/background"
-    private val REQUEST_OVERLAY_PERMISSION = 1001
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Unified MethodChannel implementation routing everything through BackgroundService
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OVERLAY_CHANNEL).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "showOverlay" -> {
-                    val isOnline = call.argument<Boolean>("isOnline") ?: false
-                    val intent = Intent(this, BackgroundService::class.java)
-                    intent.action = "SHOW_OVERLAY"
-                    intent.putExtra("isOnline", isOnline)
-                    startServiceSafely(intent)
-                    result.success(true)
-                }
-                "hideOverlay" -> {
-                    val intent = Intent(this, BackgroundService::class.java)
-                    intent.action = "HIDE_OVERLAY"
-                    startServiceSafely(intent)
-                    result.success(true)
-                }
-                "updateStatus" -> {
-                    val isOnline = call.argument<Boolean>("isOnline") ?: false
-                    val intent = Intent(this, BackgroundService::class.java)
-                    intent.action = "UPDATE_OVERLAY_STATUS"
-                    intent.putExtra("isOnline", isOnline)
-                    startServiceSafely(intent)
-                    result.success(true)
-                }
-                "bringAppToFront" -> {
-                    bringAppToFront()
-                    result.success(true)
-                }
-                "checkPermission" -> {
-                    result.success(hasOverlayPermission())
-                }
-                "requestPermission" -> {
-                    requestOverlayPermission()
-                    result.success(true)
-                }
-                "showRequestAlert" -> {
-                    val title = call.argument<String>("title") ?: "New Request"
-                    val intent = Intent(this, BackgroundService::class.java)
-                    intent.action = "SHOW_ALERT"
-                    intent.putExtra("title", title)
-                    startServiceSafely(intent)
-                    result.success(true)
-                }
-                else -> result.notImplemented()
-            }
-        }
+        // Register custom OverlayPlugin to handle MethodChannels across isolates
+        flutterEngine.plugins.add(OverlayPlugin())
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BACKGROUND_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -108,29 +61,5 @@ class MainActivity : FlutterActivity() {
                 // Last resort
             }
         }
-    }
-
-    private fun hasOverlayPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(this)
-        } else {
-            true
-        }
-    }
-
-    private fun requestOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION)
-        }
-    }
-
-    private fun bringAppToFront() {
-        val intent = Intent(this, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        startActivity(intent)
     }
 }

@@ -739,9 +739,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _showOfferDialog(Map request) {
     _dismissOfferDialog();
     
-    // Calculate remaining seconds if timestamp exists
+    // Calculate remaining seconds if local_receive_time or timestamp exists
     int timeLeft = 15;
-    if (request['timestamp'] != null) {
+    if (request['local_receive_time'] != null) {
+      final double receiveTime = double.tryParse(request['local_receive_time'].toString()) ?? 0.0;
+      if (receiveTime > 0.0) {
+        final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+        final int elapsed = (nowSec - receiveTime).round();
+        timeLeft = 15 - elapsed;
+      }
+    } else if (request['timestamp'] != null) {
       final double requestTime = double.tryParse(request['timestamp'].toString()) ?? 0.0;
       if (requestTime > 0.0) {
         final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
@@ -836,10 +843,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final pendingIdStr = prefs.getString('pending_offer_request_id');
       final pendingTimestampStr = prefs.getString('pending_offer_request_timestamp');
+      final pendingReceiveTime = prefs.getDouble('pending_offer_request_receive_time');
+      
       if (pendingIdStr != null && pendingIdStr.isNotEmpty) {
         // Clear immediately so we don't process it twice
         await prefs.remove('pending_offer_request_id');
         await prefs.remove('pending_offer_request_timestamp');
+        await prefs.remove('pending_offer_request_receive_time');
         
         final requestId = int.tryParse(pendingIdStr);
         if (requestId != null) {
@@ -847,6 +857,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           debugPrint("📦 [RODIE] Found pending offer request $requestId in storage on resume");
           final requestData = await ApiService.getRequestDetails(requestId);
           if (requestData != null) {
+            if (pendingReceiveTime != null) {
+              requestData['local_receive_time'] = pendingReceiveTime;
+            }
             if (pendingTimestampStr != null && pendingTimestampStr.isNotEmpty) {
               requestData['timestamp'] = pendingTimestampStr;
             }

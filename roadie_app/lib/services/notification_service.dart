@@ -14,10 +14,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // IMMEDIATELY DRAW OVER OTHER APPS / POP UP REQUEST MODEL IF IT IS AN OFFER REQUEST
   if (message.data['type'] == 'OFFER_REQUEST') {
     try {
-      // Save pending offer request in SharedPreferences so main UI can pick it up on resume
+      // Save pending offer request and local receive time in SharedPreferences so main UI can calculate countdown perfectly
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('pending_offer_request_id', message.data['request_id']?.toString() ?? '');
       await prefs.setString('pending_offer_request_timestamp', message.data['timestamp']?.toString() ?? '');
+      await prefs.setDouble('pending_offer_request_receive_time', DateTime.now().millisecondsSinceEpoch / 1000.0);
       
       const channel = MethodChannel('vehix/overlay');
       await channel.invokeMethod('bringAppToFront');
@@ -123,6 +124,9 @@ class NotificationService {
     if (requestIdStr == null) return;
     final requestId = int.tryParse(requestIdStr.toString());
     if (requestId == null) return;
+
+    // Capture local receive time immediately to bypass any clock drifts
+    final double receiveTime = DateTime.now().millisecondsSinceEpoch / 1000.0;
     
     // Add a short delay to ensure UI/home_screen has mounted and subscribed
     await Future.delayed(const Duration(milliseconds: 500));
@@ -130,6 +134,7 @@ class NotificationService {
     print('📦 [RODIE] Fetching details for request $requestId from push');
     final details = await ApiService.getRequestDetails(requestId);
     if (details != null) {
+      details['local_receive_time'] = receiveTime;
       if (data['timestamp'] != null) {
         details['timestamp'] = data['timestamp'];
       }

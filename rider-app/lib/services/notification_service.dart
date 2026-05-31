@@ -121,6 +121,15 @@ class NotificationService {
   void _showForegroundNotification(RemoteMessage message) {
     final title = message.notification?.title ?? "Notification";
     final body = message.notification?.body ?? "";
+    
+    // Suppress expired request notifications in the foreground since the requesting screen already handles expiration UI natively.
+    if (title.toUpperCase().contains("EXPIRED") || 
+        body.toUpperCase().contains("EXPIRED") || 
+        message.data['status']?.toString().toUpperCase() == "EXPIRED") {
+      print("🛑 [RIDER] Suppressed foreground notification for request expiry");
+      return;
+    }
+
     final context = navigatorKey.currentContext;
     if (context != null) {
       ScaffoldMessenger.of(context).showSnackBar(
