@@ -1,17 +1,40 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import '../main.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("📩 [RODIE] Handling a background message: ${message.messageId}");
   print("Payload: ${message.data}");
+  
+  // IMMEDIATELY DRAW OVER OTHER APPS / POP UP REQUEST MODEL IF IT IS AN OFFER REQUEST
+  if (message.data['type'] == 'OFFER_REQUEST') {
+    try {
+      // Save pending offer request in SharedPreferences so main UI can pick it up on resume
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pending_offer_request_id', message.data['request_id']?.toString() ?? '');
+      await prefs.setString('pending_offer_request_timestamp', message.data['timestamp']?.toString() ?? '');
+      
+      const channel = MethodChannel('vehix/overlay');
+      await channel.invokeMethod('bringAppToFront');
+      print("🚀 [RODIE] Successfully brought app to front on background FCM OFFER_REQUEST");
+    } catch (e) {
+      print("❌ [RODIE] Failed to bring app to front from background FCM: $e");
+    }
+  }
 }
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
+  static final StreamController<Map<String, dynamic>> _offerRequestStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  static Stream<Map<String, dynamic>> get offerRequestStream => _offerRequestStreamController.stream;
 
   FirebaseMessaging? get _fcm {
     try {
@@ -64,16 +87,53 @@ class NotificationService {
       // 5. Setup foreground message handler
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('🔔 [RODIE] Foreground Message received: ${message.notification?.title}');
+        if (message.data['type'] == 'OFFER_REQUEST') {
+          _handleOfferRequestPush(message.data);
+        } else {
+          _showForegroundNotification(message);
+        }
       });
 
       // 6. Handle notification click
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         print('🚀 [RODIE] Notification clicked! Data: ${message.data}');
+        if (message.data['type'] == 'OFFER_REQUEST') {
+          _handleOfferRequestPush(message.data);
+        }
+      });
+
+      // 7. Handle initial message (terminated state launch)
+      fcmInstance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          print('🚀 [RODIE] App launched from initial message: ${message.data}');
+          if (message.data['type'] == 'OFFER_REQUEST') {
+            _handleOfferRequestPush(message.data);
+          }
+        }
       });
 
       _initialized = true;
     } catch (e) {
       print('❌ [RODIE] NotificationService initialization error: $e');
+    }
+  }
+
+  void _handleOfferRequestPush(Map<String, dynamic> data) async {
+    final requestIdStr = data['request_id'];
+    if (requestIdStr == null) return;
+    final requestId = int.tryParse(requestIdStr.toString());
+    if (requestId == null) return;
+    
+    // Add a short delay to ensure UI/home_screen has mounted and subscribed
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    print('📦 [RODIE] Fetching details for request $requestId from push');
+    final details = await ApiService.getRequestDetails(requestId);
+    if (details != null) {
+      if (data['timestamp'] != null) {
+        details['timestamp'] = data['timestamp'];
+      }
+      _offerRequestStreamController.add(details);
     }
   }
 
@@ -99,5 +159,37 @@ class NotificationService {
 
   Future<void> refreshRegistration() async {
     await _getTokenAndRegister();
+  }
+
+  void _showForegroundNotification(RemoteMessage message) {
+    final title = message.notification?.title ?? "Notification";
+    final body = message.notification?.body ?? "";
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ],
+          ),
+          backgroundColor: const Color(0xFF10223D),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          action: SnackBarAction(
+            label: "VIEW",
+            textColor: const Color(0xFFFF8C00),
+            onPressed: () {
+              // Notification click handling if any custom routing is needed
+            },
+          ),
+        ),
+      );
+    }
   }
 }

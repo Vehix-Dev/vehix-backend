@@ -63,6 +63,13 @@ class RoadieRequestsListView(generics.ListAPIView):
         return qs
 
 
+class RequestDetailView(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    from .serializers import ServiceRequestSerializer
+    serializer_class = ServiceRequestSerializer
+    queryset = ServiceRequest.objects.all()
+
+
 class NearbyRodieListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

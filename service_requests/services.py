@@ -160,6 +160,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                 "fee": float(service_type.fixed_price),
                 "rider_username": req_obj.rider.username,
                 "rider_phone": req_obj.rider.phone,
+                "timestamp": time.time(),
                 "rider": {
                     "id": req_obj.rider.id,
                     "first_name": req_obj.rider.first_name,

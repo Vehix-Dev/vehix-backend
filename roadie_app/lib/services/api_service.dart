@@ -659,6 +659,14 @@ class ApiService {
     return await post("/requests/$requestId/decline/", {}, requiresAuth: true);
   }
 
+  static Future<Map<String, dynamic>?> getRequestDetails(int requestId) async {
+    final response = await get("/requests/$requestId/");
+    if (response is Map) {
+      return Map<String, dynamic>.from(response);
+    }
+    return null;
+  }
+
   static Future<List<dynamic>> fetchChatHistory(int requestId) async {
     final response = await get("/requests/$requestId/chat/");
     return response is List ? response : [];

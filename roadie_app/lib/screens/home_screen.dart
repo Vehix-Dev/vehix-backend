@@ -18,6 +18,8 @@ import 'package:roadie_app/widgets/app_drawer.dart';
 import 'package:roadie_app/core/cache/cache_manager.dart';
 import 'package:roadie_app/services/overlay_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:roadie_app/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   final String role;
@@ -28,8 +30,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   LatLng? currentLocation;
+  StreamSubscription<Map<String, dynamic>>? _offerRequestSubscription;
   List<LatLng> roadieLocations = [];
   final WebSocketService ws = WebSocketService();
   String _loadingStatus = "Initializing...";
@@ -55,6 +58,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _offerRequestSubscription = NotificationService.offerRequestStream.listen((requestData) {
+      if (mounted) {
+        _showOfferDialog(requestData);
+      }
+    });
+
+    _checkPendingOfferRequest();
     
     // Configure audio for notifications so it bypasses media muting
     final audioContext = AudioContext(
@@ -453,6 +465,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _offerRequestSubscription?.cancel();
     _sessionSubscription?.cancel();
     _locationSubscription?.cancel();
     _networkSubscription?.cancel();
@@ -724,7 +738,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showOfferDialog(Map request) {
     _dismissOfferDialog();
+    
+    // Calculate remaining seconds if timestamp exists
     int timeLeft = 15;
+    if (request['timestamp'] != null) {
+      final double requestTime = double.tryParse(request['timestamp'].toString()) ?? 0.0;
+      if (requestTime > 0.0) {
+        final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+        final int elapsed = (nowSec - requestTime).round();
+        timeLeft = 15 - elapsed;
+      }
+    }
+    
+    // Add request to processed list
+    final reqId = request['id'];
+    if (reqId != null) {
+      _processedRequestIds.add(int.tryParse(reqId.toString()) ?? reqId);
+    }
+    
+    if (timeLeft <= 0) {
+      debugPrint("⏳ [RODIE] Offer request already expired when modal would come up");
+      return;
+    }
+    
     _offerDialogActive = true;
     
     // Play incoming request sound in a loop
@@ -786,6 +822,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildInfoRow(IconData icon, String label, String value) { return Row(children: [Icon(icon, size: 20, color: Colors.blueGrey), const SizedBox(width: 12), Text("$label: $value")]); }
 
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingOfferRequest();
+    }
+  }
+
+  Future<void> _checkPendingOfferRequest() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pendingIdStr = prefs.getString('pending_offer_request_id');
+      final pendingTimestampStr = prefs.getString('pending_offer_request_timestamp');
+      if (pendingIdStr != null && pendingIdStr.isNotEmpty) {
+        // Clear immediately so we don't process it twice
+        await prefs.remove('pending_offer_request_id');
+        await prefs.remove('pending_offer_request_timestamp');
+        
+        final requestId = int.tryParse(pendingIdStr);
+        if (requestId != null) {
+          if (_processedRequestIds.contains(requestId)) return;
+          debugPrint("📦 [RODIE] Found pending offer request $requestId in storage on resume");
+          final requestData = await ApiService.getRequestDetails(requestId);
+          if (requestData != null) {
+            if (pendingTimestampStr != null && pendingTimestampStr.isNotEmpty) {
+              requestData['timestamp'] = pendingTimestampStr;
+            }
+            _showOfferDialog(requestData);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking pending offer request: $e");
+    }
+  }
 
   void _handleAccountApproved(Map data) async { await _refreshUserData(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Approved!"), backgroundColor: Colors.green)); }
 

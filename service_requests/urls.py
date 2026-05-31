@@ -19,6 +19,7 @@ from .views import (
     CancellationReasonViewSet,
     RequestCancellationViewSet,
     RatingViewSet,
+    RequestDetailView,
 )
 
 # Create router for viewsets
@@ -28,6 +29,7 @@ router.register(r'cancellations', RequestCancellationViewSet, basename='cancella
 router.register(r'ratings', RatingViewSet, basename='rating')
 
 urlpatterns = [
+    path('<int:pk>/', RequestDetailView.as_view(), name='request_detail'),
     path('create/', CreateServiceRequestView.as_view()),
     path('cancellation-reasons/', CancellationReasonsView.as_view(), name='cancellation_reasons'),
     path('my/', RiderRequestsListView.as_view(), name='rider_my_requests'),

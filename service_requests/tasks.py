@@ -126,6 +126,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     "distance_meters": distance_m,
                     "distance_km": round(distance_m / 1000.0, 1),
                     "fee": 15000, 
+                    "timestamp": time.time(),
                     "rider": {
                         "id": req_obj.rider.id,
                         "username": req_obj.rider.username,
@@ -175,7 +176,8 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     {
                         "type": "OFFER_REQUEST",
                         "request_id": str(request_id),
-                        "status": "OFFERED"
+                        "status": "OFFERED",
+                        "timestamp": str(time.time()),
                     }
                 )
                 
