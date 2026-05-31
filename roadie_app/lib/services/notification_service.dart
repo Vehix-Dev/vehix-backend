@@ -14,8 +14,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // IMMEDIATELY DRAW OVER OTHER APPS / POP UP REQUEST MODEL IF IT IS AN OFFER REQUEST
   if (message.data['type'] == 'OFFER_REQUEST') {
     try {
-      // Save pending offer request and local receive time in SharedPreferences so main UI can calculate countdown perfectly
       final prefs = await SharedPreferences.getInstance();
+      
+      // Verify target rodie_id matches the logged-in rodie on this device
+      final loggedInId = prefs.getString('logged_in_rodie_id');
+      final targetRodieId = message.data['rodie_id']?.toString();
+      if (loggedInId != null && targetRodieId != null && loggedInId != targetRodieId) {
+        print("❌ [RODIE] Ignoring background message meant for rodie_id $targetRodieId (currently logged in as $loggedInId)");
+        return;
+      }
+      
+      // Save pending offer request and local receive time in SharedPreferences so main UI can calculate countdown perfectly
       await prefs.setString('pending_offer_request_id', message.data['request_id']?.toString() ?? '');
       await prefs.setString('pending_offer_request_timestamp', message.data['timestamp']?.toString() ?? '');
       await prefs.setDouble('pending_offer_request_receive_time', DateTime.now().millisecondsSinceEpoch / 1000.0);
@@ -125,8 +134,30 @@ class NotificationService {
     final requestId = int.tryParse(requestIdStr.toString());
     if (requestId == null) return;
 
-    // Capture local receive time immediately to bypass any clock drifts
-    final double receiveTime = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Verify target rodie_id matches the logged-in rodie on this device
+    final loggedInId = prefs.getString('logged_in_rodie_id');
+    final targetRodieId = data['rodie_id']?.toString();
+    if (loggedInId != null && targetRodieId != null && loggedInId != targetRodieId) {
+      print("❌ [RODIE] Ignoring offer request meant for rodie_id $targetRodieId (currently logged in as $loggedInId)");
+      return;
+    }
+
+    if (_processedRequestIds.contains(requestId)) return;
+    
+    // Use saved receive time if it matches this request ID (original background receipt time)
+    final savedId = prefs.getString('pending_offer_request_id');
+    double receiveTime = 0.0;
+    if (savedId == requestIdStr.toString()) {
+      receiveTime = prefs.getDouble('pending_offer_request_receive_time') ?? 0.0;
+    }
+    if (receiveTime == 0.0) {
+      receiveTime = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    }
+    
+    // Guard against concurrent processing
+    _processedRequestIds.add(requestId);
     
     // Add a short delay to ensure UI/home_screen has mounted and subscribed
     await Future.delayed(const Duration(milliseconds: 500));
@@ -134,11 +165,14 @@ class NotificationService {
     print('📦 [RODIE] Fetching details for request $requestId from push');
     final details = await ApiService.getRequestDetails(requestId);
     if (details != null) {
-      details['local_receive_time'] = receiveTime;
+      details['local_receive_time'] = receiveTime.toString();
       if (data['timestamp'] != null) {
-        details['timestamp'] = data['timestamp'];
+        details['timestamp'] = data['timestamp'].toString();
       }
       _offerRequestStreamController.add(details);
+    } else {
+      // Remove guard if fetch failed
+      _processedRequestIds.remove(requestId);
     }
   }
 

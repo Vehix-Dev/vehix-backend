@@ -176,6 +176,7 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                     {
                         "type": "OFFER_REQUEST",
                         "request_id": str(request_id),
+                        "rodie_id": str(rodie_id),
                         "status": "OFFERED",
                         "timestamp": str(time.time()),
                     }
@@ -197,29 +198,48 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
             poll_start = time.time()
             while time.time() - poll_start < offer_seconds:
                 try:
-                    status = cache.get(f"request_status:{request_id}")
+                    # Database is the ultimate source of truth for terminal statuses
+                    req_obj = ServiceRequest.objects.get(id=request_id)
+                    status = req_obj.status
+                    
                     if status == 'ACCEPTED':
                         cache.delete(f"rodie_locked:{rodie_id}")
                         cache.delete(f"active_offer:{rodie_id}")
                         return f"Accepted by {rodie_id}"
-                    if status == 'DECLINED':
-                        cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
-                        break
                     if status == 'CANCELLED':
                         cache.delete(f"rodie_locked:{rodie_id}")
                         cache.delete(f"active_offer:{rodie_id}")
                         return "Cancelled by rider"
-                except Exception:
-                    pass
+                        
+                    # Check roadie-specific decline
+                    if cache.get(f"rodie_declined:{request_id}:{rodie_id}"):
+                        logger.info(f"👎 Rodie {rodie_id} declined this request.")
+                        break
+                except Exception as e:
+                    logger.warning(f"⚠️ Polling check failed: {e}")
                 time.sleep(1)
                 
-            # Cleanup turn (lock release BEFORE resetting status to avoid race)
+            # Cleanup turn (lock release)
             cache.delete(f"rodie_locked:{rodie_id}")
             cache.delete(f"active_offer:{rodie_id}")
-            # Reset DECLINED -> REQUESTED so next roadie sees a fresh status
-            current_status = cache.get(f"request_status:{request_id}")
-            if current_status == 'DECLINED':
-                cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
+
+        # NEW: Ensure the process lasts for the full expiry_seconds regardless of roadie count
+        elapsed = time.time() - total_start
+        if elapsed < expiry_seconds:
+            remaining = expiry_seconds - elapsed
+            logger.info(f"⏳ [tasks] No more roadies in queue. Waiting remaining {int(remaining)}s for potential new arrivals...")
+            
+            # Sleep in 1-second increments to check for cancellation or status updates dynamically
+            wait_end = time.time() + remaining
+            while time.time() < wait_end:
+                try:
+                    req_obj = ServiceRequest.objects.get(id=request_id)
+                    if req_obj.status in ['ACCEPTED', 'CANCELLED', 'COMPLETED']:
+                        logger.info(f"🛑 Request status is {req_obj.status} during post-queue sleep. Exiting.")
+                        return f"Completed with status: {req_obj.status}"
+                except Exception as e:
+                    logger.warning(f"⚠️ Polling check failed during sleep: {e}")
+                time.sleep(1)
 
         # 9. Expiration — inline since there is no separate expire_request function
         try:

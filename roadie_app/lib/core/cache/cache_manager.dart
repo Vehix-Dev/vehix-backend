@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Singleton cache manager wrapping Hive for instant app startup.
 /// Caches: last GPS location, user profile, services list.
@@ -45,6 +46,13 @@ class CacheManager {
   Future<void> saveUserProfile(Map<String, dynamic> profile) async {
     if (!_initialized) return;
     await _userBox.put(_keyUserProfile, profile);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = profile['id'];
+      if (id != null) {
+        await prefs.setString('logged_in_rodie_id', id.toString());
+      }
+    } catch (_) {}
   }
 
   Map<String, dynamic>? getUserProfile() {
@@ -72,5 +80,9 @@ class CacheManager {
     if (!_initialized) return;
     await _userBox.clear();
     await _cacheBox.delete(_keyLastLocation);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('logged_in_rodie_id');
+    } catch (_) {}
   }
 }

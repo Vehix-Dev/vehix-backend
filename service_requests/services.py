@@ -197,15 +197,14 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
                 if status == 'ACCEPTED':
                     print(f"✅ Request {request_id} accepted by {rodie.username}")
                     return # Exit loop
-                if status in ['DECLINED', 'CANCELLED']:
-                    if status == 'CANCELLED':
-                        print(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
-                        return # Exit loop
-                    
-                    # FIX: Reset status to REQUESTED so the next roadie in the loop sees a fresh state
-                    cache.set(f"request_status:{request_id}", 'REQUESTED', timeout=300)
-                    print(f"👎 {rodie.username} declined. Resetting status and moving to next...")
-                    break # Break wait, move to next roadie
+                if status == 'CANCELLED':
+                    print(f"🚫 Request {request_id} cancelled during wait for {rodie.username}")
+                    return # Exit loop
+                
+                # Check roadie-specific decline
+                if cache.get(f"rodie_declined:{request_id}:{rodie.id}"):
+                    print(f"👎 {rodie.username} declined this offer. Moving to next...")
+                    break
 
                 time.sleep(1)
             
@@ -222,7 +221,18 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
     if elapsed < expiry_seconds:
         remaining = expiry_seconds - elapsed
         print(f"⏳ [Search Loop] No more roadies found. Waiting remaining {int(remaining)}s for potential new arrivals...")
-        time.sleep(remaining)
+        
+        # Sleep in 1-second increments to check for cancellation or status updates dynamically
+        wait_end = time.time() + remaining
+        while time.time() < wait_end:
+            try:
+                req_obj = ServiceRequest.objects.get(id=request_id)
+                if req_obj.status in ['ACCEPTED', 'CANCELLED', 'COMPLETED']:
+                    print(f"🛑 [Search Loop] Request status is {req_obj.status} during post-queue sleep. Exiting.")
+                    return
+            except Exception as e:
+                print(f"⚠️ Polling check failed during sleep: {e}")
+            time.sleep(1)
 
     # Check if request was accepted, cancelled, or needs expiry
     try:

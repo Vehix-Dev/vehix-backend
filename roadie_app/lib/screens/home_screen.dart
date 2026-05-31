@@ -120,6 +120,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       userData = cachedProfile;
       final bool isApproved = cachedProfile['is_approved'] ?? false;
       _isOnline = isApproved ? (cachedProfile['is_online'] ?? false) : false;
+      
+      // Keep SharedPreferences updated with current user ID
+      SharedPreferences.getInstance().then((prefs) {
+        if (cachedProfile['id'] != null) {
+          prefs.setString('logged_in_rodie_id', cachedProfile['id'].toString());
+        }
+      }).catchError((_) {});
     }
   }
 
@@ -741,20 +748,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     // Calculate remaining seconds if local_receive_time or timestamp exists
     int timeLeft = 15;
+    double receiveTime = 0.0;
+    
     if (request['local_receive_time'] != null) {
-      final double receiveTime = double.tryParse(request['local_receive_time'].toString()) ?? 0.0;
-      if (receiveTime > 0.0) {
-        final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
-        final int elapsed = (nowSec - receiveTime).round();
-        timeLeft = 15 - elapsed;
+      final val = request['local_receive_time'];
+      if (val is num) {
+        receiveTime = val.toDouble();
+      } else {
+        receiveTime = double.tryParse(val.toString()) ?? 0.0;
       }
-    } else if (request['timestamp'] != null) {
-      final double requestTime = double.tryParse(request['timestamp'].toString()) ?? 0.0;
-      if (requestTime > 0.0) {
-        final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
-        final int elapsed = (nowSec - requestTime).round();
-        timeLeft = 15 - elapsed;
+    }
+    
+    if (receiveTime == 0.0 && request['timestamp'] != null) {
+      final val = request['timestamp'];
+      if (val is num) {
+        receiveTime = val.toDouble();
+      } else {
+        receiveTime = double.tryParse(val.toString()) ?? 0.0;
       }
+    }
+    
+    if (receiveTime > 0.0) {
+      final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      final int elapsed = (nowSec - receiveTime).round();
+      timeLeft = 15 - elapsed;
+      debugPrint("⏳ [RODIE] Calculated timeLeft: $timeLeft (nowSec: $nowSec, receiveTime: $receiveTime, elapsed: $elapsed)");
+    } else {
+      debugPrint("⏳ [RODIE] Could not find valid local_receive_time or timestamp in request: $request");
     }
     
     // Add request to processed list
@@ -854,6 +874,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final requestId = int.tryParse(pendingIdStr);
         if (requestId != null) {
           if (_processedRequestIds.contains(requestId)) return;
+          _processedRequestIds.add(requestId); // Guard immediately
+          
           debugPrint("📦 [RODIE] Found pending offer request $requestId in storage on resume");
           final requestData = await ApiService.getRequestDetails(requestId);
           if (requestData != null) {
@@ -864,6 +886,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               requestData['timestamp'] = pendingTimestampStr;
             }
             _showOfferDialog(requestData);
+          } else {
+            // Revert guard if fetch failed
+            _processedRequestIds.remove(requestId);
           }
         }
       }

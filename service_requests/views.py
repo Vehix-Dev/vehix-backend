@@ -415,7 +415,8 @@ class DeclineRequestView(APIView):
         except Exception:
             pass
         try:
-            cache.set(f"request_status:{req.id}", 'DECLINED', timeout=300)
+            cache.set(f"rodie_declined:{req.id}:{user.id}", True, timeout=300)
+            cache.set(f"request_status:{req.id}", f"DECLINED:{user.id}", timeout=300)
         except Exception:
             pass
 
