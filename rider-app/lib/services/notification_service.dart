@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/material.dart';
 import 'api_service.dart';
-import '../main.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -77,7 +75,6 @@ class NotificationService {
       // 5. Setup foreground message handler
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('🔔 [RIDER] Foreground Message received: ${message.notification?.title}');
-        _showForegroundNotification(message);
       });
 
       // 6. Handle notification click
@@ -116,46 +113,5 @@ class NotificationService {
   /// Manually trigger token refresh and registration (e.g. after login)
   Future<void> refreshRegistration() async {
     await _getTokenAndRegister();
-  }
-
-  void _showForegroundNotification(RemoteMessage message) {
-    final title = message.notification?.title ?? "Notification";
-    final body = message.notification?.body ?? "";
-    
-    // Suppress expired request notifications in the foreground since the requesting screen already handles expiration UI natively.
-    if (title.toUpperCase().contains("EXPIRED") || 
-        body.toUpperCase().contains("EXPIRED") || 
-        message.data['status']?.toString().toUpperCase() == "EXPIRED") {
-      print("🛑 [RIDER] Suppressed foreground notification for request expiry");
-      return;
-    }
-
-    final context = navigatorKey.currentContext;
-    if (context != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          backgroundColor: const Color(0xFF10223D),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          action: SnackBarAction(
-            label: "VIEW",
-            textColor: const Color(0xFFFF8C00),
-            onPressed: () {
-              // Notification click handling if any custom routing is needed
-            },
-          ),
-        ),
-      );
-    }
   }
 }
