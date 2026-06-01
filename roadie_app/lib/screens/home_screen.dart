@@ -375,7 +375,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       
       if (messageType == "offer_request" || messageType == "new_request") {
-        final requestId = data["request"]?['id'] ?? data["data"]?['id'] ?? data["request_id"];
+        final rawId = data["request"]?['id'] ?? data["data"]?['id'] ?? data["request_id"];
+        final requestId = rawId != null ? (int.tryParse(rawId.toString()) ?? rawId) : null;
         final requestData = data["request"] ?? data["data"] ?? data;
         if (requestId != null && _processedRequestIds.contains(requestId)) return;
         if (requestId != null) _processedRequestIds.add(requestId);
@@ -745,6 +746,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _showOfferDialog(Map request) {
     _dismissOfferDialog();
+    
+    // Clear any pending offer requests from SharedPreferences immediately to prevent duplicates on resume
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('pending_offer_request_id');
+      prefs.remove('pending_offer_request_timestamp');
+      prefs.remove('pending_offer_request_receive_time');
+    }).catchError((_) {});
     
     // Calculate remaining seconds if local_receive_time or timestamp exists
     int timeLeft = 15;
