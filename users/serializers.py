@@ -392,6 +392,14 @@ class UserProfilePhotoSerializer(serializers.Serializer):
         return value
 
 class NotificationSerializer(serializers.ModelSerializer):
+    body = serializers.CharField(source='message', required=False, allow_blank=True)
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='recipient',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     recipient_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         source='recipient',
@@ -404,6 +412,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only=True
     )
     target_role = serializers.CharField(required=False)
+    broadcast = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = Notification
@@ -413,10 +422,22 @@ class NotificationSerializer(serializers.ModelSerializer):
             'recipient_external_id',
             'target_role',
             'title',
+            'body',
             'message',
             'url',
             'notification_type',
             'is_read',
-            'created_at'
+            'created_at',
+            'user',
+            'broadcast',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        broadcast = attrs.pop('broadcast', False)
+        if broadcast:
+            attrs['target_role'] = 'ALL'
+            attrs['recipient'] = None
+        elif attrs.get('recipient'):
+            attrs.setdefault('target_role', 'SPECIFIC')
+        return attrs

@@ -32,6 +32,9 @@ class ServiceRequestAdminSerializer(serializers.ModelSerializer):
     
     service_type_details = ServiceTypeSerializer(source='service_type', read_only=True)
     ratings = serializers.SerializerMethodField()
+    chat_messages = serializers.SerializerMethodField()
+    cancellation_detail = serializers.SerializerMethodField()
+    service_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
@@ -42,7 +45,9 @@ class ServiceRequestAdminSerializer(serializers.ModelSerializer):
             'is_paid', 'fee_charged',
             'accepted_at', 'en_route_at', 'started_at', 'completed_at',
             'created_at', 'updated_at',
-            'rider_username_input', 'rodie_username_input', 'ratings'
+            'additional_notes',
+            'rider_username_input', 'rodie_username_input',
+            'ratings', 'chat_messages', 'cancellation_detail', 'service_duration',
         )
 
         if ServiceType:
@@ -55,6 +60,59 @@ class ServiceRequestAdminSerializer(serializers.ModelSerializer):
             return RatingSerializer(ratings, many=True).data
         except Exception:
             return []
+
+    def get_chat_messages(self, obj):
+        try:
+            from .models_chat import ChatMessage
+            messages = ChatMessage.objects.filter(service_request=obj).select_related('sender').order_by('created_at')
+            return [
+                {
+                    'id': m.id,
+                    'sender_id': m.sender_id,
+                    'sender_username': m.sender.username,
+                    'sender_name': m.sender_display_name,
+                    'sender_role': getattr(m.sender, 'role', ''),
+                    'text': m.text,
+                    'is_read': m.is_read,
+                    'created_at': m.created_at.isoformat(),
+                }
+                for m in messages
+            ]
+        except Exception:
+            return []
+
+    def get_cancellation_detail(self, obj):
+        try:
+            from .models import RequestCancellation
+            cancellation = obj.cancellation
+            return {
+                'cancelled_by_id': cancellation.cancelled_by_id,
+                'cancelled_by_username': cancellation.cancelled_by.username,
+                'cancelled_by_name': f"{cancellation.cancelled_by.first_name} {cancellation.cancelled_by.last_name}".strip() or cancellation.cancelled_by.username,
+                'cancelled_by_role': getattr(cancellation.cancelled_by, 'role', ''),
+                'reason': cancellation.display_reason,
+                'custom_reason_text': cancellation.custom_reason_text,
+                'cancelled_at': cancellation.cancelled_at.isoformat(),
+            }
+        except Exception:
+            return None
+
+    def get_service_duration(self, obj):
+        """Returns duration from accepted_at → completed_at in human-readable form."""
+        try:
+            if obj.accepted_at and obj.completed_at:
+                delta = obj.completed_at - obj.accepted_at
+                total_seconds = int(delta.total_seconds())
+                hours, rem = divmod(total_seconds, 3600)
+                minutes, secs = divmod(rem, 60)
+                if hours:
+                    return f"{hours}h {minutes}m"
+                if minutes:
+                    return f"{minutes}m {secs}s"
+                return f"{secs}s"
+        except Exception:
+            pass
+        return None
 
     def validate(self, attrs):
         rider_username = self.initial_data.get('rider_username') or self.initial_data.get('rider_username_input')

@@ -3,14 +3,16 @@ from rest_framework import generics, permissions, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q, Avg, Sum
+from django.utils import timezone
+from decimal import Decimal
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
 from django.apps import apps
 ServiceRequest = apps.get_model('service_requests', 'ServiceRequest')
 from rest_framework import generics, permissions
 from .serializers import WalletSerializer, ReferralSerializer, PlatformConfigSerializer, NotificationSerializer
-from .models import Wallet, Referral, PlatformConfig, Notification
+from .models import Wallet, WalletTransaction, Referral, PlatformConfig, Notification, Payment
 try:
     from asgiref.sync import async_to_sync
     from channels.layers import get_channel_layer
@@ -102,7 +104,7 @@ class RiderRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
                 avg_rating=models.Avg('rating')
             )['avg_rating'] or 0
-            avg_rating = round(float(avg_rating), 1) if avg_rating else 0.0
+            avg_rating = round(float(avg_rating), 1) if avg_rating else 5.0
             ratings_qs = Rating.objects.filter(rated_user=instance).select_related(
                 'rater', 'rated_user', 'service_request'
             ).order_by('-created_at')[:20]
@@ -271,7 +273,7 @@ class RoadieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             avg_rating = Rating.objects.filter(rated_user=instance).aggregate(
                 avg_rating=models.Avg('rating')
             )['avg_rating'] or 0
-            avg_rating = round(float(avg_rating), 1) if avg_rating else 0.0
+            avg_rating = round(float(avg_rating), 1) if avg_rating else 5.0
             ratings_qs = Rating.objects.filter(rated_user=instance).select_related(
                 'rater', 'rated_user', 'service_request'
             ).order_by('-created_at')[:20]
@@ -540,22 +542,12 @@ class AdminNotificationListCreateView(generics.ListCreateAPIView):
                 'notification': NotificationSerializer(notif).data
             }
 
-            push_data = {
-                'notification_id': str(notif.id),
-                'type': notif.notification_type,
-                'url': notif.url or ''
-            }
-
             if notif.target_role == 'ALL':
                 async_to_sync(channel_layer.group_send)('notifications', payload)
-                broadcast_role_push('RIDER', notif.title, notif.message, push_data)
-                broadcast_role_push('RODIE', notif.title, notif.message, push_data)
             elif notif.target_role in ['RIDER', 'RODIE']:
                 async_to_sync(channel_layer.group_send)(f'role_{notif.target_role}', payload)
-                broadcast_role_push(notif.target_role, notif.title, notif.message, push_data)
             elif notif.recipient_id:
                 async_to_sync(channel_layer.group_send)(f'user_{notif.recipient_id}', payload)
-                send_push_notification(notif.recipient, notif.title, notif.message, push_data)
         except Exception as e:
             print(f"DEBUG Error in Broadcast: {str(e)}")
 

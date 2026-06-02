@@ -13,6 +13,8 @@ from .pesapal import PesapalClient
 import uuid
 from services.models import RodieService
 from django.db.models import Q
+from django.contrib.auth.forms import AdminPasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
 
 
 
@@ -51,6 +53,30 @@ class UserAdmin(admin.ModelAdmin):
     )
 
     inlines = [RodieServiceInline]
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('change_password_link',)
+        return self.readonly_fields
+
+    def get_fieldsets(self, request, obj=None):
+        if obj:
+            return (
+                (None, {'fields': ('external_id', 'username', 'change_password_link')}),
+                ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'phone')}),
+                ('Identifiers', {'fields': ('role', 'referral_code')}),
+                ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_approved')}),
+                ('Deletion', {'fields': ('is_deleted', 'deletion_status', 'deletion_requested_at', 'deletion_reason')}),
+            )
+        return self.fieldsets
+
+    def change_password_link(self, obj):
+        if obj.pk:
+            from django.urls import reverse
+            url = reverse('admin:user-change-password', args=[obj.pk])
+            return format_html('<a class="button" href="{}">Change Password</a>', url)
+        return "Save user first to change password"
+    change_password_link.short_description = 'Change Password'
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
@@ -111,6 +137,7 @@ class UserAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
+            path('<int:user_id>/password/', self.admin_site.admin_view(self.user_change_password_view), name='user-change-password'),
             path('<int:user_id>/stk-deposit/', self.admin_site.admin_view(self.stk_deposit_view), name='user-stk-deposit'),
             path('deleted/', self.admin_site.admin_view(self.deleted_users_view), name='users_user_deleted'),
             path('deleted/riders/', self.admin_site.admin_view(self.deleted_riders_view), name='users_user_deleted_riders'),
@@ -121,6 +148,30 @@ class UserAdmin(admin.ModelAdmin):
             path('mechanics/', self.admin_site.admin_view(self.mechanics_view), name='users_user_mechanics'),
         ]
         return custom_urls + urls
+
+    def user_change_password_view(self, request, user_id):
+        user = self.get_object(request, user_id)
+        if not user:
+            return redirect('admin:users_user_changelist')
+
+        if request.method == 'POST':
+            form = AdminPasswordChangeForm(user, request.POST)
+            if form.is_valid():
+                form.save()
+                update_session_auth_hash(request, form.user)
+                self.message_user(request, f"Password for user '{user.username}' changed successfully.", messages.SUCCESS)
+                return redirect('admin:users_user_change', user_id)
+        else:
+            form = AdminPasswordChangeForm(user)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'Change Password: {user.username}',
+            'form': form,
+            'user_obj': user,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/users/change_password.html', context)
 
     def deleted_users_view(self, request):
         users = User.objects.filter(is_deleted=True).order_by('-updated_at')

@@ -32,6 +32,28 @@ class ServiceType(models.Model):
         return self.name
 
 
+class ServiceSubCategory(models.Model):
+    """Sub-categories under a main service type."""
+    service = models.ForeignKey(
+        ServiceType,
+        on_delete=models.CASCADE,
+        related_name='subcategories'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        unique_together = ('service', 'name')
+
+    def __str__(self):
+        return f"{self.service.name} → {self.name}"
+
+
 class RodieService(models.Model):
     rodie = models.ForeignKey(
         settings.AUTH_USER_MODEL,
