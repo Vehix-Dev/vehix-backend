@@ -137,6 +137,7 @@ class NotificationService {
     if (requestId == null) return;
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // Force reload native disk changes
     
     // Verify target rodie_id matches the logged-in rodie on this device
     final loggedInId = prefs.getString('logged_in_rodie_id');

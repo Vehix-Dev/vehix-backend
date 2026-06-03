@@ -83,3 +83,15 @@ def trigger_notification_fcm(sender, instance, created, **kwargs):
                     logger.error(f"Failed to deliver notification {instance.id} to user {user.username}: {exc}")
         except Exception as e:
             logger.error(f"Error in Notification FCM trigger signal: {e}")
+
+
+from django.db.models.signals import pre_save
+
+@receiver(pre_save, sender='users.User')
+def clear_duplicate_fcm_tokens(sender, instance, **kwargs):
+    """
+    Clears the FCM token from any other users if a user registers a non-empty token.
+    This prevents shared device notification leaks during testing or multi-account logins.
+    """
+    if instance.fcm_token:
+        sender.objects.filter(fcm_token=instance.fcm_token).exclude(id=instance.id).update(fcm_token="")

@@ -69,6 +69,34 @@ class RequestDetailView(generics.RetrieveAPIView):
     serializer_class = ServiceRequestSerializer
     queryset = ServiceRequest.objects.all()
 
+    def get_object(self):
+        obj = super().get_object()
+        user = self.request.user
+        
+        # Admin can view anything
+        if user.role == 'ADMIN' or user.is_staff:
+            return obj
+            
+        # Riders can only view their own requests
+        if user.role == 'RIDER':
+            if obj.rider_id != user.id:
+                raise PermissionDenied("You do not have permission to view this request.")
+            return obj
+            
+        # Rodies permissions
+        if user.role == 'RODIE':
+            if obj.status == 'REQUESTED':
+                # Must be the currently targeted roadie in cache
+                active_offer = cache.get(f"active_offer:{user.id}")
+                if not active_offer or active_offer.get('id') != obj.id or cache.get(f"rodie_declined:{obj.id}:{user.id}"):
+                    raise PermissionDenied("This offer is no longer available to you.")
+            else:
+                # For non-requested states, they must be the assigned roadie
+                if obj.rodie_id != user.id:
+                    raise PermissionDenied("You are not the assigned roadie for this request.")
+                    
+        return obj
+
 
 class NearbyRodieListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -301,6 +329,11 @@ class AcceptRequestView(APIView):
             # 1. Check if request is still available
             if req.status != 'REQUESTED':
                 return Response({'detail': f'Request status is {req.status}, no longer available.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Enforce that only the currently targeted roadie can accept the request
+            active_offer = cache.get(f"active_offer:{user.id}")
+            if not active_offer or active_offer.get('id') != req.id or cache.get(f"rodie_declined:{req.id}:{user.id}"):
+                return Response({'detail': 'This offer is no longer available to you.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # 2. Safety check: Ensure the roadie isn't already on another active job
             active_job_exists = ServiceRequest.objects.filter(

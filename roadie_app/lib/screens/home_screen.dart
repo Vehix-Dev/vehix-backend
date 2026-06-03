@@ -869,6 +869,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _checkPendingOfferRequest() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload(); // Force reload disk changes written by background FCM isolate
       final pendingIdStr = prefs.getString('pending_offer_request_id');
       final pendingTimestampStr = prefs.getString('pending_offer_request_timestamp');
       final pendingReceiveTime = prefs.getDouble('pending_offer_request_receive_time');
