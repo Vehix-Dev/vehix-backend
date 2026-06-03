@@ -1,10 +1,17 @@
 from django.contrib import admin
-from .models import ServiceType, RodieService
+from .models import ServiceType, RodieService, ServiceSubCategory
+
+
+class ServiceSubCategoryInline(admin.TabularInline):
+    model = ServiceSubCategory
+    extra = 0
+    fields = ('name', 'description', 'is_active', 'order')
 
 
 @admin.register(ServiceType)
 class ServiceTypeAdmin(admin.ModelAdmin):
-	list_display = ('name', 'code', 'category', 'is_active', 'rodie_count')
+	inlines = [ServiceSubCategoryInline]
+	list_display = ('name', 'code', 'category', 'is_active', 'has_subcategories', 'rodie_count')
 	search_fields = ('name', 'code')
 
 	def rodie_count(self, obj):

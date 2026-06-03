@@ -131,14 +131,25 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
 
 
 class WalletSerializer(serializers.ModelSerializer):
-    transactions = WalletTransactionSerializer(many=True, read_only=True)
+    transactions = serializers.SerializerMethodField()
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     user_external_id = serializers.CharField(source='user.external_id', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
+    user_role = serializers.CharField(source='user.role', read_only=True)
 
     class Meta:
         model = Wallet
-        fields = ('id', 'user_id', 'user_external_id', 'user_username', 'balance', 'transactions')
+        fields = ('id', 'user_id', 'user_external_id', 'user_username', 'user_role', 'balance', 'transactions')
+
+    def get_transactions(self, obj):
+        wallet_transactions = list(WalletTransaction.objects.filter(wallet=obj))
+        payments = list(Payment.objects.filter(user=obj.user))
+        combined = sorted(
+            [*wallet_transactions, *payments],
+            key=lambda item: item.created_at,
+            reverse=True,
+        )
+        return TransactionHistorySerializer(combined, many=True).data
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -392,6 +403,14 @@ class UserProfilePhotoSerializer(serializers.Serializer):
         return value
 
 class NotificationSerializer(serializers.ModelSerializer):
+    body = serializers.CharField(source='message', required=False, allow_blank=True)
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='recipient',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     recipient_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         source='recipient',
@@ -404,6 +423,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only=True
     )
     target_role = serializers.CharField(required=False)
+    broadcast = serializers.BooleanField(write_only=True, required=False)
+    data = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
         model = Notification
@@ -413,10 +434,26 @@ class NotificationSerializer(serializers.ModelSerializer):
             'recipient_external_id',
             'target_role',
             'title',
+            'body',
             'message',
             'url',
             'notification_type',
             'is_read',
-            'created_at'
+            'created_at',
+            'user',
+            'broadcast',
+            'data',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        broadcast = attrs.pop('broadcast', False)
+        data = attrs.pop('data', None) or {}
+        if data.get('url') and not attrs.get('url'):
+            attrs['url'] = data.get('url')
+        if broadcast:
+            attrs['target_role'] = 'ALL'
+            attrs['recipient'] = None
+        elif attrs.get('recipient'):
+            attrs.setdefault('target_role', 'SPECIFIC')
+        return attrs

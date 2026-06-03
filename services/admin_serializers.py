@@ -1,20 +1,33 @@
 from rest_framework import serializers
-from .models import ServiceType, RodieService
+from .models import ServiceType, RodieService, ServiceSubCategory
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+class ServiceSubCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceSubCategory
+        fields = ('id', 'service', 'name', 'description', 'is_active', 'order', 'created_at', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at')
+        ref_name = 'AdminServiceSubCategorySerializer'
 
 
 class ServiceTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True, allow_blank=False)
     code = serializers.CharField(required=True, allow_blank=False)
     rodie_count = serializers.SerializerMethodField(read_only=True)
-    
+    subcategories = ServiceSubCategorySerializer(many=True, read_only=True)
+
     class Meta:
         model = ServiceType
-        fields = ('id', 'name', 'code', 'fixed_price', 'image', 'is_active', 'created_at', 'updated_at', 'rodie_count')
+        fields = (
+            'id', 'name', 'code', 'category', 'fixed_price', 'service_fee',
+            'image', 'is_active', 'has_subcategories',
+            'created_at', 'updated_at', 'rodie_count', 'subcategories'
+        )
         read_only_fields = ('created_at', 'updated_at')
-        ref_name = 'AdminServiceTypeSerializer'  # Moved inside Meta class
+        ref_name = 'AdminServiceTypeSerializer'
 
     def validate(self, attrs):
         return attrs

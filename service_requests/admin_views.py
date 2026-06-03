@@ -3,7 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import ServiceRequest
 from .admin_serializers import ServiceRequestAdminSerializer
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.utils.dateparse import parse_date
 from locations.models import RodieLocation
 from .osrm import get_route_info
 from django.shortcuts import get_object_or_404
@@ -18,6 +19,65 @@ class ServiceRequestListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         return ServiceRequest.objects.select_related('rider', 'rodie', 'service_type').all()
+
+
+class JobsPerformanceReportView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, 'is_authenticated', False) or getattr(request.user, 'role', None) != 'ADMIN':
+            return Response({'detail': 'Admin credentials required'}, status=403)
+
+        qs = ServiceRequest.objects.select_related('service_type').all()
+        start_date = parse_date(request.query_params.get('start_date') or '')
+        end_date = parse_date(request.query_params.get('end_date') or '')
+        if start_date:
+            qs = qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_at__date__lte=end_date)
+
+        total_requests = qs.count()
+        completed = qs.filter(status='COMPLETED').count()
+        cancelled = qs.filter(status='CANCELLED').count()
+        expired = qs.filter(status='EXPIRED').count()
+        failed = cancelled + expired
+
+        accepted_requests = qs.exclude(accepted_at__isnull=True)
+        response_seconds = [
+            (req.accepted_at - req.created_at).total_seconds()
+            for req in accepted_requests
+            if req.accepted_at and req.created_at and req.accepted_at >= req.created_at
+        ]
+        average_response_time = sum(response_seconds) / len(response_seconds) if response_seconds else 0
+
+        by_service_type = []
+        for row in qs.values('service_type__id', 'service_type__name').annotate(total=Count('id')).order_by('service_type__name'):
+            service_qs = qs.filter(service_type_id=row['service_type__id'])
+            service_total = row['total']
+            service_completed = service_qs.filter(status='COMPLETED').count()
+            service_cancelled = service_qs.filter(status='CANCELLED').count()
+            service_expired = service_qs.filter(status='EXPIRED').count()
+            service_failed = service_cancelled + service_expired
+            by_service_type.append({
+                'service_type': row['service_type__name'] or 'Unknown',
+                'total': service_total,
+                'completed': service_completed,
+                'cancelled': service_cancelled,
+                'expired': service_expired,
+                'success_rate': round((service_completed / service_total) * 100, 2) if service_total else 0,
+                'failure_rate': round((service_failed / service_total) * 100, 2) if service_total else 0,
+            })
+
+        return Response({
+            'total_requests': total_requests,
+            'completed': completed,
+            'cancelled': cancelled,
+            'expired': expired,
+            'average_response_time': round(average_response_time, 2),
+            'success_conversion_rate': round((completed / total_requests) * 100, 2) if total_requests else 0,
+            'failure_rate': round((failed / total_requests) * 100, 2) if total_requests else 0,
+            'by_service_type': by_service_type,
+        })
 
 
 class ServiceRequestRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):

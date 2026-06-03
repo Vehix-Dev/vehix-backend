@@ -218,19 +218,6 @@ class NotificationListCreateView(generics.ListCreateAPIView):
         except Exception:
             pass
 
-        try:
-            send_push_notification(
-                self.request.user,
-                notif.title,
-                notif.message,
-                {
-                    'notification_id': str(notif.id),
-                    'type': notif.notification_type,
-                }
-            )
-        except Exception:
-            pass
-
 
 class NotificationRUDView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]

@@ -52,6 +52,7 @@ from service_requests.admin_views import (
     RealtimeRiderMapView,
     ServiceRequestRouteView,
     AdminAssignRodieView,
+    JobsPerformanceReportView,
 )
 from locations.admin_views import (
     RealtimeLocationsView,
@@ -137,6 +138,7 @@ urlpatterns = [
     path('auth/admin/notifications/<int:pk>/', AdminNotificationRUDView.as_view(), name='admin_notifications_rud'),
     path('auth/admin/users/<int:pk>/password/', AdminUserPasswordView.as_view(), name='admin_user_password_change'),
     path('auth/admin/requests/<int:pk>/assign/', AdminAssignRodieView.as_view(), name='admin_request_assign'),
+    path('auth/admin/reports/jobs-performance/', JobsPerformanceReportView.as_view(), name='admin_jobs_performance_report'),
 ]
 
 # Add router URLs

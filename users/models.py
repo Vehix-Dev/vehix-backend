@@ -254,9 +254,6 @@ class User(AbstractUser):
             self.is_approved = True
             self.is_active = True
 
-        if self.role == 'ADMIN':
-            self.is_approved = False
-
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -1,6 +1,6 @@
 from rest_framework import generics, permissions, filters, parsers
-from .models import ServiceType, RodieService
-from .admin_serializers import ServiceTypeSerializer, RodieServiceSerializer
+from .models import ServiceType, RodieService, ServiceSubCategory
+from .admin_serializers import ServiceTypeSerializer, RodieServiceSerializer, ServiceSubCategorySerializer
 
 
 class ServiceTypeListCreateView(generics.ListCreateAPIView):
@@ -39,3 +39,26 @@ class RodieServiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIVie
 
     def get_queryset(self):
         return RodieService.objects.select_related('rodie', 'service').all()
+
+
+class ServiceSubCategoryListCreateView(generics.ListCreateAPIView):
+    """List and create subcategories for a service. Optionally filter by service_id query param."""
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    serializer_class = ServiceSubCategorySerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        qs = ServiceSubCategory.objects.select_related('service').all()
+        service_id = self.request.query_params.get('service_id')
+        if service_id:
+            qs = qs.filter(service_id=service_id)
+        return qs
+
+
+class ServiceSubCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ServiceSubCategorySerializer
+
+    def get_queryset(self):
+        return ServiceSubCategory.objects.select_related('service').all()

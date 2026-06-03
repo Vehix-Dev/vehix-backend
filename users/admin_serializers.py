@@ -14,6 +14,8 @@ class AdminUserSerializer(serializers.ModelSerializer):
     id_card_back = serializers.SerializerMethodField()
     license_photo = serializers.SerializerMethodField()
     vehicle_photo = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    rating_count = serializers.SerializerMethodField()
 
     try:
         from .serializers import WalletSerializer
@@ -30,8 +32,15 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'is_active', 'is_deleted',
             'profile_photo', 'id_card_front', 
             'id_card_back', 'license_photo', 'vehicle_photo',
+            'rating', 'rating_count',
         )
         read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'role': {'required': False},
+            'email': {'required': False},
+            'phone': {'required': False},
+            'is_approved': {'required': False},
+        }
 
     def _get_user_image(self, obj, image_type):
         from images.models import UserImage
@@ -71,12 +80,23 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def get_vehicle_photo(self, obj):
         return self._get_user_image(obj, 'VEHICLE')
-        extra_kwargs = {
-            'role': {'required': False},
-            'email': {'required': False},
-            'phone': {'required': False},
-            'is_approved': {'required': False},
-        }
+
+    def get_rating(self, obj):
+        try:
+            from service_requests.models_rating import Rating
+            from django.db.models import Avg
+            avg = Rating.objects.filter(rated_user=obj).aggregate(avg=Avg('rating'))['avg']
+            return round(float(avg), 1) if avg is not None else 5.0
+        except Exception:
+            return 5.0
+
+    def get_rating_count(self, obj):
+        try:
+            from service_requests.models_rating import Rating
+            return Rating.objects.filter(rated_user=obj).count()
+        except Exception:
+            return 0
+
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
