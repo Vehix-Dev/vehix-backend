@@ -62,6 +62,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _offerRequestSubscription = NotificationService.offerRequestStream.listen((requestData) {
       if (mounted) {
+        // Guard: prevent FCM-triggered stream from re-showing an offer that WS already handled
+        final rawId = requestData['id'];
+        final streamReqId = rawId != null ? (int.tryParse(rawId.toString()) ?? -1) : -1;
+        if (streamReqId != -1 && _processedRequestIds.contains(streamReqId)) {
+          debugPrint("⚠️ [RODIE] Stream listener skipping already-processed request $streamReqId");
+          return;
+        }
         _showOfferDialog(requestData);
       }
     });
@@ -379,7 +386,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final requestId = rawId != null ? (int.tryParse(rawId.toString()) ?? rawId) : null;
         final requestData = data["request"] ?? data["data"] ?? data;
         if (requestId != null && _processedRequestIds.contains(requestId)) return;
-        if (requestId != null) _processedRequestIds.add(requestId);
+        if (requestId != null) {
+          _processedRequestIds.add(requestId);
+          // Sync to NotificationService so FCM handler also knows this ID is handled
+          if (requestId is int) {
+            NotificationService.markAsProcessed(requestId);
+          }
+        }
         
         if (mounted && requestId != null) {
           _showOfferDialog(requestData);
@@ -745,6 +758,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _dismissOfferDialog() { _offerDialogTimer?.cancel(); _offerDialogTimer = null; _offerDialogActive = false; }
 
   void _showOfferDialog(Map request) {
+    // === DEDUP GUARD: Must be FIRST, before _dismissOfferDialog() ===
+    // Prevents late FCM / WS reconnect triggers from dismissing and re-showing the current dialog
+    final guardId = request['id'];
+    final guardRequestId = guardId != null ? (int.tryParse(guardId.toString()) ?? -1) : -1;
+    if (guardRequestId != -1 && _processedRequestIds.contains(guardRequestId)) {
+      debugPrint("⚠️ [RODIE] _showOfferDialog BLOCKED duplicate for request $guardRequestId");
+      return;
+    }
+    if (guardRequestId != -1) {
+      _processedRequestIds.add(guardRequestId);
+      if (guardRequestId is int) {
+        NotificationService.markAsProcessed(guardRequestId);
+      }
+    }
+
     _dismissOfferDialog();
     
     // Clear any pending offer requests from SharedPreferences immediately to prevent duplicates on resume
@@ -785,11 +813,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       debugPrint("⏳ [RODIE] Could not find valid local_receive_time or timestamp in request: $request");
     }
     
-    // Add request to processed list
-    final reqId = request['id'];
-    if (reqId != null) {
-      _processedRequestIds.add(int.tryParse(reqId.toString()) ?? reqId);
-    }
+    // NOTE: processed list is now handled by the guard at the top of this method
     
     if (timeLeft <= 0) {
       debugPrint("⏳ [RODIE] Offer request already expired when modal would come up");

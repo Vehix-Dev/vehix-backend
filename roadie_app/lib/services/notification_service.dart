@@ -45,6 +45,17 @@ class NotificationService {
 
   static final Set<int> _processedRequestIds = {};
 
+  /// Mark a request ID as processed from outside (e.g., WS handler in HomeScreen).
+  /// This prevents the FCM handler from re-processing the same offer that WS already handled.
+  static void markAsProcessed(int requestId) {
+    _processedRequestIds.add(requestId);
+  }
+
+  /// Check if a request ID has already been processed.
+  static bool isProcessed(int requestId) {
+    return _processedRequestIds.contains(requestId);
+  }
+
   static final StreamController<Map<String, dynamic>> _offerRequestStreamController = StreamController<Map<String, dynamic>>.broadcast();
   static Stream<Map<String, dynamic>> get offerRequestStream => _offerRequestStreamController.stream;
 
