@@ -809,6 +809,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
     
+    // Use an absolute expiry time so backgrounding the app doesn't pause the timer
+    final DateTime expiryTime = DateTime.now().add(Duration(seconds: timeLeft));
+    
     _offerDialogActive = true;
     
     // Play incoming request sound in a loop
@@ -829,7 +832,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (dialogContext, setDialogState) {
           _offerDialogTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
             if (!_offerDialogActive) { timer.cancel(); return; }
-            if (timeLeft > 0) { setDialogState(() => timeLeft--); } 
+            final int newTimeLeft = expiryTime.difference(DateTime.now()).inSeconds;
+            if (newTimeLeft > 0) { setDialogState(() => timeLeft = newTimeLeft); } 
             else { 
               timer.cancel(); 
               _audioPlayer.stop();
@@ -864,7 +868,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Row(children: [
       Expanded(child: TextButton(onPressed: () { _audioPlayer.stop(); _audioPlayer.setReleaseMode(ReleaseMode.release); Vibration.cancel(); Navigator.pop(dialogContext); ApiService.declineRequest(request['id']); }, child: const Text("Decline"))),
       const SizedBox(width: 16),
-      Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00), foregroundColor: Colors.white), onPressed: () async { _dismissOfferDialog(); await _audioPlayer.stop(); _audioPlayer.setReleaseMode(ReleaseMode.release); Vibration.cancel(); final nav = Navigator.of(dialogContext); nav.pop(); final response = await ApiService.acceptRequest(request['id'], lat: currentLocation?.latitude, lng: currentLocation?.longitude); if (response != null) { _playAcceptanceSound(); final fullRequest = (response is Map && response['request'] != null) ? Map<String, dynamic>.from(response['request']) : Map<String, dynamic>.from(request); nav.push(MaterialPageRoute(builder: (_) => RideScreen(request: fullRequest, ws: ws))); } }, child: const Text("ACCEPT"))),
+      Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00), foregroundColor: Colors.white), onPressed: () async { _dismissOfferDialog(); await _audioPlayer.stop(); _audioPlayer.setReleaseMode(ReleaseMode.release); Vibration.cancel(); final nav = Navigator.of(dialogContext); nav.pop(); final response = await ApiService.acceptRequest(request['id'], lat: currentLocation?.latitude, lng: currentLocation?.longitude); if (response != null && response['detail'] == null && response['error'] == null) { _playAcceptanceSound(); final fullRequest = (response is Map && response['request'] != null) ? Map<String, dynamic>.from(response['request']) : Map<String, dynamic>.from(request); nav.push(MaterialPageRoute(builder: (_) => RideScreen(request: fullRequest, ws: ws))); } else if (response != null && (response['detail'] != null || response['error'] != null)) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response['detail'] ?? response['error'] ?? 'Failed to accept'))); } }, child: const Text("ACCEPT"))),
     ]);
   }
 
