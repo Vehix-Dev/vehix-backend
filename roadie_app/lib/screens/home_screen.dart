@@ -69,6 +69,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           debugPrint("⚠️ [RODIE] Stream listener skipping already-processed request $streamReqId");
           return;
         }
+        if (streamReqId != -1) {
+          _processedRequestIds.add(streamReqId);
+          NotificationService.markAsProcessed(streamReqId);
+        }
         _showOfferDialog(requestData);
       }
     });
@@ -758,21 +762,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _dismissOfferDialog() { _offerDialogTimer?.cancel(); _offerDialogTimer = null; _offerDialogActive = false; }
 
   void _showOfferDialog(Map request) {
-    // === DEDUP GUARD: Must be FIRST, before _dismissOfferDialog() ===
-    // Prevents late FCM / WS reconnect triggers from dismissing and re-showing the current dialog
-    final guardId = request['id'];
-    final guardRequestId = guardId != null ? (int.tryParse(guardId.toString()) ?? -1) : -1;
-    if (guardRequestId != -1 && _processedRequestIds.contains(guardRequestId)) {
-      debugPrint("⚠️ [RODIE] _showOfferDialog BLOCKED duplicate for request $guardRequestId");
-      return;
-    }
-    if (guardRequestId != -1) {
-      _processedRequestIds.add(guardRequestId);
-      if (guardRequestId is int) {
-        NotificationService.markAsProcessed(guardRequestId);
-      }
-    }
-
     _dismissOfferDialog();
     
     // Clear any pending offer requests from SharedPreferences immediately to prevent duplicates on resume
