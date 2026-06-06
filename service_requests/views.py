@@ -580,6 +580,9 @@ class CancelRequestView(APIView):
                                     cancellation_payload
                                 )
                                 print(f"🚫 Sent cancellation to offered roadie {r.username}")
+                                cache.delete(f"rodie_locked:{r.id}")
+                                # DO NOT delete active_offer immediately; let it expire naturally 
+                                # so RodieConsumer.connect() can detect it and force-close ghost dialogs on reconnect.
                     
                     from users.fcm import send_push_notification
                     if req.rodie:

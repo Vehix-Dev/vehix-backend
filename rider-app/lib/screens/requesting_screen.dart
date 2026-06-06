@@ -304,8 +304,10 @@ class _RequestingScreenState extends State<RequestingScreen>
         final type = data["type"];
         final typeLower = type?.toString().toLowerCase();
         
-        if (typeLower == "request_update") {
-          final status = data["status"];
+        if (typeLower == "request_update" || typeLower == "request_accepted") {
+          final requestData = data["request"] ?? data["data"] ?? data;
+          final status = requestData["status"] ?? data["status"];
+          
           if (status == "ACCEPTED" && !_hasAccepted) {
             _hasAccepted = true; // Guard against duplicate calls
             debugPrint("✅ [Rider] Request ACCEPTED! Navigating to RideScreen");
@@ -324,7 +326,7 @@ class _RequestingScreenState extends State<RequestingScreen>
               _requestHandler = null; 
             }
             
-            final request = data["request"] ?? widget.request;
+            final request = data["request"] ?? data["data"] ?? widget.request;
             
             Navigator.pushReplacement(
               context,

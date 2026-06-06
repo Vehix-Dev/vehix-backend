@@ -117,6 +117,9 @@ class NotificationService {
         print('🔔 [RODIE] Foreground Message received: ${message.notification?.title}');
         if (message.data['type'] == 'OFFER_REQUEST') {
           _handleOfferRequestPush(message.data);
+        } else if (message.data['type'] == 'REQUEST_CANCELLED') {
+          // Do nothing, let WebSocket handle it so we don't show a generic VIEW snackbar
+          print('🔔 [RODIE] Ignoring REQUEST_CANCELLED push in foreground');
         } else {
           _showForegroundNotification(message);
         }

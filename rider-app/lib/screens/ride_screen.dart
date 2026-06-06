@@ -1265,22 +1265,18 @@ class _RideScreenState extends State<RideScreen> {
 
   void _showRideCancelledInfoDialog(String message) {
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text("Ride Cancelled", style: TextStyle(fontWeight: FontWeight.bold)),
+    
+    // Show a snackbar on the root context so it survives navigation
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-            child: const Text("OK", style: TextStyle(color: Color(0xFFFF8C00))),
-          ),
-        ],
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 5),
       ),
     );
+    
+    // Automatically pop back to the Home Screen
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
 

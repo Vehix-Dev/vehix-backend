@@ -208,7 +208,8 @@ def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng
                         return f"Accepted by {rodie_id}"
                     if status == 'CANCELLED':
                         cache.delete(f"rodie_locked:{rodie_id}")
-                        cache.delete(f"active_offer:{rodie_id}")
+                        # DO NOT delete active_offer immediately; let it expire naturally 
+                        # so RodieConsumer.connect() can detect it and force-close ghost dialogs on reconnect.
                         return "Cancelled by rider"
                         
                     # Check roadie-specific decline

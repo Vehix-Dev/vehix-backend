@@ -150,9 +150,14 @@ class RodieConsumer(AsyncJsonWebsocketConsumer):
                         })
                         print(f"📡 [RodieConsumer] Re-sent active offer for request {offer.get('id')}")
                     else:
-                        # Stale offer — clean up
+                        # Stale offer — clean up and force-close ghost dialog
                         cache.delete(f"active_offer:{user.id}")
                         print(f"🧹 [RodieConsumer] Cleared stale offer for request {offer.get('id')} (status={offer_status})")
+                        await self.send_json({
+                            "type": "REQUEST_CANCELLED",
+                            "request_id": offer.get("id"),
+                            "message": "The offer you were viewing is no longer available."
+                        })
             except Exception:
                 pass
         except Exception as e:
@@ -749,6 +754,35 @@ class RiderConsumer(AsyncJsonWebsocketConsumer):
             "type": "REQUEST_UPDATE",
             "request": req_data,
             "status": status
+        })
+
+    # Add missing lifecycle handlers mapping to REQUEST_UPDATE so the rider's UI transitions automatically
+    async def request_accepted(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ACCEPTED", "request": event.get("request")})
+
+    async def request_enroute(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EN_ROUTE", "request": event.get("request")})
+
+    async def request_started(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "STARTED", "request": event.get("request")})
+
+    async def request_arrived(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "ARRIVED", "request": event.get("request")})
+
+    async def request_completed(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "COMPLETED", "request": event.get("request")})
+
+    async def request_declined(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "DECLINED", "request": event.get("request")})
+
+    async def request_expired(self, event):
+        await self.send_json({"type": "REQUEST_UPDATE", "status": "EXPIRED", "request": event.get("request")})
+
+    async def request_cancelled(self, event):
+        await self.send_json({
+            "type": "REQUEST_CANCELLED",
+            "request_id": event.get("request_id"),
+            "message": event.get("message", "This request has been cancelled.")
         })
 
     async def session_invalidated(self, event):
