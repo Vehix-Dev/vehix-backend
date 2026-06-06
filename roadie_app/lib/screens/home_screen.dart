@@ -784,22 +784,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
     
-    if (receiveTime == 0.0 && request['timestamp'] != null) {
-      final val = request['timestamp'];
-      if (val is num) {
-        receiveTime = val.toDouble();
-      } else {
-        receiveTime = double.tryParse(val.toString()) ?? 0.0;
-      }
-    }
-    
     if (receiveTime > 0.0) {
       final double nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
       final int elapsed = (nowSec - receiveTime).round();
       timeLeft = 15 - elapsed;
       debugPrint("⏳ [RODIE] Calculated timeLeft: $timeLeft (nowSec: $nowSec, receiveTime: $receiveTime, elapsed: $elapsed)");
     } else {
-      debugPrint("⏳ [RODIE] Could not find valid local_receive_time or timestamp in request: $request");
+      debugPrint("⏳ [RODIE] Fresh foreground request, starting full 15s timer");
     }
     
     // NOTE: processed list is now handled by the guard at the top of this method
