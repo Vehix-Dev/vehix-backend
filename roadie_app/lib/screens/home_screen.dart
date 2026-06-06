@@ -365,12 +365,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final request = data["request"];
         if (mounted && request != null) {
           if (["ACCEPTED", "EN_ROUTE", "ARRIVED", "STARTED"].contains(status)) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RideScreen(request: request, ws: ws),
-              ),
-            );
+            if (ModalRoute.of(context)?.isCurrent == true) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RideScreen(request: request, ws: ws),
+                ),
+              );
+            }
           }
         }
         return;
@@ -507,7 +509,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _heartbeatTimer?.cancel();
     _audioPlayer.dispose();
     _dismissOfferDialog();
-    ws.disconnect();
+    // Do not call ws.disconnect() here because ws is a shared singleton and is passed to RideScreen.
+    // Disconnecting it here will kill the connection for RideScreen when HomeScreen is pushed/replaced.
     super.dispose();
   }
 
