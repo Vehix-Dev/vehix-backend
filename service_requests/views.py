@@ -449,7 +449,7 @@ class DeclineRequestView(APIView):
             pass
         try:
             cache.set(f"rodie_declined:{req.id}:{user.id}", True, timeout=300)
-            cache.set(f"request_status:{req.id}", f"DECLINED:{user.id}", timeout=300)
+            # DO NOT overwrite request_status here; keep it as REQUESTED so the matching loop continues.
         except Exception:
             pass
 
@@ -671,19 +671,24 @@ class CancelRequestView(APIView):
                     print(f"🚫 Roadie cancelled request {req.id} - reason: {cancellation_reason.reason}")
                 except Exception as e:
                     print(f"❌ Error broadcasting roadie cancellation: {e}")
-                
-                    from users.fcm import send_push_notification
-                    send_push_notification(
-                        req.rider,
-                        "Request Cancelled",
-                        "The Roadie has cancelled the request.",
-                        {
-                            "type": "REQUEST_CANCELLED",
-                            "request_id": str(req.id),
-                            "status": "CANCELLED"
-                        }
-                    )
                     
+                    # We still want to try pushing FCM if the WS broadcast failed, 
+                    # but only if we didn't already send it above. Since the above 
+                    # send_push_notification is in the try block, if it fails, we fall here.
+                    from users.fcm import send_push_notification
+                    try:
+                        send_push_notification(
+                            req.rider,
+                            "Request Cancelled",
+                            "The Roadie has cancelled the request.",
+                            {
+                                "type": "REQUEST_CANCELLED",
+                                "request_id": str(req.id),
+                                "status": "CANCELLED"
+                            }
+                        )
+                    except Exception as push_e:
+                        print(f"❌ Error sending FCM fallback for cancellation: {push_e}")
                 return Response({'detail': 'Request cancelled successfully'})
             else:
                 return Response(
