@@ -1,0 +1,280 @@
+  Preparing
+
+Analyzing dependencies
+
+Inspecting targets to integrate
+  Using `ARCHS` setting to build architectures of target `Pods-Runner`: (``)
+  Using `ARCHS` setting to build architectures of target `Pods-RunnerTests`: (``)
+
+Finding Podfile changes
+  - Flutter
+  - connectivity_plus
+  - device_info_plus
+  - firebase_core
+  - firebase_messaging
+  - flutter_background_service_ios
+  - flutter_secure_storage
+  - permission_handler_apple
+
+Fetching external sources
+-> Fetching podspec for `Flutter` from `Flutter`
+-> Fetching podspec for `connectivity_plus` from `.symlinks/plugins/connectivity_plus/ios`
+-> Fetching podspec for `device_info_plus` from `.symlinks/plugins/device_info_plus/ios`
+-> Fetching podspec for `firebase_core` from `.symlinks/plugins/firebase_core/ios`
+firebase_core: Using Firebase SDK version '10.25.0' defined in 'firebase_core'
+-> Fetching podspec for `firebase_messaging` from `.symlinks/plugins/firebase_messaging/ios`
+firebase_messaging: Using Firebase SDK version '10.25.0' defined in 'firebase_core'
+-> Fetching podspec for `flutter_background_service_ios` from `.symlinks/plugins/flutter_background_service_ios/ios`
+-> Fetching podspec for `flutter_secure_storage` from `.symlinks/plugins/flutter_secure_storage/ios`
+-> Fetching podspec for `permission_handler_apple` from `.symlinks/plugins/permission_handler_apple/ios`
+
+Resolving dependencies of `Podfile`
+  CDN: trunk Relative path: CocoaPods-version.yml exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_d_d_6.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/d/d/6/ReachabilitySwift/5.2.4/ReachabilitySwift.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_0_3_5.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/3/5/Firebase/12.13.0/Firebase.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/3/5/Firebase/10.25.0/Firebase.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/3/5/Firebase/10.25.0/Firebase.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_2_d_6.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/2/d/6/FirebaseMessaging/12.13.0/FirebaseMessaging.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/d/d/6/ReachabilitySwift/5.2.4/ReachabilitySwift.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_8_b_d.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/8/b/d/FirebaseCore/12.13.0/FirebaseCore.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/2/d/6/FirebaseMessaging/10.25.0/FirebaseMessaging.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_2_f_7.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/2/f/7/FirebaseInstallations/12.13.0/FirebaseInstallations.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_0_8_4.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/8.1.0/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_0_6_a.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/6/a/GoogleDataTransport/10.1.0/GoogleDataTransport.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_6_1_e.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/6/1/e/nanopb/3.30910.0/nanopb.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/6/1/e/nanopb/2.30910.0/nanopb.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/6/1/e/nanopb/2.30910.0/nanopb.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/6/1/e/nanopb/2.30910.0/nanopb.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/8/b/d/FirebaseCore/10.25.0/FirebaseCore.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_7_9_1.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/7/9/1/FirebaseCoreInternal/12.13.0/FirebaseCoreInternal.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/8/b/d/FirebaseCore/10.25.0/FirebaseCore.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/6/a/GoogleDataTransport/9.4.1/GoogleDataTransport.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_0_b_5.txt exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/b/5/PromisesObjC/2.4.0/PromisesObjC.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/2/f/7/FirebaseInstallations/10.29.0/FirebaseInstallations.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/b/5/PromisesObjC/2.4.0/PromisesObjC.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/b/5/PromisesObjC/2.4.0/PromisesObjC.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/7/9/1/FirebaseCoreInternal/10.29.0/FirebaseCoreInternal.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+  CDN: trunk Relative path: Specs/0/8/4/GoogleUtilities/7.13.3/GoogleUtilities.podspec.json exists! Returning local because checking is only performed in repo update
+
+Comparing resolved specification to the sandbox manifest
+  M FirebaseCoreInternal
+  M FirebaseMessaging
+  - Firebase
+  - FirebaseCore
+  - FirebaseInstallations
+  - Flutter
+  - GoogleDataTransport
+  - GoogleUtilities
+  - PromisesObjC
+  - ReachabilitySwift
+  - connectivity_plus
+  - device_info_plus
+  - firebase_core
+  - firebase_messaging
+  - flutter_background_service_ios
+  - flutter_secure_storage
+  - nanopb
+  - permission_handler_apple
+
+Downloading dependencies
+
+-> Using Firebase (10.25.0)
+
+-> Using FirebaseCore (10.25.0)
+
+-> Installing FirebaseCoreInternal 10.29.0
+  > Copying FirebaseCoreInternal from `/Users/mahadkaluuma/Library/Caches/CocoaPods/Pods/Release/FirebaseCoreInternal/10.29.0-d2b0d` to `Pods/FirebaseCoreInternal`
+
+-> Using FirebaseInstallations (10.29.0)
+
+-> Installing FirebaseMessaging 10.25.0
+  > Copying FirebaseMessaging from `/Users/mahadkaluuma/Library/Caches/CocoaPods/Pods/Release/FirebaseMessaging/10.25.0-a35f3` to `Pods/FirebaseMessaging`
+
+-> Using Flutter (1.0.0)
+
+-> Using GoogleDataTransport (9.4.1)
+
+-> Using GoogleUtilities (7.13.3)
+
+-> Using PromisesObjC (2.4.0)
+
+-> Using ReachabilitySwift (5.2.4)
+
+-> Using connectivity_plus (0.0.1)
+
+-> Using device_info_plus (0.0.1)
+
+-> Using firebase_core (2.32.0)
+
+-> Using firebase_messaging (14.7.10)
+
+-> Using flutter_background_service_ios (0.0.3)
+
+-> Using flutter_secure_storage (6.0.0)
+
+-> Using nanopb (2.30910.0)
+
+-> Using permission_handler_apple (9.3.0)
+  - Running pre install hooks
+  - Running pre integrate hooks
+
+Generating Pods project
+  - Creating Pods project
+  - Installing files into Pods project
+    - Adding source files
+    - Adding frameworks
+    - Adding libraries
+    - Adding resources
+    - Adding development pod helper files
+    - Linking headers
+  - Installing Pod Targets
+    - Installing target `Firebase` iOS 11.0
+    - Installing target `FirebaseCore` iOS 10.0
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseCore/ResourceBundle-FirebaseCore_Privacy-FirebaseCore-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/FirebaseCore/FirebaseCore.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/FirebaseCore/FirebaseCore-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseCore/FirebaseCore-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/FirebaseCore/FirebaseCore-dummy.m`
+    - Installing target `FirebaseCoreInternal` iOS 10.0
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseCoreInternal/ResourceBundle-FirebaseCoreInternal_Privacy-FirebaseCoreInternal-Info.plist`
+    - Installing target `FirebaseInstallations` iOS 10.0
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseInstallations/ResourceBundle-FirebaseInstallations_Privacy-FirebaseInstallations-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/FirebaseInstallations/FirebaseInstallations.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/FirebaseInstallations/FirebaseInstallations-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseInstallations/FirebaseInstallations-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/FirebaseInstallations/FirebaseInstallations-dummy.m`
+    - Installing target `FirebaseMessaging` iOS 11.0
+      - Generating Info.plist file at `Pods/Target Support Files/FirebaseMessaging/ResourceBundle-FirebaseMessaging_Privacy-FirebaseMessaging-Info.plist`
+    - Installing target `Flutter` iOS 13.0
+    - Installing target `GoogleDataTransport` iOS 9.0
+      - Generating Info.plist file at `Pods/Target Support Files/GoogleDataTransport/ResourceBundle-GoogleDataTransport_Privacy-GoogleDataTransport-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/GoogleDataTransport/GoogleDataTransport.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/GoogleDataTransport/GoogleDataTransport-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/GoogleDataTransport/GoogleDataTransport-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/GoogleDataTransport/GoogleDataTransport-dummy.m`
+    - Installing target `GoogleUtilities` iOS 9.0
+      - Generating Info.plist file at `Pods/Target Support Files/GoogleUtilities/ResourceBundle-GoogleUtilities_Privacy-GoogleUtilities-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/GoogleUtilities/GoogleUtilities.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/GoogleUtilities/GoogleUtilities-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/GoogleUtilities/GoogleUtilities-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/GoogleUtilities/GoogleUtilities-dummy.m`
+    - Installing target `PromisesObjC` iOS 9.0
+      - Generating Info.plist file at `Pods/Target Support Files/PromisesObjC/ResourceBundle-FBLPromises_Privacy-PromisesObjC-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/PromisesObjC/PromisesObjC.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/PromisesObjC/PromisesObjC-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/PromisesObjC/PromisesObjC-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/PromisesObjC/PromisesObjC-dummy.m`
+    - Installing target `ReachabilitySwift` iOS 12.0
+      - Generating Info.plist file at `Pods/Target Support Files/ReachabilitySwift/ResourceBundle-ReachabilitySwift-ReachabilitySwift-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/ReachabilitySwift/ReachabilitySwift.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/ReachabilitySwift/ReachabilitySwift-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/ReachabilitySwift/ReachabilitySwift-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/ReachabilitySwift/ReachabilitySwift-dummy.m`
+    - Installing target `connectivity_plus` iOS 12.0
+      - Generating module map file at `Pods/Target Support Files/connectivity_plus/connectivity_plus.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/connectivity_plus/connectivity_plus-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/connectivity_plus/connectivity_plus-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/connectivity_plus/connectivity_plus-dummy.m`
+    - Installing target `device_info_plus` iOS 12.0
+      - Generating Info.plist file at `Pods/Target Support Files/device_info_plus/ResourceBundle-device_info_plus_privacy-device_info_plus-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/device_info_plus/device_info_plus.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/device_info_plus/device_info_plus-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/device_info_plus/device_info_plus-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/device_info_plus/device_info_plus-dummy.m`
+    - Installing target `firebase_core` iOS 11.0
+      - Generating module map file at `Pods/Target Support Files/firebase_core/firebase_core.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/firebase_core/firebase_core-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/firebase_core/firebase_core-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/firebase_core/firebase_core-dummy.m`
+    - Installing target `firebase_messaging` iOS 11.0
+      - Generating module map file at `Pods/Target Support Files/firebase_messaging/firebase_messaging.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/firebase_messaging/firebase_messaging-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/firebase_messaging/firebase_messaging-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/firebase_messaging/firebase_messaging-dummy.m`
+    - Installing target `flutter_background_service_ios` iOS 8.0
+      - Generating module map file at `Pods/Target Support Files/flutter_background_service_ios/flutter_background_service_ios.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/flutter_background_service_ios/flutter_background_service_ios-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/flutter_background_service_ios/flutter_background_service_ios-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/flutter_background_service_ios/flutter_background_service_ios-dummy.m`
+    - Installing target `flutter_secure_storage` iOS 9.0
+      - Generating Info.plist file at `Pods/Target Support Files/flutter_secure_storage/ResourceBundle-flutter_secure_storage-flutter_secure_storage-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/flutter_secure_storage/flutter_secure_storage.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/flutter_secure_storage/flutter_secure_storage-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/flutter_secure_storage/flutter_secure_storage-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/flutter_secure_storage/flutter_secure_storage-dummy.m`
+    - Installing target `nanopb` iOS 9.0
+      - Generating Info.plist file at `Pods/Target Support Files/nanopb/ResourceBundle-nanopb_Privacy-nanopb-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/nanopb/nanopb.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/nanopb/nanopb-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/nanopb/nanopb-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/nanopb/nanopb-dummy.m`
+    - Installing target `permission_handler_apple` iOS 8.0
+      - Generating Info.plist file at `Pods/Target Support Files/permission_handler_apple/ResourceBundle-permission_handler_apple_privacy-permission_handler_apple-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/permission_handler_apple/permission_handler_apple.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/permission_handler_apple/permission_handler_apple-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support Files/permission_handler_apple/permission_handler_apple-Info.plist`
+      - Generating dummy source at `Pods/Target Support Files/permission_handler_apple/permission_handler_apple-dummy.m`
+  - Installing Aggregate Targets
+    - Installing target `Pods-Runner` iOS 13.0
+      - Generating Info.plist file at `Pods/Target Support Files/Pods-Runner/Pods-Runner-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/Pods-Runner/Pods-Runner.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/Pods-Runner/Pods-Runner-umbrella.h`
+      - Generating dummy source at `Pods/Target Support Files/Pods-Runner/Pods-Runner-dummy.m`
+    - Installing target `Pods-RunnerTests` iOS 13.0
+      - Generating Info.plist file at `Pods/Target Support Files/Pods-RunnerTests/Pods-RunnerTests-Info.plist`
+      - Generating module map file at `Pods/Target Support Files/Pods-RunnerTests/Pods-RunnerTests.modulemap`
+      - Generating umbrella header at `Pods/Target Support Files/Pods-RunnerTests/Pods-RunnerTests-umbrella.h`
+      - Generating dummy source at `Pods/Target Support Files/Pods-RunnerTests/Pods-RunnerTests-dummy.m`
+  - Generating deterministic UUIDs
+  - Stabilizing target UUIDs
+  - Running post install hooks
+    - Podfile
+  - Writing Xcode project file to `Pods/Pods.xcodeproj`
+  Cleaning up sandbox directory
+
+Integrating client project
+
+Integrating target `Pods-Runner` (`Runner.xcodeproj` project)
+
+Integrating target `Pods-RunnerTests` (`Runner.xcodeproj` project)
+  - Running post integrate hooks
+  - Writing Lockfile in `Podfile.lock`
+  - Writing Manifest in `Pods/Manifest.lock`
+  CDN: trunk Relative path: CocoaPods-version.yml exists! Returning local because checking is only performed in repo update
+
+-> Pod installation complete! There are 8 dependencies from the Podfile and 18 total pods installed.
+
+[!] Automatically assigning platform `iOS` with version `13.0` on target `Runner` because no platform was specified. Please specify a platform for this target in your Podfile. See `https://guides.cocoapods.org/syntax/podfile.html#platform`.
+
+[!] Unable to read the license file `LICENSE` for the spec `FirebaseCoreInternal (10.29.0)`
+
+[!] Unable to read the license file `LICENSE` for the spec `FirebaseMessaging (10.25.0)`
+
+[!] Unable to read the license file `LICENSE` for the spec `FirebaseCoreInternal (10.29.0)`
+
+[!] Unable to read the license file `LICENSE` for the spec `FirebaseMessaging (10.25.0)`
+
+[!] CocoaPods did not set the base configuration of your project because your project already has a custom config set. In order for CocoaPods integration to work at all, please either set the base configurations of the target `Runner` to `Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig` or include the `Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig` in your build configuration (`Flutter/Release.xcconfig`).
