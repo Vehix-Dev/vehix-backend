@@ -73,6 +73,15 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
 
     rider_username = serializers.ReadOnlyField(source='rider.username')
     rodie_username = serializers.ReadOnlyField(source='rodie.username')
+    
+    # Cancellation details
+    cancelled_by = serializers.ReadOnlyField(source='cancellation.cancelled_by.username')
+    cancellation_reason = serializers.ReadOnlyField(source='cancellation.reason.reason')
+    custom_reason_text = serializers.ReadOnlyField(source='cancellation.custom_reason_text')
+    display_reason = serializers.SerializerMethodField()
+    
+    # Additional notes
+    additional_notes = serializers.ReadOnlyField()
 
     class Meta:
         model = ServiceRequest
@@ -82,7 +91,9 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'rider_phone', 'rodie_phone',
             'status', 'rider_lat', 'rider_lng', 'accepted_at', 'en_route_at', 
             'started_at', 'completed_at', 'is_paid', 'fee_charged', 'created_at', 'updated_at',
-            'distance_km', 'eta_seconds'
+            'distance_km', 'eta_seconds',
+            'cancelled_by', 'cancellation_reason', 'custom_reason_text', 'display_reason',
+            'additional_notes'
         )
         read_only_fields = ('accepted_at', 'en_route_at', 'started_at', 'completed_at', 'created_at', 'updated_at')
 
@@ -114,6 +125,17 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
         if dist is not None:
             # Estimate 30 km/h
             return int((dist / 30) * 3600)
+        return None
+
+    def get_display_reason(self, obj):
+        """Get the full cancellation reason for display"""
+        if hasattr(obj, 'cancellation') and obj.cancellation:
+            cancellation = obj.cancellation
+            if cancellation.reason:
+                if cancellation.reason.requires_custom_text and cancellation.custom_reason_text:
+                    return f"{cancellation.reason.reason}: {cancellation.custom_reason_text}"
+                return cancellation.reason.reason
+            return cancellation.custom_reason_text or "No reason provided"
         return None
 
 

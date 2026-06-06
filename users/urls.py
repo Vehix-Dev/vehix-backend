@@ -30,6 +30,8 @@ from .admin_views import (
     AdminUserPasswordView,
     RoadieOnlineTimeFleetView,
     RoadieOnlineTimeDetailView,
+    AdminWithdrawalListView,
+    AdminWithdrawalDetailView,
 )
 from .support_views import (
     SupportTicketViewSet,
@@ -139,6 +141,8 @@ urlpatterns = [
     path('auth/admin/users/<int:pk>/password/', AdminUserPasswordView.as_view(), name='admin_user_password_change'),
     path('auth/admin/requests/<int:pk>/assign/', AdminAssignRodieView.as_view(), name='admin_request_assign'),
     path('auth/admin/reports/jobs-performance/', JobsPerformanceReportView.as_view(), name='admin_jobs_performance_report'),
+    path('auth/admin/withdrawals/', AdminWithdrawalListView.as_view(), name='admin_withdrawals_list'),
+    path('auth/admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view(), name='admin_withdrawals_detail'),
 ]
 
 # Add router URLs

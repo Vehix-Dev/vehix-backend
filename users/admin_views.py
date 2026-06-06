@@ -8,6 +8,7 @@ from django.utils import timezone
 from decimal import Decimal
 from .admin_serializers import AdminUserSerializer
 from .admin_serializers import AdminCreateSerializer
+from .admin_serializers import AdminPaymentSerializer, AdminWithdrawalApprovalSerializer
 from django.apps import apps
 ServiceRequest = apps.get_model('service_requests', 'ServiceRequest')
 from rest_framework import generics, permissions
@@ -734,3 +735,200 @@ class RoadieOnlineTimeDetailView(APIView):
             'sessions': sessions,
             'calendar': calendar_out,
         })
+
+
+class AdminWithdrawalListView(generics.ListAPIView):
+    """
+    Admin endpoint to list all withdrawal requests.
+    Supports filtering by status and transaction type.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = AdminPaymentSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__username', 'user__email', 'user__phone', 'reference']
+
+    def get_queryset(self):
+        queryset = Payment.objects.filter(transaction_type='WITHDRAWAL').select_related('user').order_by('-created_at')
+        
+        # Filter by status if provided
+        status = self.request.query_params.get('status', None)
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        return queryset
+
+
+class AdminWithdrawalDetailView(APIView):
+    """
+    Admin endpoint to view, approve, or reject a specific withdrawal request.
+    GET: Retrieve withdrawal request details
+    PATCH: Approve (COMPLETED) or reject (FAILED/CANCELLED) the withdrawal
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request, pk):
+        """Get details of a specific withdrawal request."""
+        try:
+            payment = Payment.objects.select_related('user', 'user__wallet').get(
+                pk=pk, 
+                transaction_type='WITHDRAWAL'
+            )
+        except Payment.DoesNotExist:
+            return Response({'error': 'Withdrawal request not found.'}, status=404)
+        
+        serializer = AdminPaymentSerializer(payment)
+        
+        # Add wallet balance info
+        response_data = serializer.data
+        try:
+            wallet = Wallet.objects.get(user=payment.user)
+            response_data['user_wallet_balance'] = str(wallet.balance)
+        except Wallet.DoesNotExist:
+            response_data['user_wallet_balance'] = '0.00'
+        
+        return Response(response_data)
+
+    def patch(self, request, pk):
+        """Approve or reject a withdrawal request."""
+        from django.db import transaction
+        
+        try:
+            payment = Payment.objects.select_for_update().get(
+                pk=pk, 
+                transaction_type='WITHDRAWAL',
+                status='PENDING'
+            )
+        except Payment.DoesNotExist:
+            return Response({
+                'error': 'Withdrawal request not found or already processed.'
+            }, status=404)
+        
+        serializer = AdminWithdrawalApprovalSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                'error': 'Invalid data.',
+                'details': serializer.errors
+            }, status=400)
+        
+        new_status = serializer.validated_data['status']
+        rejection_reason = serializer.validated_data.get('rejection_reason', '')
+        
+        with transaction.atomic():
+            if new_status == 'COMPLETED':
+                # Approve the withdrawal - already deducted from wallet in WithdrawView
+                payment.status = 'COMPLETED'
+                payment.description = f"{payment.description} | Approved by admin"
+                payment.save()
+                
+                # Log the admin action
+                try:
+                    AdminAuditLog = apps.get_model('users', 'AdminAuditLog')
+                    AdminAuditLog.objects.create(
+                        admin_user=request.user,
+                        action_type='PAYMENT_PROCESS',
+                        action_description=f'Approved withdrawal request {payment.reference}',
+                        target_user=payment.user,
+                        target_entity_type='Payment',
+                        target_entity_id=str(payment.id),
+                        changes={
+                            'status': 'COMPLETED',
+                            'amount': str(payment.amount),
+                            'reference': payment.reference,
+                        }
+                    )
+                except Exception:
+                    pass
+                
+                # Send notification to user
+                try:
+                    Notification.objects.create(
+                        recipient=payment.user,
+                        title='Withdrawal Approved',
+                        message=f'Your withdrawal request of {payment.amount} has been approved and processed.',
+                        notification_type='SERVICE'
+                    )
+                    
+                    # Send push notification
+                    send_push_notification(
+                        payment.user,
+                        'Withdrawal Approved',
+                        f'Your withdrawal of {payment.amount} has been processed successfully.',
+                        {'type': 'withdrawal_approved', 'reference': payment.reference}
+                    )
+                except Exception:
+                    pass
+                
+                return Response({
+                    'success': True,
+                    'message': 'Withdrawal request approved successfully.',
+                    'payment': AdminPaymentSerializer(payment).data
+                })
+            
+            else:
+                # Reject the withdrawal - refund to wallet
+                wallet, created = Wallet.objects.get_or_create(user=payment.user)
+                
+                # Refund the amount back to wallet
+                wallet.balance += payment.amount
+                wallet.save()
+                
+                # Create wallet transaction for the refund
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    amount=payment.amount,
+                    reason=f"Withdrawal {payment.reference} rejected - refunded"
+                )
+                
+                # Update payment status
+                payment.status = new_status
+                if rejection_reason:
+                    payment.description = f"{payment.description} | Rejected: {rejection_reason}"
+                else:
+                    payment.description = f"{payment.description} | Rejected by admin"
+                payment.save()
+                
+                # Log the admin action
+                try:
+                    AdminAuditLog = apps.get_model('users', 'AdminAuditLog')
+                    AdminAuditLog.objects.create(
+                        admin_user=request.user,
+                        action_type='PAYMENT_PROCESS',
+                        action_description=f'Rejected withdrawal request {payment.reference}',
+                        target_user=payment.user,
+                        target_entity_type='Payment',
+                        target_entity_id=str(payment.id),
+                        changes={
+                            'status': new_status,
+                            'amount': str(payment.amount),
+                            'reference': payment.reference,
+                            'rejection_reason': rejection_reason,
+                            'refunded': True,
+                        }
+                    )
+                except Exception:
+                    pass
+                
+                # Send notification to user
+                try:
+                    Notification.objects.create(
+                        recipient=payment.user,
+                        title='Withdrawal Rejected',
+                        message=f'Your withdrawal request of {payment.amount} has been rejected. The amount has been refunded to your wallet.',
+                        notification_type='SERVICE'
+                    )
+                    
+                    # Send push notification
+                    send_push_notification(
+                        payment.user,
+                        'Withdrawal Rejected',
+                        f'Your withdrawal of {payment.amount} has been rejected. Amount refunded to wallet.',
+                        {'type': 'withdrawal_rejected', 'reference': payment.reference}
+                    )
+                except Exception:
+                    pass
+                
+                return Response({
+                    'success': True,
+                    'message': f'Withdrawal request {new_status.lower()} successfully. Amount refunded to user wallet.',
+                    'payment': AdminPaymentSerializer(payment).data
+                })

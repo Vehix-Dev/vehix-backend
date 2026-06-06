@@ -4,6 +4,64 @@ from rest_framework import serializers
 User = get_user_model()
 
 
+class AdminPaymentSerializer(serializers.ModelSerializer):
+    """Serializer for viewing payment/withdrawal requests in admin panel."""
+    user_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = None  # Set dynamically in __init__ to avoid circular imports
+        fields = (
+            'id', 'user', 'user_details', 'amount', 'transaction_type', 
+            'status', 'reference', 'processor_id', 'description',
+            'created_at', 'updated_at'
+        )
+        read_only_fields = (
+            'id', 'user', 'amount', 'transaction_type', 'reference',
+            'processor_id', 'created_at', 'updated_at'
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set model dynamically to avoid circular import issues
+        if self.Meta.model is None:
+            try:
+                from .models import Payment
+                self.Meta.model = Payment
+            except Exception:
+                pass
+
+    def get_user_details(self, obj):
+        """Include user details in the payment response."""
+        return {
+            'id': obj.user.id,
+            'external_id': obj.user.external_id,
+            'username': obj.user.username,
+            'email': obj.user.email,
+            'phone': obj.user.phone,
+            'role': obj.user.role,
+        }
+
+
+class AdminWithdrawalApprovalSerializer(serializers.Serializer):
+    """Serializer for approving/rejecting withdrawal requests."""
+    status = serializers.ChoiceField(
+        choices=['COMPLETED', 'FAILED', 'CANCELLED'],
+        required=True,
+        help_text="Set to COMPLETED to approve, FAILED or CANCELLED to reject."
+    )
+    rejection_reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Optional reason for rejection (when status is FAILED or CANCELLED)."
+    )
+
+    def validate(self, data):
+        status = data.get('status')
+        # If approving, no additional validation needed
+        # If rejecting, rejection_reason is optional but recommended
+        return data
+
+
 class AdminUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     wallet = None
