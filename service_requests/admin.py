@@ -7,25 +7,25 @@ from .models import ServiceRequest
 
 @admin.register(ServiceRequest)
 class ServiceRequestAdmin(admin.ModelAdmin):
- 
+
     list_display = (
-        'id', 'service_type', 'status', 'rider', 'rodie', 
-        'is_paid', 'fee_charged', 'accepted_at', 'en_route_at', 
+        'id', 'service_type', 'status', 'rider', 'rodie',
+        'is_paid', 'fee_charged', 'accepted_at', 'en_route_at',
         'started_at', 'completed_at', 'created_at'
     )
-    
+
     list_filter = ('status', 'service_type', 'is_paid', 'fee_charged')
     search_fields = ('rider__username', 'rodie__username', 'rider__email', 'rodie__email')
-    
-    
+
+
     readonly_fields = (
-        'created_at', 'updated_at', 'accepted_at', 'en_route_at', 
-        'started_at', 'completed_at'
+        'created_at', 'updated_at', 'accepted_at', 'en_route_at',
+        'started_at', 'completed_at', 'display_cancellation_details', 'display_additional_notes'
     )
-    
+
     actions = ['charge_selected_fees']
-    
-    
+
+
     fieldsets = (
         ('User Information', {
             'fields': ('rider', 'rodie')
@@ -36,6 +36,14 @@ class ServiceRequestAdmin(admin.ModelAdmin):
         ('Location Coordinates', {
             'fields': ('rider_lat', 'rider_lng'),
             'description': 'Geographic coordinates for the rider'
+        }),
+        ('Additional Notes', {
+            'fields': ('additional_notes',),
+            'description': 'Additional notes from the rider'
+        }),
+        ('Cancellation Details', {
+            'fields': ('display_cancellation_details',),
+            'description': 'Cancellation information (read-only)'
         }),
         ('Payment Status', {
             'fields': ('is_paid', 'fee_charged')
@@ -96,11 +104,35 @@ class ServiceRequestAdmin(admin.ModelAdmin):
             )
     
     charge_selected_fees.short_description = 'Charge fees for selected completed requests'
+
+    def display_cancellation_details(self, obj):
+        """Display cancellation details in admin"""
+        if obj.status != 'CANCELLED':
+            return 'Not cancelled'
+        if hasattr(obj, 'cancellation') and obj.cancellation:
+            cancellation = obj.cancellation
+            details = []
+            if cancellation.cancelled_by:
+                details.append(f"Cancelled by: {cancellation.cancelled_by.username}")
+            if cancellation.reason:
+                details.append(f"Reason: {cancellation.reason.reason}")
+            if cancellation.custom_reason_text:
+                details.append(f"Additional: {cancellation.custom_reason_text}")
+            return '<br/>'.join(details) if details else 'No cancellation details'
+        return 'No cancellation details'
+
+    display_cancellation_details.short_description = 'Cancellation Details'
+
+    def display_additional_notes(self, obj):
+        """Display additional notes in admin"""
+        return obj.additional_notes or 'No additional notes provided'
+
+    display_additional_notes.short_description = 'Additional Notes'
     
     def get_queryset(self, request):
         """Optimize queryset by selecting related objects"""
         queryset = super().get_queryset(request)
-        return queryset.select_related('rider', 'rodie', 'service_type')
+        return queryset.select_related('rider', 'rodie', 'service_type', 'cancellation', 'cancellation__cancelled_by', 'cancellation__reason')
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Customize foreign key dropdowns"""
