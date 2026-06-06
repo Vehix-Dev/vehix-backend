@@ -391,8 +391,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final requestData = data["request"] ?? data["data"] ?? data;
         if (requestId != null && _processedRequestIds.contains(requestId)) return;
         
-        // We process the offer request even in the background so the sound can play
-        // and the countdown timer can start when the app is woken up.
+        final isForeground = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+        if (!isForeground) {
+          debugPrint("⏳ [RODIE] WS received offer in background. Playing sound but letting FCM/Resume handle dialog.");
+          _audioPlayer.setReleaseMode(ReleaseMode.release);
+          _audioPlayer.play(AssetSource('Strong.mpeg')).catchError((_) {});
+          return;
+        }
 
         if (requestId != null) {
           _processedRequestIds.add(requestId);
