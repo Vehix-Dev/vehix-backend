@@ -391,11 +391,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final requestData = data["request"] ?? data["data"] ?? data;
         if (requestId != null && _processedRequestIds.contains(requestId)) return;
         
-        final isForeground = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-        if (!isForeground) {
-          debugPrint("⏳ [RODIE] WS received offer in background. Ignoring. Letting FCM handle wakeup.");
-          return;
-        }
+        // We process the offer request even in the background so the sound can play
+        // and the countdown timer can start when the app is woken up.
 
         if (requestId != null) {
           _processedRequestIds.add(requestId);
@@ -812,8 +809,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     _offerDialogActive = true;
     
-    // Play incoming request sound in a loop
-    _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    // Play incoming request sound once (not looping) to prevent infinite ghost sound
+    // if the OS suspends the app in the background before the 15s timer finishes.
+    _audioPlayer.setReleaseMode(ReleaseMode.release);
     _audioPlayer.play(AssetSource('Strong.mpeg')).catchError((e) {
       debugPrint("Warning: Strong.mpeg failed to play: $e");
     });
