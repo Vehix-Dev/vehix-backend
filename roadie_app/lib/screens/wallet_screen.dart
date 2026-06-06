@@ -247,6 +247,29 @@ class _WalletScreenState extends State<WalletScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+              
+              // ℹ️ Manual processing notice
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time_outlined, color: Colors.blue.shade800, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Withdrawals are processed manually by our team. Please allow up to 24 hours for funds to reflect on your mobile money account.',
+                        style: TextStyle(color: Colors.blue.shade900, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
 
               // Available balance
@@ -354,7 +377,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       if (!mounted) return;
                       if (result != null && result['success'] == true) {
                         Navigator.pop(ctx);
-                        _showSuccess('Withdrawal submitted! Ref: ${result['reference']}. Your new balance: UGX ${result['new_balance']}');
+                        _showSuccess('Withdrawal submitted! It will be reviewed and processed within 24 hours. Ref: ${result['reference']}');
                         _loadWallet();
                       } else {
                         setS(() => errorMessage = _parseErrorMessage(result) ?? 'Withdrawal failed. Please try again.');

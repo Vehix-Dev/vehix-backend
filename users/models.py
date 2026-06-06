@@ -366,10 +366,39 @@ class Payment(models.Model):
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_status = self.status
+
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        
+        # If it's an existing withdrawal payment transitioning to FAILED
+        if self.pk and self.transaction_type == 'WITHDRAWAL' and self.status == 'FAILED' and self._original_status != 'FAILED':
+            with transaction.atomic():
+                try:
+                    wallet = self.user.wallet
+                    # Refund the wallet
+                    wallet.balance += self.amount
+                    wallet.save()
+                    
+                    # Log the refund transaction
+                    from .models import WalletTransaction
+                    WalletTransaction.objects.create(
+                        wallet=wallet,
+                        amount=self.amount,
+                        reason=f"Refund: Withdrawal Failed ({self.reference})"
+                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to refund wallet for payment {self.id}: {str(e)}")
+                    
+        super().save(*args, **kwargs)
+        self._original_status = self.status
+
     def __str__(self):
         return f"{self.transaction_type} - {self.reference} ({self.status})"
-
-
 class Notification(models.Model):
     NOTIFICATION_TYPES = (
         ('BULLETIN', 'Bulletin'),

@@ -414,32 +414,10 @@ class WithdrawView(APIView):
                     reason=f"Withdrawal request {reference}"
                 )
 
-                # --- Automated Flutterwave Payout ---
-                # This only runs if credentials are provided in .env
-                from .flutterwave import FlutterwaveClient
-                client = FlutterwaveClient()
-                
-                if client.secret_key:
-                    payout_response = client.transfer_to_mobile_money(
-                        phone_number=phone_number,
-                        amount=amount,
-                        reference=reference,
-                        description=f"Vehix Withdrawal: {request.user.username}"
-                    )
-                    
-                    if payout_response.get('success'):
-                        payment.status = 'COMPLETED'
-                        payment.processor_id = payout_response.get('transaction_id')
-                        payment.save()
-                        message = 'Withdrawal processed and sent successfully via Flutterwave'
-                    else:
-                        # If the API call fails, we keep it as PENDING 
-                        # so admin can process it manually or retry
-                        payment.description += f" | Auto-payout failed: {payout_response.get('error')}"
-                        payment.save()
-                        message = f'Withdrawal requested successfully (Auto-payout pending: {payout_response.get('error')})'
-                else:
-                    message = 'Withdrawal request submitted successfully'
+                # Manual Payout Process
+                # The payment remains in PENDING status. Admin will process it manually
+                # and mark it as COMPLETED or FAILED in the Django Admin panel.
+                message = 'Withdrawal request submitted successfully'
 
                 return Response({
                     'success': True,
