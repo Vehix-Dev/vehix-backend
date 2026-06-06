@@ -204,7 +204,12 @@ class AdminCreateSerializer(AdminUserSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta(AdminUserSerializer.Meta):
-        pass
+        extra_kwargs = {
+            'role': {'required': False},
+            'email': {'required': False},
+            'phone': {'required': False},
+            'is_approved': {'required': False},
+        }
 
     def create(self, validated_data):
         validated_data['role'] = 'ADMIN'
