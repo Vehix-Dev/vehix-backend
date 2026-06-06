@@ -78,10 +78,20 @@
 	<array>
 		<string>dev.flutter.background.refresh</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vehix needs your location to show you nearby requests and track your progress while on a job.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Vehix needs your location to track your route in the background while you are on an active job.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vehix needs access to your camera so you can take photos of your license and profile.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vehix needs access to your photo library so you can upload your license and profile pictures.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+		<string>remote-notification</string>
+		<string>location</string>
 	</array>
 </dict>
 </plist>

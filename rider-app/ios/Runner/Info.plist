@@ -74,5 +74,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vehix needs your location to find nearby roadies and show your position on the map.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Vehix needs your location to track your ride progress in the background.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vehix needs access to your camera to take a profile picture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vehix needs access to your photo library to select a profile picture.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

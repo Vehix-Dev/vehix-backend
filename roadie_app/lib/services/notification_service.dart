@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -29,9 +30,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       await prefs.setString('pending_offer_request_timestamp', message.data['timestamp']?.toString() ?? '');
       await prefs.setDouble('pending_offer_request_receive_time', DateTime.now().millisecondsSinceEpoch / 1000.0);
       
-      const channel = MethodChannel('vehix/overlay');
-      await channel.invokeMethod('bringAppToFront');
-      print("🚀 [RODIE] Successfully brought app to front on background FCM OFFER_REQUEST");
+      if (Platform.isAndroid) {
+        const channel = MethodChannel('vehix/overlay');
+        await channel.invokeMethod('bringAppToFront');
+        print("🚀 [RODIE] Successfully brought app to front on background FCM OFFER_REQUEST");
+      } else {
+        print("ℹ️ [RODIE] iOS background FCM received. User must tap the banner to open the app.");
+      }
     } catch (e) {
       print("❌ [RODIE] Failed to bring app to front from background FCM: $e");
     }
