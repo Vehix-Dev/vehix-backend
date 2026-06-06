@@ -62,16 +62,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _offerRequestSubscription = NotificationService.offerRequestStream.listen((requestData) {
       if (mounted) {
-        // Guard: prevent FCM-triggered stream from re-showing an offer that WS already handled
-        final rawId = requestData['id'];
-        final streamReqId = rawId != null ? (int.tryParse(rawId.toString()) ?? -1) : -1;
-        if (streamReqId != -1 && _processedRequestIds.contains(streamReqId)) {
-          debugPrint("⚠️ [RODIE] Stream listener skipping already-processed request $streamReqId");
+        final rawId = requestData['id'] ?? requestData['request_id'];
+        final requestId = rawId != null ? (int.tryParse(rawId.toString()) ?? (rawId is int ? rawId : -1)) : -1;
+        
+        if (requestId != -1 && _processedRequestIds.contains(requestId)) {
+          debugPrint("⚠️ [RODIE] Stream listener skipping already-processed request $requestId");
           return;
         }
-        if (streamReqId != -1) {
-          _processedRequestIds.add(streamReqId);
-          NotificationService.markAsProcessed(streamReqId);
+        if (requestId != -1) {
+          _processedRequestIds.add(requestId);
+          NotificationService.markAsProcessed(requestId);
         }
         _showOfferDialog(requestData);
       }
@@ -902,6 +902,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (requestId != null) {
           if (_processedRequestIds.contains(requestId)) return;
           _processedRequestIds.add(requestId); // Guard immediately
+          NotificationService.markAsProcessed(requestId); // Sync to FCM handler
           
           debugPrint("📦 [RODIE] Found pending offer request $requestId in storage on resume");
           final requestData = await ApiService.getRequestDetails(requestId);
