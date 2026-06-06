@@ -88,7 +88,7 @@ class RequestDetailView(generics.RetrieveAPIView):
             if obj.status == 'REQUESTED':
                 # Must be the currently targeted roadie in cache
                 active_offer = cache.get(f"active_offer:{user.id}")
-                if not active_offer or active_offer.get('id') != obj.id or cache.get(f"rodie_declined:{obj.id}:{user.id}"):
+                if not active_offer or str(active_offer.get('id')) != str(obj.id) or cache.get(f"rodie_declined:{obj.id}:{user.id}"):
                     raise PermissionDenied("This offer is no longer available to you.")
             else:
                 # For non-requested states, they must be the assigned roadie
@@ -332,7 +332,7 @@ class AcceptRequestView(APIView):
 
             # Enforce that only the currently targeted roadie can accept the request
             active_offer = cache.get(f"active_offer:{user.id}")
-            if not active_offer or active_offer.get('id') != req.id or cache.get(f"rodie_declined:{req.id}:{user.id}"):
+            if not active_offer or str(active_offer.get('id')) != str(req.id) or cache.get(f"rodie_declined:{req.id}:{user.id}"):
                 return Response({'detail': 'This offer is no longer available to you.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # 2. Safety check: Ensure the roadie isn't already on another active job
@@ -531,6 +531,7 @@ class CancelRequestView(APIView):
                             status=status.HTTP_409_CONFLICT
                         )
                     req.status = 'CANCELLED'
+                    cache.set(f"request_status:{req.id}", "CANCELLED", timeout=120)
                     req.save()
                     
                     # Create cancellation record
@@ -627,6 +628,7 @@ class CancelRequestView(APIView):
                             status=status.HTTP_409_CONFLICT
                         )
                     req.status = 'CANCELLED'
+                    cache.set(f"request_status:{req.id}", "CANCELLED", timeout=120)
                     req.save()
                     
                     # Create cancellation record

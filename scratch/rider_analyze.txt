@@ -1,0 +1,20 @@
+Analyzing rider-app...                                          
+
+warning • The declaration '_requestOverlayPermission' isn't referenced. Try removing the declaration of '_requestOverlayPermission' • lib/main.dart:15:14 • unused_element
+   info • The 'child' argument should be last in widget constructor invocations. Try moving the argument to the end of the argument list • lib/screens/notification_detail_screen.dart:104:21 • sort_child_properties_last
+   info • The 'child' argument should be last in widget constructor invocations. Try moving the argument to the end of the argument list • lib/screens/notification_detail_screen.dart:127:21 • sort_child_properties_last
+   info • 'Share' is deprecated and shouldn't be used. Use SharePlus instead. Try replacing the use of the deprecated member with the replacement • lib/screens/referrals_screen.dart:56:11 • deprecated_member_use
+   info • 'share' is deprecated and shouldn't be used. Use SharePlus.instance.share() instead. Try replacing the use of the deprecated member with the replacement • lib/screens/referrals_screen.dart:56:17 • deprecated_member_use
+warning • The declaration '_buildShareButton' isn't referenced. Try removing the declaration of '_buildShareButton' • lib/screens/referrals_screen.dart:281:10 • unused_element
+warning • Unused import: '../services/network_service.dart'. Try removing the import directive • lib/screens/requesting_screen.dart:7:8 • unused_import
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/requesting_screen.dart:151:31 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/requesting_screen.dart:152:31 • deprecated_member_use
+warning • The declaration '_handleCancellation' isn't referenced. Try removing the declaration of '_handleCancellation' • lib/screens/ride_screen.dart:281:8 • unused_element
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/ride_screen.dart:729:31 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/ride_screen.dart:730:31 • deprecated_member_use
+warning • The operand can't be 'null', so the condition is always 'true'. Remove the condition • lib/screens/ride_screen.dart:814:25 • unnecessary_null_comparison
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/screens/ride_screen.dart:814:62 • unnecessary_non_null_assertion
+warning • The operand can't be 'null', so the condition is always 'true'. Remove the condition • lib/screens/ride_screen.dart:815:25 • unnecessary_null_comparison
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/screens/ride_screen.dart:815:62 • unnecessary_non_null_assertion
+warning • Unused import: 'package:url_launcher/url_launcher.dart'. Try removing the import directive • lib/widgets/app_drawer.dart:2:8 • unused_import
+

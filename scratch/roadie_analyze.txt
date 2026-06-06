@@ -1,0 +1,23 @@
+
+┌─────────────────────────────────────────────────────────┐
+│ A new version of Flutter is available!                  │
+│                                                         │
+│ To update to the latest version, run "flutter upgrade". │
+└─────────────────────────────────────────────────────────┘
+Analyzing roadie_app...                                         
+
+   info • The imported package 'intl' isn't a dependency of the importing package. Try adding a dependency for 'intl' in the 'pubspec.yaml' file • lib/screens/notification_detail_screen.dart:2:8 • depend_on_referenced_packages
+   info • The 'child' argument should be last in widget constructor invocations. Try moving the argument to the end of the argument list • lib/screens/notification_detail_screen.dart:104:21 • sort_child_properties_last
+   info • The 'child' argument should be last in widget constructor invocations. Try moving the argument to the end of the argument list • lib/screens/notification_detail_screen.dart:127:21 • sort_child_properties_last
+   info • The imported package 'intl' isn't a dependency of the importing package. Try adding a dependency for 'intl' in the 'pubspec.yaml' file • lib/screens/notifications_screen.dart:4:8 • depend_on_referenced_packages
+warning • The value of the field '_isUploadingLicense' isn't used. Try removing the field, or using it • lib/screens/profile_screen.dart:22:8 • unused_field
+warning • The value of the field '_isUploadingVehicle' isn't used. Try removing the field, or using it • lib/screens/profile_screen.dart:23:8 • unused_field
+   info • 'Share' is deprecated and shouldn't be used. Use SharePlus instead. Try replacing the use of the deprecated member with the replacement • lib/screens/referrals_screen.dart:56:11 • deprecated_member_use
+   info • 'share' is deprecated and shouldn't be used. Use SharePlus.instance.share() instead. Try replacing the use of the deprecated member with the replacement • lib/screens/referrals_screen.dart:56:17 • deprecated_member_use
+warning • The declaration '_buildShareButton' isn't referenced. Try removing the declaration of '_buildShareButton' • lib/screens/referrals_screen.dart:287:10 • unused_element
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/ride_screen.dart:599:31 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/screens/ride_screen.dart:600:31 • deprecated_member_use
+warning • A value for optional parameter 'screen' isn't ever given. Try removing the unused parameter • lib/screens/support_screen.dart:83:10 • unused_element_parameter
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/services/websocket_service.dart:321:7 • use_null_aware_elements
+warning • Unused import: 'package:url_launcher/url_launcher.dart'. Try removing the import directive • lib/widgets/app_drawer.dart:2:8 • unused_import
+
