@@ -390,6 +390,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final requestId = rawId != null ? (int.tryParse(rawId.toString()) ?? rawId) : null;
         final requestData = data["request"] ?? data["data"] ?? data;
         if (requestId != null && _processedRequestIds.contains(requestId)) return;
+        
+        final isForeground = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+        if (!isForeground) {
+          debugPrint("⏳ [RODIE] WS received offer in background. Ignoring. Letting FCM handle wakeup.");
+          return;
+        }
+
         if (requestId != null) {
           _processedRequestIds.add(requestId);
           // Sync to NotificationService so FCM handler also knows this ID is handled
