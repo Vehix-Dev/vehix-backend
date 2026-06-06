@@ -1549,8 +1549,11 @@ class _RideScreenState extends State<RideScreen> {
       ),
     );
     
-    // Automatically pop back to the Home Screen
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Automatically push back to the Home Screen since RideScreen was a replacement route
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen(role: "RODIE")),
+      (route) => false,
+    );
   }
 }
 
