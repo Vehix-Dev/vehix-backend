@@ -204,8 +204,17 @@ class AdminCreateSerializer(AdminUserSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta(AdminUserSerializer.Meta):
+        fields = (
+            'id', 'external_id', 'first_name', 'last_name', 'email', 'phone',
+            'username', 'password',
+            'is_approved', 'is_online', 'device_type', 'created_at', 'updated_at', 'wallet',
+            'is_active', 'is_deleted',
+            'profile_photo', 'id_card_front',
+            'id_card_back', 'license_photo', 'vehicle_photo',
+            'rating', 'rating_count',
+        )
+        read_only_fields = ('external_id', 'referral_code', 'created_at', 'updated_at')
         extra_kwargs = {
-            'role': {'required': False},
             'email': {'required': False},
             'phone': {'required': False},
             'is_approved': {'required': False},
