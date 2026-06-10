@@ -265,7 +265,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      // PROMINENT DISCLOSURE FOR GOOGLE PLAY
+      bool? userAgreed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text("Location Tracking Required"),
+          content: const Text("Vehix Roadie collects location data to find nearby emergency roadside requests and track your arrival time, even when the app is closed or not in use."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("DECLINE"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("CONTINUE"),
+            ),
+          ],
+        ),
+      );
+
+      if (userAgreed == true) {
+        permission = await Geolocator.requestPermission();
+      } else {
+        return false;
+      }
     }
     if (permission == LocationPermission.deniedForever) {
       if (mounted) {
