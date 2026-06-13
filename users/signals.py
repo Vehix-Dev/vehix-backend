@@ -67,7 +67,10 @@ def trigger_notification_fcm(sender, instance, created, **kwargs):
                         )
                     ),
                     apns=messaging.APNSConfig(
-                        payload=messaging.APNSPayload(aps=messaging.Aps(sound='default'))
+                        payload=messaging.APNSPayload(aps=messaging.Aps(
+                            alert=messaging.ApsAlert(title=instance.title, body=instance.message),
+                            sound='default'
+                        ))
                     ),
                 )
                 

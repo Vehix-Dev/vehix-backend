@@ -56,7 +56,7 @@ def _send_with_admin(token, title, message, data=None):
         notification=messaging.Notification(title=title, body=message),
         data={k: str(v) for k, v in (data or {}).items()},
         android=messaging.AndroidConfig(priority='high', notification=messaging.AndroidNotification(click_action='FLUTTER_NOTIFICATION_CLICK', sound='default')),
-        apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(sound='default'))),
+        apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(alert=messaging.ApsAlert(title=title, body=message), sound='default'))),
     )
     try:
         response = messaging.send(msg, app=app)
@@ -83,7 +83,7 @@ def _send_multicast_with_admin(tokens, title, message, data=None):
             notification=messaging.Notification(title=title, body=message),
             data={k: str(v) for k, v in (data or {}).items()},
             android=messaging.AndroidConfig(priority='high', notification=messaging.AndroidNotification(click_action='FLUTTER_NOTIFICATION_CLICK', sound='default')),
-            apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(sound='default'))),
+            apns=messaging.APNSConfig(payload=messaging.APNSPayload(aps=messaging.Aps(alert=messaging.ApsAlert(title=title, body=message), sound='default'))),
         )
         try:
             response = messaging.send_multicast(multicast, app=app)
