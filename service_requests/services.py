@@ -92,7 +92,7 @@ def find_nearby_rodies(service_type, rider_lat, rider_lng):
 
     return sorted(eligible_rodies, key=lambda x: x['distance'])
 
-def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=30, expiry_seconds=90):
+def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id, offer_seconds=15, expiry_seconds=90):
     """Background thread: send offer to each rodie in order, wait `offer_seconds` for acceptance, expire after `expiry_seconds`."""
     channel_layer = get_channel_layer()
     start_time = time.time()
@@ -255,7 +255,7 @@ def _sequential_offers(rodies, request_id, rider_lat, rider_lng, service_type_id
         pass
 
 
-def notify_rodies(rodies, request_obj, offer_seconds=30, expiry_seconds=90):
+def notify_rodies(rodies, request_obj, offer_seconds=15, expiry_seconds=90):
     """Start a Celery task to offer the request to rodies one-by-one.
     Falls back to a background daemon thread if Celery is unavailable.
     """
