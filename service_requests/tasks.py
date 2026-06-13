@@ -11,7 +11,7 @@ from services.models import ServiceType
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3)
-def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng, service_type_id, offer_seconds=15, expiry_seconds=90):
+def sequential_offers_task(self, request_id, rodie_details, rider_lat, rider_lng, service_type_id, offer_seconds=30, expiry_seconds=90):
     """
     Celery task to handle sequential matching of rodies.
     rodie_details: List of dicts with {'id': rodie_id, 'distance': distance_km}
