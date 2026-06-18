@@ -345,7 +345,7 @@ class AdminListCreateView(generics.ListCreateAPIView):
     search_fields = ['first_name', 'last_name', 'email', 'phone', 'username']
 
     def get_queryset(self):
-        return User.objects.filter(is_deleted=False)
+        return User.objects.filter(role='ADMIN', is_deleted=False)
 
     def perform_create(self, serializer):
         serializer.save(role='ADMIN', is_staff=True, is_superuser=True, is_approved=True)
