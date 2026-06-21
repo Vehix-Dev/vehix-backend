@@ -8,8 +8,9 @@ import json
 import time
 from typing import Dict, Optional
 
-# Configuration - Live backend
-BASE_URL = "https://backend.vehix.ug/api"
+# Configuration - Update these to match your live backend
+BASE_URL = "http://localhost:8000/api"  # Update to your live backend URL
+# BASE_URL = "https://your-live-backend.com/api"  # Use this for production
 
 class VehixAPIClient:
     def __init__(self, base_url: str = BASE_URL):
@@ -165,8 +166,8 @@ def test_bug1_home_screen_ws_handler():
     client = VehixAPIClient()
     
     # Login as rider
-    if not client.login("parrot", "parrot"):
-        print("❌ Failed to login as rider")
+    if not client.login("test_rider", "test_password"):
+        print("❌ Failed to login as rider - please create test user first")
         return False
     
     # Create request
@@ -195,8 +196,8 @@ def test_bug1_home_screen_ws_handler():
     
     # Login as roadie
     client.logout()
-    if not client.login("castle", "castle"):
-        print("❌ Failed to login as roadie")
+    if not client.login("test_rodie", "test_password"):
+        print("❌ Failed to login as roadie - please create test user first")
         return False
     
     # Accept request
@@ -238,7 +239,7 @@ def test_bug2_decline_cache_pollution():
     client = VehixAPIClient()
     
     # Login as rider
-    if not client.login("parrot", "parrot"):
+    if not client.login("test_rider", "test_password"):
         print("❌ Failed to login as rider")
         return False
     
@@ -260,7 +261,7 @@ def test_bug2_decline_cache_pollution():
     
     # Login as roadie
     client.logout()
-    if not client.login("castle", "castle"):
+    if not client.login("test_rodie", "test_password"):
         print("❌ Failed to login as roadie")
         return False
     
@@ -296,7 +297,7 @@ def test_bug7_rider_cancels_after_accept():
     client = VehixAPIClient()
     
     # Login as rider
-    if not client.login("parrot", "parrot"):
+    if not client.login("test_rider", "test_password"):
         print("❌ Failed to login as rider")
         return False
     
@@ -318,7 +319,7 @@ def test_bug7_rider_cancels_after_accept():
     
     # Login as roadie
     client.logout()
-    if not client.login("castle", "castle"):
+    if not client.login("test_rodie", "test_password"):
         print("❌ Failed to login as roadie")
         return False
     
@@ -394,7 +395,7 @@ def test_scenario1_happy_path():
     client = VehixAPIClient()
     
     # Login as rider
-    if not client.login("parrot", "parrot"):
+    if not client.login("test_rider", "test_password"):
         print("❌ Failed to login as rider")
         return False
     
@@ -416,7 +417,7 @@ def test_scenario1_happy_path():
     
     # Login as roadie
     client.logout()
-    if not client.login("castle", "castle"):
+    if not client.login("test_rodie", "test_password"):
         print("❌ Failed to login as roadie")
         return False
     
@@ -470,8 +471,8 @@ def run_all_tests():
     print("\n⚠️  PREREQUISITES:")
     print("   1. Backend must be running at the configured URL")
     print("   2. Test users must exist:")
-    print("      - parrot (role: RIDER)")
-    print("      - castle (role: RODIE, approved, online)")
+    print("      - test_rider (role: RIDER)")
+    print("      - test_rodie (role: RODIE, approved, online)")
     print("   3. At least one service type must exist (ID: 1)")
     print("   4. Cancellation reasons must exist")
     print("\n" + "=" * 70)

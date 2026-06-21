@@ -34,7 +34,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # of the product and file versions while build-number is used as the build suffix.
 
-version: 1.0.0+1
+version: 1.0.0+5
 
 
 
@@ -172,10 +172,10 @@ flutter:
 
     - assets/app.png
 
-    - assets/Strong.mpeg
+    - assets/Strong.mp3
 
-    - assets/Accept.mpeg
-    - assets/cancel.mpeg
+    - assets/Accept.mp3
+    - assets/cancel.mp3
     - assets/icons/
     - assets/sounds/
 

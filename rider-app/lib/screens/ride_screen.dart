@@ -1118,10 +1118,9 @@ class _RideScreenState extends State<RideScreen> {
                       const SizedBox(height: 16),
                       
                       // Primary Actions (Call/Chat)
-                      if (currentRequest["status"]?.toString().toUpperCase() == "ACCEPTED" ||
-                          currentRequest["status"]?.toString().toUpperCase() == "EN_ROUTE" ||
-                          currentRequest["status"]?.toString().toUpperCase() == "ARRIVED" ||
-                          currentRequest["status"]?.toString().toUpperCase() == "STARTED") ...[
+                      if (currentRequest["status"]?.toString().toUpperCase() != "REQUESTED" &&
+                          currentRequest["status"]?.toString().toUpperCase() != "COMPLETED" &&
+                          currentRequest["status"]?.toString().toUpperCase() != "CANCELLED") ...[
                         Row(
                           children: [
                             Expanded(

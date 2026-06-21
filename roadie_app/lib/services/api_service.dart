@@ -607,9 +607,26 @@ class ApiService {
     request.fields['image_type'] = type;
     request.files.add(await http.MultipartFile.fromPath('image', image.path));
 
-    var streamedResponse = await request.send();
-    var response = await http.Response.fromStream(streamedResponse);
-    return jsonDecode(response.body);
+    try {
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode >= 400) {
+        print("❌ Upload failed: ${response.statusCode} - ${response.reasonPhrase}");
+        try {
+          return jsonDecode(response.body);
+        } catch (_) {
+          throw Exception("Server returned ${response.statusCode}. The file might be too large or the server is encountering an error.");
+        }
+      }
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      if (e is FormatException) {
+        throw Exception("Server returned an invalid response. The file might be too large.");
+      }
+      rethrow;
+    }
   }
 
   /// History APIs

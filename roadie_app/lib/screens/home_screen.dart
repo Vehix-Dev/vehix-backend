@@ -421,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (!isForeground) {
           debugPrint("⏳ [RODIE] WS received offer in background. Playing sound but letting FCM/Resume handle dialog.");
           _audioPlayer.setReleaseMode(ReleaseMode.release);
-          _audioPlayer.play(AssetSource('Strong.mpeg')).catchError((_) {});
+          _audioPlayer.play(AssetSource('Strong.mp3')).catchError((_) {});
           return;
         }
 
@@ -486,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       await _audioPlayer.stop();
       _audioPlayer.setReleaseMode(ReleaseMode.release);
-      await _audioPlayer.play(AssetSource('Accept.mpeg'));
+      await _audioPlayer.play(AssetSource('Accept.mp3'));
       if (await Vibration.hasVibrator()) await Vibration.vibrate(pattern: [0, 300, 100, 300]);
     } catch (e) { debugPrint("Sound error: $e"); }
   }
@@ -495,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       await _audioPlayer.stop();
       _audioPlayer.setReleaseMode(ReleaseMode.release);
-      await _audioPlayer.play(AssetSource('cancel.mpeg'));
+      await _audioPlayer.play(AssetSource('cancel.mp3'));
       if (await Vibration.hasVibrator()) await Vibration.vibrate(pattern: [0, 300, 100, 300]);
     } catch (e) { debugPrint("Sound error: $e"); }
   }
@@ -844,8 +844,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Play incoming request sound once (not looping) to prevent infinite ghost sound
     // if the OS suspends the app in the background before the 15s timer finishes.
     _audioPlayer.setReleaseMode(ReleaseMode.release);
-    _audioPlayer.play(AssetSource('Strong.mpeg')).catchError((e) {
-      debugPrint("Warning: Strong.mpeg failed to play: $e");
+    _audioPlayer.play(AssetSource('Strong.mp3')).catchError((e) {
+      debugPrint("Warning: Strong.mp3 failed to play: $e");
     });
     
     Vibration.hasVibrator().then((hasVibrator) {
