@@ -11,13 +11,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 
 
-/// Requests SYSTEM_ALERT_WINDOW (display over other apps) permission on Android.
-Future<void> _requestOverlayPermission() async {
-  try {
-    const channel = MethodChannel('vehix/overlay');
-    await channel.invokeMethod('requestOverlayPermission');
-  } catch (_) {}
-}
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

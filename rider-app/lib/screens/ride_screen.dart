@@ -811,8 +811,8 @@ class _RideScreenState extends State<RideScreen> {
       'reason_id': selectedReasonIdResult['id'],
       if (selectedReasonIdResult['requires_custom_text']) 
         'custom_reason_text': selectedReasonIdResult['custom_text'] ?? '',
-      if (riderLocation != null) 'current_lat': riderLocation!.latitude,
-      if (riderLocation != null) 'current_lng': riderLocation!.longitude,
+      'current_lat': riderLocation.latitude,
+      'current_lng': riderLocation.longitude,
     };
 
     setState(() => _isCancelling = true);
