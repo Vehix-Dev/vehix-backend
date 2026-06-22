@@ -308,7 +308,7 @@ class _RequestingScreenState extends State<RequestingScreen>
           final requestData = data["request"] ?? data["data"] ?? data;
           final status = requestData["status"] ?? data["status"];
           
-          if (status == "ACCEPTED" && !_hasAccepted) {
+          if (["ACCEPTED", "EN_ROUTE", "ARRIVED", "STARTED"].contains(status) && !_hasAccepted) {
             _hasAccepted = true; // Guard against duplicate calls
             debugPrint("✅ [Rider] Request ACCEPTED! Navigating to RideScreen");
             
