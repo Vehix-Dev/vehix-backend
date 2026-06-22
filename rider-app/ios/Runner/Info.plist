@@ -27,6 +27,7 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
+		<string>sms</string>
 		<string>https</string>
 		<string>comgooglemaps</string>
 		<string>waze</string>

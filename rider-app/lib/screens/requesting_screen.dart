@@ -327,6 +327,7 @@ class _RequestingScreenState extends State<RequestingScreen>
             }
             
             final request = data["request"] ?? data["data"] ?? widget.request;
+            request["status"] = "ACCEPTED";
             
             Navigator.pushReplacement(
               context,
