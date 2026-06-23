@@ -380,49 +380,60 @@ class AcceptRequestView(APIView):
                     resp_data['roadie_lat'] = float(lat)
                     resp_data['roadie_lng'] = float(lng)
 
-                channel_layer = get_channel_layer()
+                def send_acceptance_notifications():
+                    try:
+                        channel_layer = get_channel_layer()
+                        
+                        # Notify Rider via personal channel (critical transition event)
+                        async_to_sync(channel_layer.group_send)(
+                            f"rider_{req.rider.id}",
+                            {
+                                'type': 'request_accepted',
+                                'status': 'ACCEPTED',
+                                'request': resp_data
+                            }
+                        )
+
+                        # Redundantly notify via request channel group to ensure delivery to rider (and roadie)
+                        async_to_sync(channel_layer.group_send)(
+                            f"request_{req.id}",
+                            {
+                                'type': 'request_accepted',
+                                'status': 'ACCEPTED',
+                                'request': resp_data
+                            }
+                        )
+
+                        title = 'Roadie Accepted Your Request'
+                        body = f'{user.first_name or user.username} is on the way to your location.'
+                        Notification.objects.create(
+                            recipient=req.rider,
+                            target_role='SPECIFIC',
+                            title=title,
+                            message=body,
+                            notification_type='UPDATE'
+                        )
+                        send_push_notification(
+                            req.rider,
+                            title,
+                            body,
+                            {
+                                'notification_id': str(req.id),
+                                'type': 'request_accepted',
+                                'request_id': str(req.id)
+                            }
+                        )
+                    except Exception as inner_e:
+                        print(f"DEBUG: Acceptance notification deferred error: {inner_e}")
+
+                # Defer notifications until AFTER the transaction commits!
+                # This prevents the race condition where the Rider app receives the WebSocket message,
+                # immediately transitions to RideScreen, sends a JOIN_REQUEST, and reads the OLD status
+                # from the database because this transaction hasn't committed yet (blocked by FCM HTTP call).
+                transaction.on_commit(send_acceptance_notifications)
                 
-                # Notify Rider via personal channel (critical transition event)
-                async_to_sync(channel_layer.group_send)(
-                    f"rider_{req.rider.id}",
-                    {
-                        'type': 'request_accepted',
-                        'status': 'ACCEPTED',
-                        'request': resp_data
-                    }
-                )
-
-                # Redundantly notify via request channel group to ensure delivery to rider (and roadie)
-                async_to_sync(channel_layer.group_send)(
-                    f"request_{req.id}",
-                    {
-                        'type': 'request_accepted',
-                        'status': 'ACCEPTED',
-                        'request': resp_data
-                    }
-                )
-
-                title = 'Roadie Accepted Your Request'
-                body = f'{user.first_name or user.username} is on the way to your location.'
-                Notification.objects.create(
-                    recipient=req.rider,
-                    target_role='SPECIFIC',
-                    title=title,
-                    message=body,
-                    notification_type='UPDATE'
-                )
-                send_push_notification(
-                    req.rider,
-                    title,
-                    body,
-                    {
-                        'notification_id': str(req.id),
-                        'type': 'request_accepted',
-                        'request_id': str(req.id)
-                    }
-                )
             except Exception as e:
-                print(f"DEBUG: Acceptance notification error: {e}")
+                print(f"DEBUG: Acceptance notification setup error: {e}")
 
             return Response({'detail': 'Request accepted', 'request_id': req.id, 'request': resp_data})
 

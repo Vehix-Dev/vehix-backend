@@ -28,33 +28,37 @@ def broadcast_request_update(sender, instance, created, **kwargs):
 
     print(f"\n SIGNAL FIRED: Request {instance.id} created={created}, status={instance.status}, rodie_id={instance.rodie_id}")
 
-    # If request is assigned to a specific rodie, send update
-    if instance.rodie_id:
-        print(f" Sending update to assigned rodie {instance.rodie_id}")
+    def send_signal_ws():
+        # If request is assigned to a specific rodie, send update
+        if instance.rodie_id:
+            print(f" Sending update to assigned rodie {instance.rodie_id}")
+            async_to_sync(channel_layer.group_send)(
+                f"rodie_{instance.rodie_id}", 
+                {
+                    "type": "request_update",
+                    "data": data
+                }
+            )
+        
+        # Update to rider
+        if instance.rider_id:
+            async_to_sync(channel_layer.group_send)(
+                f"rider_{instance.rider_id}", 
+                {
+                    "type": "request_update",
+                    "data": data
+                }
+            )
+        
+        # Update to admin monitoring
         async_to_sync(channel_layer.group_send)(
-            f"rodie_{instance.rodie_id}", 
+            "admin_monitoring", 
             {
                 "type": "request_update",
                 "data": data
             }
         )
-    
-    # Update to rider
-    if instance.rider_id:
-        async_to_sync(channel_layer.group_send)(
-            f"rider_{instance.rider_id}", 
-            {
-                "type": "request_update",
-                "data": data
-            }
-        )
-    
-    # Update to admin monitoring
-    async_to_sync(channel_layer.group_send)(
-        "admin_monitoring", 
-        {
-            "type": "request_update",
-            "data": data
-        }
-    )
-    print(f" Signal complete for request {instance.id}\n")
+        print(f" Signal complete for request {instance.id}\n")
+
+    from django.db import transaction
+    transaction.on_commit(send_signal_ws)

@@ -31,6 +31,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  bool _isNavigatingToRide = false;
   LatLng? currentLocation;
   StreamSubscription<Map<String, dynamic>>? _offerRequestSubscription;
   List<LatLng> roadieLocations = [];
@@ -387,9 +388,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (messageType == "request_update") {
         final status = data["status"];
         final request = data["request"];
-        if (mounted && request != null) {
+        if (mounted && request != null && !_isNavigatingToRide) {
           if (["ACCEPTED", "EN_ROUTE", "ARRIVED", "STARTED"].contains(status)) {
             if (ModalRoute.of(context)?.isCurrent == true) {
+              _isNavigatingToRide = true;
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
