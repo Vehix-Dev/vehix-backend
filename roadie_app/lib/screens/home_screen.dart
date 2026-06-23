@@ -898,8 +898,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Row(children: [
       Expanded(child: TextButton(onPressed: () { _audioPlayer.stop(); _audioPlayer.setReleaseMode(ReleaseMode.release); Vibration.cancel(); Navigator.pop(dialogContext); ApiService.declineRequest(request['id']); }, child: const Text("Decline"))),
       const SizedBox(width: 16),
-      Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00), foregroundColor: Colors.white), onPressed: () async { _dismissOfferDialog(); await _audioPlayer.stop(); _audioPlayer.setReleaseMode(ReleaseMode.release); Vibration.cancel(); final nav = Navigator.of(dialogContext); nav.pop(); final response = await ApiService.acceptRequest(request['id'], lat: currentLocation?.latitude, lng: currentLocation?.longitude); if (response != null && response['detail'] == null && response['error'] == null) { _playAcceptanceSound(); final fullRequest = (response is Map && response['request'] != null) ? Map<String, dynamic>.from(response['request']) : Map<String, dynamic>.from(request);
-if (fullRequest["status"] == "REQUESTED") fullRequest["status"] = "ACCEPTED"; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => RideScreen(request: fullRequest, ws: ws))); } else if (response != null && (response['detail'] != null || response['error'] != null)) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response['detail'] ?? response['error'] ?? 'Failed to accept'))); } }, child: const Text("ACCEPT"))),
+      Expanded(
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF8C00), foregroundColor: Colors.white),
+          onPressed: () async {
+            _dismissOfferDialog();
+            await _audioPlayer.stop();
+            _audioPlayer.setReleaseMode(ReleaseMode.release);
+            Vibration.cancel();
+            final nav = Navigator.of(dialogContext);
+            nav.pop();
+
+            final response = await ApiService.acceptRequest(
+              request['id'],
+              lat: currentLocation?.latitude,
+              lng: currentLocation?.longitude,
+            );
+
+            // SUCCESS: backend returns {'detail': 'Request accepted', 'request_id': ..., 'request': {...}}
+            // The presence of 'request' or 'request_id' distinguishes a real success from an error.
+            // Previously this check was (response['detail'] == null) which ALWAYS FAILED because the
+            // success response also contains a 'detail' key ("Request accepted"), causing the Roadie
+            // to see a "Request accepted" snackbar but never navigate to the RideScreen.
+            final bool isSuccess = response != null &&
+                (response['request'] != null || response['request_id'] != null);
+
+            if (isSuccess) {
+              _playAcceptanceSound();
+              final fullRequest = (response['request'] != null)
+                  ? Map<String, dynamic>.from(response['request'])
+                  : Map<String, dynamic>.from(request);
+              if (fullRequest["status"] == "REQUESTED") fullRequest["status"] = "ACCEPTED";
+
+              // Guard against double-navigation (the WS request_update handler also navigates)
+              if (!_isNavigatingToRide && mounted) {
+                _isNavigatingToRide = true;
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => RideScreen(request: fullRequest, ws: ws)),
+                );
+              }
+            } else if (response != null) {
+              // Only real errors reach here (e.g. "no longer available", "already on a job")
+              final errorMsg = response['detail'] ?? response['error'] ?? 'Failed to accept request';
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
+                );
+              }
+            }
+          },
+          child: const Text("ACCEPT"),
+        ),
+      ),
     ]);
   }
 
