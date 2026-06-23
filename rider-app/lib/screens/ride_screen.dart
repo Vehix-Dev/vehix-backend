@@ -825,7 +825,11 @@ class _RideScreenState extends State<RideScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Request cancelled successfully")),
       );
-      Navigator.of(context).pop(); // Go back to HomeScreen
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen(role: "RIDER")),
+        (route) => false,
+      );
     }
   }
 
