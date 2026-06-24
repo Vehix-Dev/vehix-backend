@@ -747,14 +747,20 @@ class AdminWithdrawalListView(generics.ListAPIView):
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__username', 'user__email', 'user__phone', 'reference']
 
+    def get_serializer_context(self):
+        """Ensure request is passed to serializer context for image URL generation"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def get_queryset(self):
         queryset = Payment.objects.filter(transaction_type='WITHDRAWAL').select_related('user').order_by('-created_at')
-        
+
         # Filter by status if provided
         status = self.request.query_params.get('status', None)
         if status:
             queryset = queryset.filter(status=status)
-        
+
         return queryset
 
 
@@ -770,14 +776,14 @@ class AdminWithdrawalDetailView(APIView):
         """Get details of a specific withdrawal request."""
         try:
             payment = Payment.objects.select_related('user', 'user__wallet').get(
-                pk=pk, 
+                pk=pk,
                 transaction_type='WITHDRAWAL'
             )
         except Payment.DoesNotExist:
             return Response({'error': 'Withdrawal request not found.'}, status=404)
-        
-        serializer = AdminPaymentSerializer(payment)
-        
+
+        serializer = AdminPaymentSerializer(payment, context={'request': request})
+
         # Add wallet balance info
         response_data = serializer.data
         try:
@@ -785,7 +791,7 @@ class AdminWithdrawalDetailView(APIView):
             response_data['user_wallet_balance'] = str(wallet.balance)
         except Wallet.DoesNotExist:
             response_data['user_wallet_balance'] = '0.00'
-        
+
         return Response(response_data)
 
     def patch(self, request, pk):
