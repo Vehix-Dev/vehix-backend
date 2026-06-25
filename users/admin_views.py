@@ -797,29 +797,28 @@ class AdminWithdrawalDetailView(APIView):
     def patch(self, request, pk):
         """Approve or reject a withdrawal request."""
         from django.db import transaction
-        
-        try:
-            payment = Payment.objects.select_for_update().get(
-                pk=pk, 
-                transaction_type='WITHDRAWAL',
-                status='PENDING'
-            )
-        except Payment.DoesNotExist:
-            return Response({
-                'error': 'Withdrawal request not found or already processed.'
-            }, status=404)
-        
+
         serializer = AdminWithdrawalApprovalSerializer(data=request.data)
         if not serializer.is_valid():
             return Response({
                 'error': 'Invalid data.',
                 'details': serializer.errors
             }, status=400)
-        
+
         new_status = serializer.validated_data['status']
         rejection_reason = serializer.validated_data.get('rejection_reason', '')
-        
+
         with transaction.atomic():
+            try:
+                payment = Payment.objects.select_for_update().get(
+                    pk=pk,
+                    transaction_type='WITHDRAWAL',
+                    status='PENDING'
+                )
+            except Payment.DoesNotExist:
+                return Response({
+                    'error': 'Withdrawal request not found or already processed.'
+                }, status=404)
             if new_status == 'COMPLETED':
                 # Approve the withdrawal - already deducted from wallet in WithdrawView
                 payment.status = 'COMPLETED'

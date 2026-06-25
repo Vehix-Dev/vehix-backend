@@ -32,6 +32,20 @@ class AdminPaymentSerializer(serializers.ModelSerializer):
 
     def get_user_details(self, obj):
         """Include user details in the payment response."""
+        # Get profile photo URL
+        profile_photo = None
+        try:
+            from images.models import UserImage
+            image = UserImage.objects.filter(user=obj.user, image_type='PROFILE').order_by('-created_at').first()
+            if image and image.original_image:
+                request = self.context.get('request')
+                if request:
+                    profile_photo = request.build_absolute_uri(image.original_image.url)
+                else:
+                    profile_photo = image.original_image.url
+        except Exception:
+            pass
+
         # Get profile photo URL using the same method as AdminUserSerializer
         profile_photo = self._get_user_image(obj.user, 'PROFILE')
 
@@ -42,6 +56,7 @@ class AdminPaymentSerializer(serializers.ModelSerializer):
             'email': obj.user.email,
             'phone': obj.user.phone,
             'role': obj.user.role,
+            'profile_photo': profile_photo,
             'profile_photo': profile_photo,
         }
 
