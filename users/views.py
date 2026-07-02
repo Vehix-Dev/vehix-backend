@@ -341,6 +341,15 @@ class DepositView(APIView):
             ipn_url = request.build_absolute_uri('/api/pesapal/ipn/')
             
             response = client.submit_order(payment, callback_url, phone_number=None)
+            # If Pesapal returns an error payload, fail the payment and surface a clear 502
+            if response and isinstance(response, dict) and response.get('error'):
+                payment.status = 'FAILED'
+                payment.save()
+                return Response({
+                    'error': 'Pesapal error',
+                    'pesapal_response': response
+                }, status=status.HTTP_502_BAD_GATEWAY)
+
             tracking_id = response.get('order_tracking_id')
             payment.processor_id = tracking_id
             payment.save()
