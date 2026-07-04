@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
 import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'id_verification_screen.dart';
@@ -91,12 +92,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Center(child: Text("Registration Failed", style: TextStyle(fontWeight: FontWeight.bold))),
-          content: const Text(
-            "Please check if the following details have already been used:\n"
-            "• Username\n"
-            "• Phone Number\n"
-            "• Email Address\n"
-            "• NIN",
+          content: Text(
+            Platform.isIOS
+                ? "Please check if the following details have already been used:\n"
+                  "• Username\n"
+                  "• Phone Number\n"
+                  "• Email Address"
+                : "Please check if the following details have already been used:\n"
+                  "• Username\n"
+                  "• Phone Number\n"
+                  "• Email Address\n"
+                  "• NIN",
           ),
           actions: [
             TextButton(
@@ -172,19 +178,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 16),
                   _buildField(phoneController, "Phone Number", Icons.phone_outlined, keyboardType: TextInputType.phone),
                   const SizedBox(height: 16),
+                  // On iOS: NIN is optional at sign-up (Apple App Store policy 5.1.1v).
+                  // NIN is still collected — but as a voluntary field here.
+                  // iOS users who skip it will be prompted to add it before going online.
+                  // On Android: NIN remains required at registration.
                   TextFormField(
                     controller: ninController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: "NIN (14 Characters)",
+                      labelText: Platform.isIOS ? "NIN (14 Characters) – Optional" : "NIN (14 Characters)",
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.badge_outlined, color: Colors.white70),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.1),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2))),
+                      helperText: Platform.isIOS ? "You can add this later in your profile" : null,
+                      helperStyle: const TextStyle(color: Colors.white54),
                     ),
-                    validator: (v) => (v == null || v.length != 14) ? "NIN must be 14 characters" : null,
+                    // iOS: optional — validate only if something was entered (must be correct length if provided)
+                    // Android: required — must be exactly 14 characters
+                    validator: (v) {
+                      if (Platform.isIOS) {
+                        if (v != null && v.isNotEmpty && v.length != 14) {
+                          return "NIN must be 14 characters";
+                        }
+                        return null; // empty is fine on iOS
+                      }
+                      return (v == null || v.length != 14) ? "NIN must be 14 characters" : null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

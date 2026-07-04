@@ -774,6 +774,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (!isApproved) { _showCheckDialog("Account Pending Approval", "You’ll be notified once your Vehix account is approved to go online."); return; }
                 if (!servicesSelected) { _showCheckDialog("Select a service", "Please select at least one service you intend to provide before going online."); return; }
                 if (isBalanceExceeded) { _showCheckDialog("Balance Exceeded", "Your negative balance (UGX $currentBalance) exceeds the allowed limit (UGX $currentMaxNeg). Please settle your balance in the wallet to go online."); return; }
+
+                // iOS only: NIN was optional at sign-up (Apple policy 5.1.1v).
+                // If the roadie skipped it, block going online until they add it via Profile.
+                if (Platform.isIOS) {
+                  final String nin = (userData?['nin'] ?? '').toString().trim();
+                  if (nin.isEmpty || nin.length != 14) {
+                    _showCheckDialog(
+                      "Identity Verification Required",
+                      "To go online and accept requests, you must complete identity verification.\n\nPlease go to your Profile and add your National Identification Number (NIN) before going online.",
+                    );
+                    return;
+                  }
+                }
               }
               setState(() => _isOnline = val);
               await ApiService.updateRodieStatus(val);
