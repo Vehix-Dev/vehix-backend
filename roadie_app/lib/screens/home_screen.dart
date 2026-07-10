@@ -266,31 +266,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // PROMINENT DISCLOSURE FOR GOOGLE PLAY
-      bool? userAgreed = await showDialog<bool>(
+      // PROMINENT DISCLOSURE FOR GOOGLE PLAY & APP STORE
+      // Apple policy 5.1.1(iv): The user must always proceed to the real system
+      // permission dialog. No exit/decline button allowed on this pre-prompt.
+      // The user can still deny location access inside the iOS system dialog.
+      await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text("Location Tracking Required"),
-          content: const Text("Vehix Roadie collects location data to find nearby emergency roadside requests and track your arrival time, even when the app is closed or not in use."),
+          title: const Text("Location Access Required"),
+          content: const Text("Vehix Roadie needs your location to find nearby emergency roadside requests and track your arrival time, even when the app is closed or not in use."),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("DECLINE"),
-            ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context),
               child: const Text("CONTINUE"),
             ),
           ],
         ),
       );
 
-      if (userAgreed == true) {
-        permission = await Geolocator.requestPermission();
-      } else {
-        return false;
-      }
+      permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.deniedForever) {
       if (mounted) {
