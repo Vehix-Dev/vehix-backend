@@ -345,6 +345,17 @@ class DepositView(APIView):
             if response and isinstance(response, dict) and response.get('error'):
                 payment.status = 'FAILED'
                 payment.save()
+                err = response.get('error') or {}
+                err_type = err.get('error_type') or err.get('type')
+                code = err.get('code')
+                # Map known Pesapal test-limit errors to a user-friendly 400
+                if err_type == 'test_transactions_exceeded' or code == 'maximum_amount_limit_exceeded':
+                    return Response({
+                        'error': 'Pesapal test transactions limit exceeded',
+                        'message': 'Pesapal rejected this request: test transactions limit exceeded. Use live (production) credentials or contact Pesapal to increase your test limits.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Otherwise surface the Pesapal response as a 502 for visibility
                 return Response({
                     'error': 'Pesapal error',
                     'pesapal_response': response

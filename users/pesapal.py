@@ -4,11 +4,23 @@ from django.conf import settings
 
 
 class PesapalClient:
-    # Switch to https://cybqa.pesapal.com/pesapalv3 for sandbox
+    # Base configuration (defaults to production). Use PESAPAL_URL to override.
     BASE_URL = getattr(settings, 'PESAPAL_URL', 'https://pay.pesapal.com/v3')
     CONSUMER_KEY = getattr(settings, 'PESAPAL_CONSUMER_KEY', '')
     CONSUMER_SECRET = getattr(settings, 'PESAPAL_CONSUMER_SECRET', '')
     IPN_ID = getattr(settings, 'PESAPAL_IPN_ID', '')
+
+    # Optional override: force use of live production credentials/URL
+    # even when DEBUG=True. To enable, set PESAPAL_ALWAYS_USE_LIVE=True and
+    # provide PESAPAL_LIVE_CONSUMER_KEY / PESAPAL_LIVE_CONSUMER_SECRET in settings.
+    if getattr(settings, 'PESAPAL_ALWAYS_USE_LIVE', False):
+        live_key = getattr(settings, 'PESAPAL_LIVE_CONSUMER_KEY', None)
+        live_secret = getattr(settings, 'PESAPAL_LIVE_CONSUMER_SECRET', None)
+        # Only force if both live creds are present
+        if live_key and live_secret:
+            BASE_URL = 'https://pay.pesapal.com/v3'
+            CONSUMER_KEY = live_key
+            CONSUMER_SECRET = live_secret
 
     def get_token(self):
         url = f"{self.BASE_URL}/api/Auth/RequestToken"
