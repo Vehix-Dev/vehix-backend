@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
 import '../services/api_service.dart';
 
 class SupportScreen extends StatelessWidget {
@@ -181,7 +182,10 @@ class ContactUsScreen extends StatelessWidget {
               title: 'Rate Us',
               subtitle: 'Rate our app on the store',
               onTap: () async {
-                final url = Uri.parse('https://play.google.com/store/apps/details?id=ug.vehix.rider');
+                final String urlString = Platform.isIOS 
+                    ? 'https://apps.apple.com/app/id6772772972?action=write-review'
+                    : 'https://play.google.com/store/apps/details?id=ug.vehix.rider';
+                final url = Uri.parse(urlString);
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
                 }
