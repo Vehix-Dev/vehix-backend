@@ -378,4 +378,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'config.tasks.flush_locations_task',
         'schedule': 10.0,
     },
+    'sweep-offline-rodies-every-5-minutes': {
+        'task': 'users.tasks.sweep_offline_rodies',
+        'schedule': timedelta(minutes=5),
+    },
 }

@@ -29,3 +29,37 @@ def permanent_deletion_of_old_requests():
         logger.info("ℹ️ No accounts eligible for permanent deletion today.")
     
     return count
+
+@shared_task
+def sweep_offline_rodies():
+    """
+    Finds roadies who are marked online in the database but have not sent a heartbeat
+    in 10+ minutes, and securely logs them off to fix analytics and 'Ghost Driver' bugs.
+    """
+    from django.core.cache import cache
+    from users.models import RodieAvailabilityLog
+    
+    online_rodies = User.objects.filter(role='RODIE', is_online=True)
+    swept_count = 0
+    
+    for rodie in online_rodies:
+        # Check if heartbeat exists
+        if not cache.get(f"rodie_heartbeat:{rodie.id}"):
+            # Ghost roadie detected
+            logger.info(f"👻 Sweeping ghost roadie {rodie.username} (ID: {rodie.id}) offline.")
+            
+            # Update DB
+            rodie.is_online = False
+            rodie.save(update_fields=['is_online'])
+            
+            # Close availability log
+            RodieAvailabilityLog.objects.filter(
+                user=rodie, 
+                went_offline_at__isnull=True
+            ).update(went_offline_at=timezone.now())
+            
+            swept_count += 1
+            
+    if swept_count > 0:
+        logger.info(f"🧹 Successfully swept {swept_count} disconnected roadies offline.")
+    return swept_count
