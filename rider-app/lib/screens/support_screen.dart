@@ -184,7 +184,7 @@ class ContactUsScreen extends StatelessWidget {
               onTap: () async {
                 final String urlString = Platform.isIOS 
                     ? 'https://apps.apple.com/app/id6772772972?action=write-review'
-                    : 'https://play.google.com/store/apps/details?id=ug.vehix.rider';
+                    : 'https://play.google.com/store/apps/details?id=com.vehix.rider_app';
                 final url = Uri.parse(urlString);
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
