@@ -11,6 +11,7 @@ app.conf.result_backend = getattr(settings, 'REDIS_URL', 'redis://127.0.0.1:6379
 app.conf.accept_content = ['json']
 app.conf.task_serializer = 'json'
 app.conf.result_serializer = 'json'
+app.config_from_object('django.conf:settings', namespace='CELERY')
 
 try:
     from . import tasks 
